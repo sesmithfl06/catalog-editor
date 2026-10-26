@@ -415,7 +415,7 @@ function buildCatalog(sample){
   COLS = []; COLMAP = {};
   const edCols = Object.keys(sample.editions[0]||{}).filter(c=>!SKIP_ED.has(c));
   for (const c of edCols) addCol({id:"ed:"+c, kind:"ed", col:c, table:"editions", label:regLabel("editions",c), group:regGroup("editions",c,"Edition"), order:regOrder("editions",c), ro:false});
-  for (const c of sample.storyCols) if (c!=="story_id") addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), note:"Changes every language of this story", ro:false});
+  for (const c of sample.storyCols) if (c!=="story_id") addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), ro:false});
   for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
   for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:"English "+f.replace(/_/g," "), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
   for (const l of sample.mlTypes){ addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:6000, ro:false});
@@ -423,7 +423,7 @@ function buildCatalog(sample){
   const fmtFields = ["not_offered","price_usd","library_price_usd","payhip_price_usd","isbn","amazon_isbn","bn_isbn","publication_date","word_count","narrator","runtime","notes"];
   for (const f of sample.formats) for (const c of fmtFields) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
   for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
-  for (const c of ["series_synopsis","series_url","reading_note"]) addCol({id:"ser:"+c, kind:"ser", col:c, table:"series", label:regLabel("series",c), group:"Series (shared by the whole series)", order:9000+regOrder("series",c), note:"Changes every book in this series and language", ro:false});
+  for (const c of ["series_synopsis","series_url","reading_note"]) addCol({id:"ser:"+c, kind:"ser", col:c, table:"series", label:regLabel("series",c), group:"Series (shared by the whole series)", order:9000+regOrder("series",c), ro:false});
   // Story details kept as lists per book (read-only here)
   const LISTS = [
     ["main_characters","Main characters"],["all_characters","All characters (with role)"],["char_facts","Character facts"],["char_settings","Character settings"],["char_rels","Character relationships"],["species","Species & creatures"],
