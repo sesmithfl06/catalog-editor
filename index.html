@@ -53,17 +53,30 @@ header .who{color:var(--muted);font-size:12px}
 #status{font-size:12px;color:var(--muted);min-width:120px}
 #status.bad{color:var(--bad)} #status.ok{color:var(--ok)}
 
-aside{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
-aside .tools{padding:10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
-aside .tools .btns{display:flex;gap:6px;flex-wrap:wrap}
-aside .tools .btns button{padding:3px 8px;font-size:12px}
+aside{border-right:1px solid var(--line);background:var(--panel);min-height:0;overflow:auto}
+/* the two main sidebar sections: Books (rows) first, then Columns */
+.sec{border-bottom:1px solid var(--line)}
+.sec > summary{list-style:none;cursor:pointer;padding:10px 12px;font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px;background:var(--panel)}
+.sec > summary .n{margin-left:auto;font-weight:400;font-size:12px;color:var(--muted)}
+.sec .body{padding:0 10px 10px;display:flex;flex-direction:column;gap:8px}
+.sec .body select,.sec .body input[type=search]{width:100%}
+.sec .body label.chk{display:flex;gap:6px;align-items:flex-start;font-size:13px}
+.sec .body label.chk input{margin-top:3px}
+#colsec > summary{position:sticky;top:0;z-index:2}
+#coltools{position:sticky;top:38px;z-index:1;background:var(--panel);padding:0 10px 8px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--soft)}
+#coltools .btns{display:flex;gap:6px;flex-wrap:wrap}
+#coltools .btns button{padding:3px 8px;font-size:12px}
 #colsearch{width:100%}
-#collist{overflow:auto;padding:4px 0 20px;flex:1}
+#collist{padding:4px 0 20px}
+/* collapse / expand chevron on every sidebar heading */
+.sec > summary::-webkit-details-marker,.grp > summary::-webkit-details-marker{display:none}
+.sec > summary::before,.grp > summary::before{content:"";width:0;height:0;border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s;flex:none}
+.sec[open] > summary::before,.grp[open] > summary::before{transform:rotate(90deg)}
 .grp{border-bottom:1px solid var(--soft)}
-.grp > summary{list-style:none;cursor:pointer;padding:7px 12px;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);display:flex;justify-content:space-between}
-.grp > summary::-webkit-details-marker{display:none}
-.grp > summary .n{font-weight:400;text-transform:none}
+.grp > summary{list-style:none;cursor:pointer;padding:7px 12px;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);display:flex;align-items:center;gap:6px}
+.grp > summary .n{font-weight:400;text-transform:none;margin-left:auto}
 .grp[open] > summary{color:var(--ink)}
+.has-help{text-decoration:underline dotted var(--muted);text-underline-offset:3px}
 .col{display:flex;gap:8px;align-items:flex-start;padding:3px 12px 3px 18px;cursor:pointer;font-size:13px}
 .col:hover{background:var(--soft)}
 .col input{margin-top:3px}
@@ -79,6 +92,12 @@ table{border-collapse:separate;border-spacing:0;font-size:13px}
 th,td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:5px 8px;vertical-align:top;text-align:left;background:var(--panel)}
 th{position:sticky;top:0;z-index:2;background:var(--soft);font-weight:600;white-space:nowrap}
 th .tbl{display:block;font-weight:400;color:var(--muted);font-size:11px}
+th .tbl.blk{color:var(--warn)}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{background:var(--sel)}
+th .sic{display:inline-block;margin-left:6px;color:var(--muted);font-size:11px;opacity:.6}
+th.sorted .sic{color:var(--accent);opacity:1;font-weight:700}
+th.sorted{box-shadow:inset 0 -2px 0 var(--accent)}
 td.first,th.first{position:sticky;left:0;z-index:1}
 th.first{z-index:3}
 td{max-width:var(--w,220px);min-width:90px}
@@ -103,7 +122,7 @@ td.active{outline:2px solid var(--accent);outline-offset:-2px}
 @media (max-width:760px){
   #app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}
   header{grid-column:1}
-  aside{max-height:38vh;border-right:0;border-bottom:1px solid var(--line)}
+  aside{max-height:45vh;border-right:0;border-bottom:1px solid var(--line)}
 }
 button.big{width:100%;padding:12px;font-size:16px}
 .step{margin-top:6px}
@@ -116,6 +135,9 @@ dialog#secdlg::backdrop{background:#0006}
 dialog h2{margin:0 0 6px;font-size:18px} dialog h3{font-size:14px;margin:16px 0 6px}
 #pklist{padding-left:18px;margin:6px 0} #pklist li{margin:4px 0} #pklist button{padding:1px 8px;font-size:12px;margin-left:6px}
 code{font-size:12px;word-break:break-all}
+.ctx{position:fixed;z-index:1000;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:4px}
+.ctx button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:6px 10px;border-radius:5px;font-size:13px}
+.ctx button:hover{background:var(--soft)}
 </style>
 </head>
 <body>
@@ -213,25 +235,33 @@ code{font-size:12px;word-break:break-all}
   </header>
 
   <aside>
-    <div class="tools">
-      <input id="colsearch" type="search" placeholder="Find a column…">
-      <div class="btns">
-        <button id="favs" title="Back to your usual columns">Favorites</button>
-        <button id="none" title="Untick everything">Clear</button>
-        <button id="expand">Open all</button>
-        <button id="collapse">Close all</button>
+    <details class="sec" id="booksec" open>
+      <summary>Books <span class="n" id="bookcount"></span></summary>
+      <div class="body">
+        <select id="flang" aria-label="Language"><option value="">All languages</option></select>
+        <select id="fseries" aria-label="Series"><option value="">All series</option></select>
+        <input id="frow" type="search" placeholder="Find a book (title or file name)…">
       </div>
-    </div>
-    <div id="collist"></div>
+    </details>
+    <details class="sec" id="colsec" open>
+      <summary>Columns <span class="n" id="colcount"></span></summary>
+      <div id="coltools">
+        <label class="chk" title="Hides every ticked column that is filled in for all the books shown. Title, language, series, book number and file name always stay."><input type="checkbox" id="fcolblank"> Only columns with blanks</label>
+        <input id="colsearch" type="search" placeholder="Find a column…">
+        <div class="btns">
+          <button id="favs" title="Back to your usual columns">Favorites</button>
+          <button id="none" title="Untick everything">Clear</button>
+          <button id="expand" title="Open every column group">Open all</button>
+          <button id="collapse" title="Close every column group">Close all</button>
+        </div>
+      </div>
+      <div id="collist"></div>
+    </details>
   </aside>
 
   <main>
     <div class="filters">
-      <select id="flang"><option value="">All languages</option></select>
-      <select id="fseries"><option value="">All series</option></select>
-      <input id="frow" type="search" placeholder="Find a book (title or file name)…">
-      <label class="chk"><input type="checkbox" id="fblank"> Only books with blanks in the ticked columns</label>
-      <label class="chk"><input type="checkbox" id="ffull"> Show full text</label>
+      <label class="chk" title="Long cells show only their first 3 lines. Tick this to show every cell in full."><input type="checkbox" id="ffull"> Show full text</label>
       <span class="count" id="rowcount"></span>
     </div>
     <div id="gridwrap"><div class="empty">Loading…</div></div>
@@ -332,7 +362,55 @@ function regLabel(table, col){ const r = REG[table+"."+col]; return r ? (r.label
 function regGroup(table, col, fallback){ const r = REG[table+"."+col]; return (r && r.group_name) || fallback; }
 function regOrder(table, col){ const r = REG[table+"."+col]; return r ? r.sort_order : 9999; }
 
-function addCol(c){ COLS.push(c); COLMAP[c.id] = c; }
+/* ---------- hover explanations for column names ---------- */
+// From field_registry.description plus the allowed values in reference_lists (e.g. Rating: E = Explicit…).
+let REF = {};   // reference_lists by list_name -> [{value, note}]
+function refListFor(c){
+  const col = c.col || c.field; if (!col) return null;
+  if (REF[col]) return REF[col];
+  const k = Object.keys(REF).find(n => col.endsWith("_"+n)); // e.g. paperback_page_size -> page_size
+  return k ? REF[k] : null;
+}
+function helpFor(c){
+  const parts = [];
+  const regTable = {ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", ml:"marketing_links", info:"editions"}[c.kind];
+  const r = regTable && REG[regTable+"."+(c.col||"")];
+  if (r && r.description) parts.push(r.description);
+  const list = refListFor(c);
+  if (list && list.length <= 12){
+    const withNotes = list.filter(x=>x.note);
+    parts.push(withNotes.length ? list.map(x=>x.value + (x.note ? " = " + x.note : "")).join("\n") : "Values: " + list.map(x=>x.value).join(", "));
+  }
+  if (c.note) parts.push(c.note);
+  return parts.join("\n\n");
+}
+
+/* ---------- sidebar groups (what a person looks for) ---------- */
+// Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
+const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Links","Translations"];
+const GROUP_ITEMS = {
+  "Book Basics": ["ed:file_name","ed:language","ed:title","one:edition_subtitles:subtitle","st:english_title","info:english_title","ed:series","ed:number_in_series","ed:series_and_book_number",
+    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","ed:long_synopsis","ed:essential_description","ed:long_synopsis_lead_in","ed:long_synopsis_closing_line",
+    "one:long_synopsis_inserts:insert_line","one:long_synopsis_inserts:insert_place","one:long_synopsis_inserts:closing_place","ed:archived_short_synopsis","ed:archived_long_synopsis",
+    "st:rating","st:explicit_content","st:spice","st:age_max","st:audience","st:main_genre_differentiated",
+    "ed:word_count","ed:chapters","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
+    "one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","one:edition_release_notes:not_released_reason",
+    "list:authors_note","info:author","info:publisher","info:author_bio","ed:sheet_order","ed:story_id","st:story_id"],
+  "Story": ["st:main_plot","st:subplots","st:tags","st:display_tags","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
+  "Series": ["ser:series_synopsis","ser:series_url","ser:reads_in_order_from","ser:reads_in_order_to","ser:reading_note"],
+  "Marketing": ["ed:tagline","ed:reasons_to_love","ed:excerpts","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy","list:bookclub"],
+  "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
+  "Links": [],
+  "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"]
+};
+const KIND_GROUP = {ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", fmt:"Distribution", sl:"Links", ml:"Links", est:"Translations"};
+const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
+function placeCol(c){
+  for (const g of GROUP_ORDER){ const i = GROUP_ITEMS[g].indexOf(c.id); if (i>=0){ c.group = g; c.so = i; return; } }
+  c.group = KIND_GROUP[c.kind] || "Book Basics";                       // any column not listed above lands with its kind
+  c.so = 1000 + (c.kind==="fmt" ? (FORMAT_RANK[c.f]??9)*1000 + c.order : c.kind==="ml" ? 5000 + c.order : c.order);
+}
+function addCol(c){ placeCol(c); COLS.push(c); COLMAP[c.id] = c; }
 function buildCatalog(sample){
   COLS = []; COLMAP = {};
   const edCols = Object.keys(sample.editions[0]||{}).filter(c=>!SKIP_ED.has(c));
@@ -348,10 +426,10 @@ function buildCatalog(sample){
   for (const c of ["series_synopsis","series_url","reading_note"]) addCol({id:"ser:"+c, kind:"ser", col:c, table:"series", label:regLabel("series",c), group:"Series (shared by the whole series)", order:9000+regOrder("series",c), note:"Changes every book in this series and language", ro:false});
   // Story details kept as lists per book (read-only here)
   const LISTS = [
-    ["main_characters","Main characters"],["all_characters","All characters (with role)"],["species","Species & creatures"],
+    ["main_characters","Main characters"],["all_characters","All characters (with role)"],["char_facts","Character facts"],["char_settings","Character settings"],["char_rels","Character relationships"],["species","Species & creatures"],
     ["technology","Technology"],["language","Pet names & invented words"],["rare","Rare details"],["bookclub","Book club questions"],
-    ["reviews","Reviews (edit in Notion)"],["copy","Marketing copy (edit in Notion)"],["pron","Pronunciations"],["scenes","Scene image prompts"]];
-  LISTS.forEach(([k,l],i)=>addCol({id:"list:"+k, kind:"list", col:k, table:"story details", label:l, group:"Story details (read-only)", order:9800+i, ro:true}));
+    ["reviews","Reviews (edit in Notion)"],["copy","Marketing copy (edit in Notion)"],["pron","Pronunciations"],["scenes","Scene image prompts"],["authors_note","Author's Note"]];
+  LISTS.forEach(([k,l],i)=>addCol({id:"list:"+k, kind:"list", col:k, table:"story details", label:l, group:"Story", order:9800+i, ro:true}));
   for (const c of ["english_title","whole_book_number","author","publisher","author_bio"]) addCol({id:"info:"+c, kind:"info", col:c, table:"edition_info", label:{whole_book_number:"Book # with no decimals (B&N)", english_title:"English title"}[c]||regLabel("editions",c), group:"Worked out (read-only)", order:9900, ro:true});
 }
 
@@ -374,6 +452,24 @@ async function ensureLoaded(cols){
         const rows = await getAll("book_characters","file_name.asc,importance.asc,sort_order.asc");
         for (const r of rows){ if (k==="main_characters" && r.role!=="main") continue; push(r.file_name, (r.name_in_book||r.character_id) + (k==="all_characters" && r.role ? " ("+r.role+")" : "")); }
         for (const f in out) out[f] = out[f].join(k==="main_characters" ? ", " : "\n");
+      } else if (k==="char_facts" || k==="char_settings" || k==="char_rels"){
+        const bc = await getAll("book_characters","file_name.asc,importance.asc,sort_order.asc"), inBook = {}, nm = {};
+        for (const b of bc){ (inBook[b.file_name] = inBook[b.file_name] || new Set()).add(b.character_id); if (b.name_in_book && !nm[b.character_id]) nm[b.character_id] = b.name_in_book; }
+        if (k==="char_facts"){
+          const byChar = {}; for (const f of await getAll("character_facts","character_id.asc,fact_id.asc")) (byChar[f.character_id] = byChar[f.character_id] || []).push(f);
+          for (const fn in inBook) for (const id of inBook[fn]) for (const f of byChar[id]||[]) push(fn, (f.name||nm[id]||id) + ": " + f.fact + (f.status ? " [" + f.status + "]" : ""));
+        } else if (k==="char_settings"){
+          for (const r of await getAll("character_settings","file_name.asc,character_id.asc,world.asc")) push(r.file_name, (nm[r.character_id]||r.character_id) + " – " + [r.world, r.setting].filter(Boolean).join(" / ") + (r.description ? ": " + r.description : ""));
+        } else {
+          const mem = {}; for (const m of await getAll("relationship_members")) (mem[m.relationship_id] = mem[m.relationship_id] || []).push(m.character_id);
+          for (const r of await getAll("relationships","relationship_id.asc")){
+            const ids = mem[r.relationship_id]||[], txt = (r.type ? r.type + ": " : "") + (r.label||r.relationship_id) + (r.notes ? " – " + r.notes : ""), seen = new Set();
+            for (const fn of [r.established_in, r.central_romance_in]) if (fn) seen.add(fn);
+            for (const fn in inBook) if (ids.length > 1 && ids.every(id => inBook[fn].has(id))) seen.add(fn);
+            for (const fn of seen) push(fn, txt);
+          }
+        }
+        for (const f in out) out[f] = [...new Set(out[f])].join("\n");
       } else if (k==="species" || k==="technology"){
         const link = k==="species" ? "book_species" : "book_technology", idk = k==="species" ? "species_id" : "tech_id";
         const names = {}; for (const r of await getAll(k)) names[r[idk]] = r.name;
@@ -400,6 +496,9 @@ async function ensureLoaded(cols){
       } else if (k==="scenes"){
         for (const r of await getAll("scene_prompts","file_name.asc,scene_number.asc")) push(r.file_name, "Scene " + r.scene_number + " – " + r.scene_title + (r.chapter ? " (" + r.chapter + ")" : "") + "\n" + r.image_prompt);
         for (const f in out) out[f] = out[f].join("\n\n");
+      } else if (k==="authors_note"){
+        for (const r of await getAll("authors_notes","file_name.asc,placement.asc")) push(r.file_name, (r.placement ? "[" + r.placement + "] " : "") + r.note_text);
+        for (const f in out) out[f] = out[f].join("\n\n");
       } else if (k==="bookclub"){
         for (const r of await getAll("book_club_questions","file_name.asc,question_number.asc")) push(r.file_name, (r.question_number||"") + ". " + r.question);
         for (const f in out) out[f] = out[f].join("\n");
@@ -413,8 +512,9 @@ async function ensureLoaded(cols){
 async function loadAll(){
   setStatus("Loading…");
   loaded.clear(); for (const k of ["stories","est","ml","fmt","sl","ser","info","lists"]) data[k]={}; data.one={};
-  const [reg, eds, storyOne, estF, mlT, fmts, slK] = await Promise.all([
-    api("GET","field_registry?select=table_name,column_name,label,group_name,sort_order").catch(()=>[]),
+  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK] = await Promise.all([
+    api("GET","field_registry?select=*").catch(()=>[]),
+    api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000").catch(()=>[]),
     getAll("editions","sheet_order.asc.nullslast,file_name.asc"),
     api("GET","stories?select=*&limit=1"),
     api("GET","english_source_text?select=field&limit=5000").catch(()=>[]),
@@ -423,6 +523,7 @@ async function loadAll(){
     getAll("store_links").catch(()=>[])
   ]);
   REG = {}; for (const r of reg) REG[r.table_name+"."+r.column_name] = r;
+  REF = {}; for (const r of refs) (REF[r.list_name] = REF[r.list_name] || []).push(r);
   data.editions = eds;
   for (const r of slK) data.sl[`${r.file_name}|${r.store}|${r.format}|${r.link_type}`]=r; loaded.add("sl");
   const uniq = (a,k)=>[...new Set(a.map(r=>r[k]))].filter(Boolean).sort();
@@ -443,8 +544,8 @@ let checked = new Set(FAVORITES);
 function ticked(){ return COLS.filter(c=>checked.has(c.id)).sort((a,b)=>(KEY_COLS.has(b.id)-KEY_COLS.has(a.id)) || orderOf(a)-orderOf(b)); }
 function orderOf(c){ const i = FAVORITES.indexOf(c.id); return i>=0 && KEY_COLS.has(c.id) ? i-100 : c.order; }
 function groups(){
-  const g = new Map();
-  for (const c of [...COLS].sort((a,b)=>a.order-b.order || a.label.localeCompare(b.label))){ if(!g.has(c.group)) g.set(c.group,[]); g.get(c.group).push(c); }
+  const g = new Map(GROUP_ORDER.map(n=>[n,[]]));
+  for (const c of [...COLS].sort((a,b)=>a.so-b.so || a.label.localeCompare(b.label))){ if(!g.has(c.group)) g.set(c.group,[]); g.get(c.group).push(c); }
   return g;
 }
 function renderColumnList(){
@@ -456,20 +557,53 @@ function renderColumnList(){
     const show = cs.filter(c=>{ const hay = (c.label+" "+g+" "+(c.col||"")).toLowerCase().replace(/_/g," "); return words.every(w=>hay.includes(w)); });
     if (!show.length) continue;
     const n = cs.filter(c=>checked.has(c.id)).length;
-    const isOpen = q || open.has(g) || (!open.size && n>0);
+    const isOpen = q || open.has(g);
     html += `<details class="grp" data-g="${esc(g)}" ${isOpen?"open":""}><summary>${esc(g)} <span class="n">${n?n+" ticked":""}</span></summary>`;
-    for (const c of show) html += `<label class="col ${c.ro?"ro":""}"><input type="checkbox" data-id="${esc(c.id)}" ${checked.has(c.id)?"checked":""}><span><span class="lbl">${esc(c.label)}</span>${c.note?`<span class="note">${esc(c.note)}</span>`:""}</span></label>`;
+    for (const c of show){ const hp = helpFor(c);
+      html += `<label class="col ${c.ro?"ro":""}" ${hp?`title="${esc(hp)}"`:""}><input type="checkbox" data-id="${esc(c.id)}" ${checked.has(c.id)?"checked":""}><span><span class="lbl ${hp?"has-help":""}">${esc(c.label)}</span>${c.note?`<span class="note">${esc(c.note)}</span>`:""}</span></label>`; }
     html += `</details>`;
   }
   $("#collist").innerHTML = html || `<div class="empty">No column matches.</div>`;
+  updateColCount();
 }
+function updateColCount(){ const n = checked.size; $("#colcount").textContent = n ? n + " ticked" : ""; }
 $("#collist").addEventListener("change", async e=>{
   const id = e.target.dataset.id; if(!id) return;
   e.target.checked ? checked.add(id) : checked.delete(id);
   const sum = e.target.closest(".grp").querySelector(".n"); const n = [...e.target.closest(".grp").querySelectorAll("input:checked")].length; sum.textContent = n? n+" ticked":"";
+  updateColCount();
   await refresh();
 });
 $("#colsearch").addEventListener("input", renderColumnList);
+/* right-click a section header: Check all / Uncheck all for that section only (shown rows; works open or closed) */
+let ctxMenu = null;
+function closeCtx(){ if(ctxMenu){ ctxMenu.remove(); ctxMenu = null; } }
+async function setSection(grp, on){
+  const keep = id => KEY_COLS.has(id) && id !== "ed:file_name";
+  grp.querySelectorAll("input[data-id]").forEach(i=>{
+    const id = i.dataset.id;
+    if (on) { checked.add(id); i.checked = true; }
+    else if (!keep(id)) { checked.delete(id); i.checked = false; }
+  });
+  const n = grp.querySelectorAll("input:checked").length;
+  grp.querySelector(".n").textContent = n ? n+" ticked" : "";
+  updateColCount();
+  await refresh();
+}
+$("#collist").addEventListener("contextmenu", e=>{
+  const sum = e.target.closest(".grp > summary"); if(!sum) return;
+  e.preventDefault(); closeCtx();
+  const grp = sum.parentElement;
+  const m = document.createElement("div"); m.className = "ctx";
+  m.innerHTML = `<button data-on="1">Check all</button><button data-on="0">Uncheck all</button>`;
+  m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-90)+"px";
+  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); setSection(grp, b.dataset.on==="1"); });
+  document.body.appendChild(m); ctxMenu = m;
+});
+document.addEventListener("click", closeCtx);
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeCtx(); });
+document.addEventListener("scroll", closeCtx, true);
+window.addEventListener("resize", closeCtx);
 $("#favs").onclick = async()=>{ checked = new Set(FAVORITES); renderColumnList(); await refresh(); };
 $("#none").onclick = async()=>{ checked = new Set([...KEY_COLS].filter(k=>k!=="ed:file_name")); renderColumnList(); await refresh(); };
 $("#expand").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=true);
@@ -527,25 +661,57 @@ function fillFilters(){
   const sers = [...new Set(data.editions.map(e=>e.series))].filter(Boolean).sort();
   $("#fseries").innerHTML = `<option value="">All series</option>` + sers.map(s=>`<option>${esc(s)}</option>`).join("");
 }
-function visibleRows(cols){
-  const L = $("#flang").value, S = $("#fseries").value, q = $("#frow").value.trim().toLowerCase(), blanks = $("#fblank").checked;
-  const check = cols.filter(c=>!KEY_COLS.has(c.id) && !c.ro);
+function visibleRows(){
+  const L = $("#flang").value, S = $("#fseries").value, q = $("#frow").value.trim().toLowerCase();
   return data.editions.filter(ed=>{
     if (L && ed.language!==L) return false;
     if (S && ed.series!==S) return false;
     if (q && !((ed.title||"").toLowerCase().includes(q) || (ed.file_name||"").toLowerCase().includes(q))) return false;
-    if (blanks && !check.some(c=>canEdit(ed,c) && (valueOf(ed,c)==null || valueOf(ed,c)===""))) return false;
     return true;
   });
 }
+// A real blank: empty, and the cell applies to this book (e.g. "English text" doesn't apply to English editions).
+function isBlank(ed, c){ const v = valueOf(ed,c); return (v==null || v==="" || (Array.isArray(v) && !v.length)) && (c.ro || canEdit(ed,c)); }
+
+/* ---------- sorting (click a column heading: A→Z, Z→A, then back to the usual order) ---------- */
+let sortBy = {id:null, dir:1};
+const collator = new Intl.Collator(undefined, {numeric:true, sensitivity:"base"});
+function sortRows(rows){
+  const c = sortBy.id && COLMAP[sortBy.id];
+  if (!c) return rows;
+  const d = sortBy.dir;
+  return rows.map((ed,i)=>({ed,i,v:valueOf(ed,c)})).sort((a,b)=>{
+    const ea = a.v==null||a.v==="", eb = b.v==null||b.v==="";
+    if (ea || eb) return ea===eb ? a.i-b.i : (ea ? 1 : -1);            // blanks always at the bottom
+    let r;
+    if (typeof a.v==="number" && typeof b.v==="number") r = a.v-b.v;
+    else if (typeof a.v==="boolean" && typeof b.v==="boolean") r = (a.v===b.v ? 0 : a.v ? -1 : 1);
+    else r = collator.compare(show(a.v), show(b.v));
+    return r*d || a.i-b.i;
+  }).map(x=>x.ed);
+}
+
 let viewCols = [], viewRows = [];
 function renderGrid(){
-  viewCols = ticked();
-  viewRows = visibleRows(viewCols);
-  $("#rowcount").textContent = `${viewRows.length} of ${data.editions.length} books · ${viewCols.length} columns`;
+  const picked = ticked();
+  const rows = visibleRows();
+  const blanksOnly = $("#fcolblank").checked;
+  const blankN = {};
+  if (blanksOnly) for (const c of picked) blankN[c.id] = rows.reduce((n,ed)=>n + (isBlank(ed,c)?1:0), 0);
+  viewCols = blanksOnly ? picked.filter(c=>KEY_COLS.has(c.id) || blankN[c.id] > 0) : picked;
+  if (sortBy.id && !viewCols.some(c=>c.id===sortBy.id)) sortBy = {id:null, dir:1};
+  viewRows = sortRows(rows);
+  $("#bookcount").textContent = `${rows.length} of ${data.editions.length}`;
+  const hidden = picked.length - viewCols.length;
+  $("#rowcount").textContent = `${viewRows.length} of ${data.editions.length} books · ${viewCols.length} columns` + (hidden ? ` (${hidden} ticked column${hidden>1?"s":""} hidden: no blanks)` : "");
   if (!viewCols.length){ $("#gridwrap").innerHTML = `<div class="empty">Tick some columns on the left.</div>`; return; }
   let h = "<table><thead><tr>";
-  viewCols.forEach((c,i)=>{ h += `<th class="${i===0?"first":""}" title="${esc(c.note||c.table)}">${esc(c.label)}<span class="tbl">${esc(c.group)}</span></th>`; });
+  viewCols.forEach((c,i)=>{
+    const on = sortBy.id===c.id, icon = on ? (sortBy.dir>0 ? "▲" : "▼") : "⇅";
+    const hp = helpFor(c), tip = (hp ? hp + "\n\n" : "") + (on ? (sortBy.dir>0 ? "Sorted A→Z / low→high. Click for Z→A." : "Sorted Z→A / high→low. Click to go back to the usual order.") : "Click to sort by this column.");
+    const sub = blanksOnly && !KEY_COLS.has(c.id) ? `<span class="tbl blk">${blankN[c.id]} blank</span>` : "";
+    h += `<th class="sortable ${i===0?"first":""} ${on?"sorted":""}" data-sort="${esc(c.id)}" aria-sort="${on?(sortBy.dir>0?"ascending":"descending"):"none"}" title="${esc(tip)}"><span class="${hp?"has-help":""}">${esc(c.label)}</span><span class="sic" aria-hidden="true">${icon}</span>${sub}</th>`;
+  });
   h += "</tr></thead><tbody>";
   viewRows.forEach((ed,ri)=>{
     h += "<tr>";
@@ -559,7 +725,15 @@ function renderGrid(){
   h += "</tbody></table>";
   $("#gridwrap").innerHTML = h;
 }
-["#flang","#fseries","#fblank"].forEach(s=>$(s).addEventListener("change", renderGrid));
+["#flang","#fseries","#fcolblank"].forEach(s=>$(s).addEventListener("change", renderGrid));
+$("#gridwrap").addEventListener("click", e=>{
+  const th = e.target.closest("th[data-sort]"); if (!th) return;
+  const id = th.dataset.sort;
+  if (sortBy.id !== id) sortBy = {id, dir:1};
+  else if (sortBy.dir > 0) sortBy.dir = -1;
+  else sortBy = {id:null, dir:1};
+  renderGrid();
+});
 $("#ffull").addEventListener("change", ()=>$("#gridwrap").classList.toggle("full", $("#ffull").checked));
 let ft; $("#frow").addEventListener("input", ()=>{ clearTimeout(ft); ft=setTimeout(renderGrid,150); });
 
@@ -867,7 +1041,7 @@ async function sendToNotion(files, btn){
     queueCount();
   }catch(err){ setStatus(friendly(err), "bad"); }
 }
-$("#notionShown").onclick = e=>sendToNotion(visibleRows(ticked()).map(ed=>ed.file_name), e.currentTarget);
+$("#notionShown").onclick = e=>sendToNotion(visibleRows().map(ed=>ed.file_name), e.currentTarget);
 $("#notionAll").onclick = e=>sendToNotion(data.editions.map(ed=>ed.file_name), e.currentTarget);
 
 (async function init(){
