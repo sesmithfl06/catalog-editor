@@ -516,6 +516,8 @@ function typeOf(c){
   return "text";
 }
 const show = v => v==null ? "" : (typeof v==="boolean" ? (v?"Yes":"No") : Array.isArray(v) ? v.join(", ") : String(v));
+// Display only: word counts get thousands separators in the grid; the editor, saved values and comparisons still use show().
+const disp = (v,c) => (c && (c.col==="word_count" || c.field==="word_count") && v!=null && v!=="" && /^\d+$/.test(String(v).trim())) ? Number(v).toLocaleString("en-US") : show(v);
 
 /* ---------- grid ---------- */
 function fillFilters(){
@@ -550,7 +552,7 @@ function renderGrid(){
     viewCols.forEach((c,ci)=>{
       const v = valueOf(ed,c), ok = canEdit(ed,c);
       const cls = [ci===0?"first":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (LONG_HINT.test(c.col||c.field||c.label)?"long":"")].join(" ");
-      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc(show(v)).slice(0,600)}"><div class="v">${esc(show(v))}</div></td>`;
+      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc(disp(v,c)).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
     });
     h += "</tr>";
   });
@@ -707,7 +709,7 @@ function updateCell(ed, c){
       const same = r===ed || (cc.kind==="st" && c.kind==="st" && r.story_id===ed.story_id) || (cc.kind==="ser" && c.kind==="ser" && r.series===ed.series && r.language===ed.language);
       if (!same) return;
       const td = cellAt(ri,ci); if (!td) return;
-      const v = valueOf(r,cc); td.querySelector(".v").textContent = show(v); td.title = show(v).slice(0,600);
+      const v = valueOf(r,cc); td.querySelector(".v").textContent = disp(v,cc); td.title = disp(v,cc).slice(0,600);
       td.classList.toggle("blank", v==null||v==="");
     });
   });
