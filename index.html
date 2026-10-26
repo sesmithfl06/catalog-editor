@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Catalog Editor</title>
+<style>
+:root{
+  --bg:#f6f5f2; --panel:#ffffff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e3e1dc; --soft:#efeee9;
+  --accent:#2f5d8a; --accent-ink:#ffffff; --ok:#2e7d4f; --warn:#a15c00; --bad:#b3261e; --ro:#f1f0ec;
+  --sel:#e7eef6; --focus:#2f5d8a55;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#17181a; --panel:#1f2023; --ink:#ececee; --muted:#9a9aa1; --line:#33343a; --soft:#26272b;
+    --accent:#7fb0e0; --accent-ink:#0d1a26; --ok:#6cc58f; --warn:#e0a54f; --bad:#ef7f77; --ro:#232428;
+    --sel:#22303d; --focus:#7fb0e055;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#17181a; --panel:#1f2023; --ink:#ececee; --muted:#9a9aa1; --line:#33343a; --soft:#26272b;
+  --accent:#7fb0e0; --accent-ink:#0d1a26; --ok:#6cc58f; --warn:#e0a54f; --bad:#ef7f77; --ro:#232428;
+  --sel:#22303d; --focus:#7fb0e055;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:5px 10px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+input[type=text],input[type=email],input[type=password],input[type=search],select{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 8px}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.hidden{display:none !important}
+
+/* sign-in */
+#signin{max-width:380px;margin:12vh auto;padding:28px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+#signin h1{font-size:20px;margin:0 0 4px}
+#signin p{color:var(--muted);margin:0 0 18px}
+#signin label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
+#signin input{width:100%}
+#signin .row{display:flex;gap:8px;align-items:center;margin-top:18px}
+#signin .msg{margin-top:12px;font-size:13px}
+details.setup{margin-top:18px;font-size:13px;color:var(--muted)}
+
+/* app layout */
+#app{display:grid;grid-template-columns:280px 1fr;grid-template-rows:auto 1fr;height:100vh}
+header{grid-column:1/3;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0 8px 0 0}
+header .grow{flex:1}
+header .who{color:var(--muted);font-size:12px}
+#status{font-size:12px;color:var(--muted);min-width:120px}
+#status.bad{color:var(--bad)} #status.ok{color:var(--ok)}
+
+aside{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+aside .tools{padding:10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+aside .tools .btns{display:flex;gap:6px;flex-wrap:wrap}
+aside .tools .btns button{padding:3px 8px;font-size:12px}
+#colsearch{width:100%}
+#collist{overflow:auto;padding:4px 0 20px;flex:1}
+.grp{border-bottom:1px solid var(--soft)}
+.grp > summary{list-style:none;cursor:pointer;padding:7px 12px;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);display:flex;justify-content:space-between}
+.grp > summary::-webkit-details-marker{display:none}
+.grp > summary .n{font-weight:400;text-transform:none}
+.grp[open] > summary{color:var(--ink)}
+.col{display:flex;gap:8px;align-items:flex-start;padding:3px 12px 3px 18px;cursor:pointer;font-size:13px}
+.col:hover{background:var(--soft)}
+.col input{margin-top:3px}
+.col .note{color:var(--muted);font-size:11px;display:block}
+.col.ro .lbl::after{content:" (read-only)";color:var(--muted);font-size:11px}
+
+main{min-width:0;min-height:0;display:flex;flex-direction:column}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+.filters .count{color:var(--muted);font-size:12px;margin-left:auto}
+.filters label.chk{display:flex;gap:6px;align-items:center;font-size:13px}
+#gridwrap{overflow:auto;flex:1;background:var(--panel)}
+table{border-collapse:separate;border-spacing:0;font-size:13px}
+th,td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:5px 8px;vertical-align:top;text-align:left;background:var(--panel)}
+th{position:sticky;top:0;z-index:2;background:var(--soft);font-weight:600;white-space:nowrap}
+th .tbl{display:block;font-weight:400;color:var(--muted);font-size:11px}
+td.first,th.first{position:sticky;left:0;z-index:1}
+th.first{z-index:3}
+td{max-width:var(--w,220px);min-width:90px}
+td .v{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;word-break:break-word}
+td.long{--w:340px}
+#gridwrap.full td .v{display:block;-webkit-line-clamp:unset;overflow:visible}
+#gridwrap.full td.long{--w:460px}
+td.edit{cursor:text}
+td.edit:hover{background:var(--sel)}
+td.ro{background:var(--ro);color:var(--muted)}
+td.blank .v::before{content:"—";color:var(--line)}
+td.saving{box-shadow:inset 3px 0 0 var(--warn)}
+td.saved{box-shadow:inset 3px 0 0 var(--ok)}
+td.err{box-shadow:inset 3px 0 0 var(--bad)}
+td.active{outline:2px solid var(--accent);outline-offset:-2px}
+.editor{position:fixed;z-index:20;background:var(--panel);border:2px solid var(--accent);border-radius:6px;box-shadow:0 6px 24px #0003;display:flex;flex-direction:column}
+.editor textarea{border:0;resize:both;padding:8px;min-width:260px;min-height:90px;background:transparent;outline:none}
+.editor .bar{display:flex;gap:6px;align-items:center;padding:6px 8px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.editor .bar .grow{flex:1}
+.editor .bar button{padding:2px 8px;font-size:12px}
+.empty{padding:40px;color:var(--muted);text-align:center}
+@media (max-width:760px){
+  #app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}
+  header{grid-column:1}
+  aside{max-height:38vh;border-right:0;border-bottom:1px solid var(--line)}
+}
+button.big{width:100%;padding:12px;font-size:16px}
+.step{margin-top:6px}
+#signin .row.col{flex-direction:column;align-items:stretch}
+.hint{color:var(--muted);font-size:12px;margin-top:8px}
+details.other{margin-top:16px} details.other summary{cursor:pointer;color:var(--accent)}
+#qr{margin:10px 0;background:#fff;display:inline-block;padding:6px;border-radius:6px} #qr img{width:180px;height:180px;display:block}
+dialog#secdlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:460px;width:calc(100% - 32px);padding:20px}
+dialog#secdlg::backdrop{background:#0006}
+dialog h2{margin:0 0 6px;font-size:18px} dialog h3{font-size:14px;margin:16px 0 6px}
+#pklist{padding-left:18px;margin:6px 0} #pklist li{margin:4px 0} #pklist button{padding:1px 8px;font-size:12px;margin-left:6px}
+code{font-size:12px;word-break:break-all}
+</style>
+</head>
+<body>
+
+<!-- ============ Sign in ============ -->
+<section id="signin" class="hidden">
+  <h1>Catalog Editor</h1>
+  <p>S.E. Smith catalog in Supabase.</p>
+
+  <div id="st-main" class="step">
+    <button class="primary big" id="pkbtn" type="button">Sign in with Touch ID or fingerprint</button>
+    <div class="msg" id="pknote"></div>
+    <details class="other" id="otherways">
+      <summary>Other ways to sign in</summary>
+      <form id="loginform">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required>
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <div class="row">
+          <button class="primary" type="submit">Sign in with password</button>
+        </div>
+        <div class="hint">After the password you'll be asked for your LastPass Authenticator code.</div>
+      </form>
+    </details>
+  </div>
+
+  <div id="st-code" class="step hidden">
+    <label for="totp">Code from LastPass Authenticator</label>
+    <input id="totp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+    <div class="row"><button class="primary" id="totpgo" type="button">Continue</button><button type="button" class="back">Back</button></div>
+    <div class="hint" id="codehint"></div>
+  </div>
+
+
+  <div id="st-setup" class="step hidden">
+    <p><strong>One more step.</strong> To open the catalog you need Touch ID / fingerprint on this device or LastPass Authenticator. Set up either one now (ideally both).</p>
+    <div class="row col">
+      <button class="primary" id="setuppk" type="button">Use Touch ID / fingerprint on this device</button>
+      <button id="setuptotp" type="button">Set up LastPass Authenticator</button>
+    </div>
+    <div id="totpbox" class="hidden">
+      <p class="hint">In LastPass Authenticator tap <b>+</b>, then scan this code (or type the key below), and enter the 6-digit code it shows.</p>
+      <div id="qr"></div>
+      <div class="hint">Key: <code id="totpsecret"></code></div>
+      <label for="totpnew">6-digit code</label>
+      <input id="totpnew" type="text" inputmode="numeric" maxlength="6">
+      <div class="row"><button class="primary" id="totpverify" type="button">Turn on</button></div>
+    </div>
+    <div class="row"><button type="button" class="back">Sign out</button></div>
+  </div>
+
+  <div class="msg" id="loginmsg"></div>
+
+  <details class="setup" id="setupbox">
+    <summary>Connection settings</summary>
+    <label for="cfgurl">Project URL</label>
+    <input id="cfgurl" type="text" placeholder="https://xxxx.supabase.co">
+    <label for="cfgkey">Publishable (anon) key — not the secret key</label>
+    <input id="cfgkey" type="text" placeholder="sb_publishable_… or eyJ…">
+    <div class="row"><button type="button" id="cfgsave">Save settings</button></div>
+  </details>
+</section>
+
+<!-- ============ Sign-in options ============ -->
+<dialog id="secdlg">
+  <h2>Sign-in options</h2>
+  <p class="hint">Touch ID on your computer first, your phone's fingerprint as the backup, and LastPass Authenticator after that. If all three are lost, the owner resets that person's sign-in in the Supabase dashboard.</p>
+  <h3>Touch ID / fingerprint devices</h3>
+  <ul id="pklist"><li class="hint">Loading…</li></ul>
+  <button id="addpk" type="button">Add this device</button>
+  <p class="hint">Each device is added on that device: open this page on your phone, sign in, open Sign-in options and choose “Add this device”. A Mac and an Android phone don't share these, so add both.</p>
+  <h3>LastPass Authenticator</h3>
+  <div id="totpstate" class="hint">Loading…</div>
+  <div class="row"><button id="addtotp" type="button">Set up LastPass Authenticator</button><button id="deltotp" type="button" class="hidden">Remove authenticator</button></div>
+  <div id="totpbox2"></div>
+  <div class="msg" id="secmsg"></div>
+  <div class="row"><button id="secclose" class="primary" type="button">Done</button></div>
+</dialog>
+
+<!-- ============ App ============ -->
+<div id="app" class="hidden">
+  <header>
+    <h1>Catalog Editor</h1>
+    <span id="status">Loading…</span>
+    <span class="grow"></span>
+    <button id="undo" title="Undo your last edit (Ctrl/⌘+Z)" disabled>Undo</button>
+    <button id="reload" title="Reload everything from Supabase">Reload</button>
+    <button id="notionShown" title="Send the books shown in the grid (after your filters) to Notion at the next Notion sync">Send shown to Notion</button>
+    <button id="notionAll" title="Send every book to Notion at the next Notion sync">Send all to Notion</button>
+    <span class="who" id="nqueue"></span>
+    <span class="who" id="who"></span>
+    <button id="security" title="Touch ID, authenticator and backups">Sign-in options</button>
+    <button id="signout">Sign out</button>
+  </header>
+
+  <aside>
+    <div class="tools">
+      <input id="colsearch" type="search" placeholder="Find a column…">
+      <div class="btns">
+        <button id="favs" title="Back to your usual columns">Favorites</button>
+        <button id="none" title="Untick everything">Clear</button>
+        <button id="expand">Open all</button>
+        <button id="collapse">Close all</button>
+      </div>
+    </div>
+    <div id="collist"></div>
+  </aside>
+
+  <main>
+    <div class="filters">
+      <select id="flang"><option value="">All languages</option></select>
+      <select id="fseries"><option value="">All series</option></select>
+      <input id="frow" type="search" placeholder="Find a book (title or file name)…">
+      <label class="chk"><input type="checkbox" id="fblank"> Only books with blanks in the ticked columns</label>
+      <label class="chk"><input type="checkbox" id="ffull"> Show full text</label>
+      <span class="count" id="rowcount"></span>
+    </div>
+    <div id="gridwrap"><div class="empty">Loading…</div></div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+/* ---------------------------------------------------------------
+   Settings. Fill these in once the Supabase project exists (or use
+   "Connection settings" on the sign-in screen). The publishable/anon
+   key is safe to keep here; never put the secret key in this file.
+---------------------------------------------------------------- */
+const DEFAULT_URL = "";
+const DEFAULT_KEY = "";
+
+// The columns ticked when the page opens (and by the Favorites button).
+const FAVORITES = ["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name","ed:long_synopsis","st:rating","ed:word_count"];
+// Always shown first, never counted for "blanks".
+const KEY_COLS = new Set(["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name"]);
+const LONG_HINT = /synopsis|description|loglines|reasons|excerpt|review|plot|bio|keywords|promo|tags|notes|tagline|seo|text|characters|species|technology|language|rare|bookclub|scene/i;
+
+/* ---------- small storage helpers (never required) ---------- */
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ v==null?localStorage.removeItem(k):localStorage.setItem(k,v); }catch(e){} }
+};
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- connection & auth ---------- */
+const cfg = { url: (store.get("ce_url")||DEFAULT_URL).replace(/\/+$/,""), key: store.get("ce_key")||DEFAULT_KEY };
+const testToken = new URLSearchParams(location.hash.slice(1)).get("token"); // for automated testing only
+// Sign-ins are kept only until the browser closes.
+const mem = {};
+const sessionStore = {
+  getItem(k){ try{ return sessionStorage.getItem(k); }catch(e){ return mem[k] ?? null; } },
+  setItem(k,v){ try{ sessionStorage.setItem(k,v); }catch(e){ mem[k]=v; } },
+  removeItem(k){ try{ sessionStorage.removeItem(k); }catch(e){ delete mem[k]; } }
+};
+let sb = null;
+function client(){
+  if (sb) return sb;
+  if (!window.supabase || !cfg.url || !cfg.key) return null;
+  sb = window.supabase.createClient(cfg.url, cfg.key, {auth:{storage:sessionStore, persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, experimental:{passkey:true}}});
+  return sb;
+}
+async function accessToken(){
+  if (testToken) return testToken;
+  const c = client(); if (!c) return null;
+  const {data} = await c.auth.getSession();
+  return data && data.session ? data.session.access_token : null;
+}
+function claims(tok){ try{ return JSON.parse(atob(tok.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))); }catch(e){ return {}; } }
+// Same rule as the database (public.strong_sign_in): a passkey, or password/email plus the authenticator code.
+const WEAK = new Set(["password","otp","magiclink","email","email/signup","recovery","invite","sms","email_change","token_refresh","anonymous"]);
+function isStrong(c){ return c.aal === "aal2" || (c.amr||[]).some(m => !WEAK.has(String((m && m.method) || m).toLowerCase())); }
+async function headers(extra){
+  const h = {"apikey": cfg.key, "Content-Type":"application/json"};
+  const t = await accessToken();
+  if (t) h["Authorization"] = "Bearer " + t;
+  return Object.assign(h, extra||{});
+}
+async function api(method, path, body, extra){
+  const r = await fetch(cfg.url + "/rest/v1/" + path, {method, headers: await headers(extra), body: body==null?undefined:JSON.stringify(body)});
+  const txt = await r.text();
+  let j = null; try{ j = txt ? JSON.parse(txt) : null; }catch(e){}
+  if (!r.ok){
+    const m = (j && (j.message || j.hint || j.details)) || txt || ("Error " + r.status);
+    const e = new Error(m); e.status = r.status; throw e;
+  }
+  return j;
+}
+async function getAll(table, order){
+  let out = [], from = 0;
+  const step = 1000;
+  for(;;){
+    const rows = await api("GET", `${table}?select=*${order?"&order="+order:""}&limit=${step}&offset=${from}`);
+    out = out.concat(rows||[]);
+    if (!rows || rows.length < step) break;
+    from += step;
+  }
+  return out;
+}
+
+/* ---------- column catalog ---------- */
+// kinds: ed (editions), st (stories, shared by all languages), one (one row per edition),
+// est (English text kept on a translation), ml (marketing link), fmt (format), sl (store link), ser (series), info (worked out, read-only)
+const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","badge"], edition_release_notes:["subscription_publication","collection_publication","not_released_reason"], long_synopsis_inserts:["insert_line","insert_place","closing_place"]};
+const SKIP_ED = new Set(["id","created_at","updated_at"]);
+let COLS = [], COLMAP = {};
+let REG = {};   // field_registry by "table.column"
+const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sl:{}, ser:{}, info:{}, lists:{}};
+const loaded = new Set();
+
+function regLabel(table, col){ const r = REG[table+"."+col]; return r ? (r.label||col) : col.replace(/_/g," ").replace(/^./,c=>c.toUpperCase()); }
+function regGroup(table, col, fallback){ const r = REG[table+"."+col]; return (r && r.group_name) || fallback; }
+function regOrder(table, col){ const r = REG[table+"."+col]; return r ? r.sort_order : 9999; }
+
+function addCol(c){ COLS.push(c); COLMAP[c.id] = c; }
+function buildCatalog(sample){
+  COLS = []; COLMAP = {};
+  const edCols = Object.keys(sample.editions[0]||{}).filter(c=>!SKIP_ED.has(c));
+  for (const c of edCols) addCol({id:"ed:"+c, kind:"ed", col:c, table:"editions", label:regLabel("editions",c), group:regGroup("editions",c,"Edition"), order:regOrder("editions",c), ro:false});
+  for (const c of sample.storyCols) if (c!=="story_id") addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), note:"Changes every language of this story", ro:false});
+  for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
+  for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:"English "+f.replace(/_/g," "), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
+  for (const l of sample.mlTypes){ addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:6000, ro:false});
+    if (l==="Cover image") addCol({id:"ml:"+l+":alt_text", kind:"ml", lt:l, col:"alt_text", table:"marketing_links", label:"Cover alt text", group:"Marketing links", order:6001, ro:false}); }
+  const fmtFields = ["not_offered","price_usd","library_price_usd","payhip_price_usd","isbn","amazon_isbn","bn_isbn","publication_date","word_count","narrator","runtime","notes"];
+  for (const f of sample.formats) for (const c of fmtFields) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
+  for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
+  for (const c of ["series_synopsis","series_url","reading_note"]) addCol({id:"ser:"+c, kind:"ser", col:c, table:"series", label:regLabel("series",c), group:"Series (shared by the whole series)", order:9000+regOrder("series",c), note:"Changes every book in this series and language", ro:false});
+  // Story details kept as lists per book (read-only here)
+  const LISTS = [
+    ["main_characters","Main characters"],["all_characters","All characters (with role)"],["species","Species & creatures"],
+    ["technology","Technology"],["language","Pet names & invented words"],["rare","Rare details"],["bookclub","Book club questions"],
+    ["reviews","Reviews (edit in Notion)"],["copy","Marketing copy (edit in Notion)"],["pron","Pronunciations"],["scenes","Scene image prompts"]];
+  LISTS.forEach(([k,l],i)=>addCol({id:"list:"+k, kind:"list", col:k, table:"story details", label:l, group:"Story details (read-only)", order:9800+i, ro:true}));
+  for (const c of ["english_title","whole_book_number","author","publisher","author_bio"]) addCol({id:"info:"+c, kind:"info", col:c, table:"edition_info", label:{whole_book_number:"Book # with no decimals (B&N)", english_title:"English title"}[c]||regLabel("editions",c), group:"Worked out (read-only)", order:9900, ro:true});
+}
+
+/* ---------- loading ---------- */
+function needTable(c){ return {st:"stories", one:"one:"+c.t, est:"est", ml:"ml", fmt:"fmt", sl:"sl", ser:"ser", info:"info", list:"list:"+c.col}[c.kind]; }
+async function ensureLoaded(cols){
+  const need = [...new Set(cols.map(needTable).filter(Boolean))].filter(x=>!loaded.has(x));
+  for (const n of need){
+    setStatus("Loading " + n.replace("one:","").replace(/_/g," ") + "…");
+    if (n==="stories"){ for (const r of await getAll("stories")) data.stories[r.story_id]=r; }
+    else if (n.startsWith("one:")){ const t=n.slice(4); data.one[t]={}; for (const r of await getAll(t)) data.one[t][r.file_name]=r; }
+    else if (n==="est"){ for (const r of await getAll("english_source_text")) data.est[r.file_name+"|"+r.field]=r; }
+    else if (n==="ml"){ for (const r of await getAll("marketing_links")) data.ml[r.file_name+"|"+r.link_type]=r; }
+    else if (n==="fmt"){ for (const r of await getAll("formats")) data.fmt[r.file_name+"|"+r.format]=r; }
+    else if (n==="sl"){ for (const r of await getAll("store_links")) data.sl[`${r.file_name}|${r.store}|${r.format}|${r.link_type}`]=r; }
+    else if (n==="ser"){ for (const r of await getAll("series")) data.ser[r.series+"|"+r.language]=r; }
+    else if (n.startsWith("list:")){
+      const k = n.slice(5), out = {}, push = (fn, t)=>{ (out[fn] = out[fn] || []).push(t); };
+      if (k==="main_characters" || k==="all_characters"){
+        const rows = await getAll("book_characters","file_name.asc,importance.asc,sort_order.asc");
+        for (const r of rows){ if (k==="main_characters" && r.role!=="main") continue; push(r.file_name, (r.name_in_book||r.character_id) + (k==="all_characters" && r.role ? " ("+r.role+")" : "")); }
+        for (const f in out) out[f] = out[f].join(k==="main_characters" ? ", " : "\n");
+      } else if (k==="species" || k==="technology"){
+        const link = k==="species" ? "book_species" : "book_technology", idk = k==="species" ? "species_id" : "tech_id";
+        const names = {}; for (const r of await getAll(k)) names[r[idk]] = r.name;
+        for (const r of await getAll(link)) push(r.file_name, names[r[idk]] || r[idk]);
+        for (const f in out) out[f] = out[f].join(", ");
+      } else if (k==="language"){
+        for (const r of await getAll("language_notes")) push(r.file_name, r.term + (r.meaning ? " = " + r.meaning : "") + (r.speaker ? " (" + r.speaker + (r.said_to ? " to " + r.said_to : "") + ")" : ""));
+        for (const f in out) out[f] = out[f].join("\n");
+      } else if (k==="rare"){
+        for (const r of await getAll("rare_details")) push(r.file_name, "• " + r.detail);
+        for (const f in out) out[f] = out[f].join("\n");
+      } else if (k==="reviews"){
+        for (const r of await getAll("reviews","file_name.asc,sort_order.asc")) push(r.file_name, "“" + r.review_text + "”" + (r.reviewer||r.source ? " — " + [r.source, r.reviewer].filter(Boolean).join(", ") : ""));
+        for (const f in out) out[f] = out[f].join("\n\n");
+      } else if (k==="copy"){
+        for (const r of await getAll("marketing_copy","file_name.asc,copy_type.asc,sort_order.asc")) push(r.file_name, "[" + r.copy_type + "] " + r.copy_text);
+        for (const f in out) out[f] = out[f].join("\n\n");
+      } else if (k==="pron"){
+        // pronunciations belong to characters and words, shown on the books those characters are in
+        const pr = await getAll("pronunciations"), bc = await getAll("book_characters"), byChar = {};
+        for (const p of pr) if (p.character_id) (byChar[p.character_id] = byChar[p.character_id] || []).push(p);
+        for (const b of bc) for (const p of byChar[b.character_id]||[]) push(b.file_name, p.term + " = " + (p.pronunciation||p.pronunciation_symbols||"") + (p.voice_note ? " (voice: " + p.voice_note + ")" : ""));
+        for (const f in out) out[f] = [...new Set(out[f])].join("\n");
+      } else if (k==="scenes"){
+        for (const r of await getAll("scene_prompts","file_name.asc,scene_number.asc")) push(r.file_name, "Scene " + r.scene_number + " – " + r.scene_title + (r.chapter ? " (" + r.chapter + ")" : "") + "\n" + r.image_prompt);
+        for (const f in out) out[f] = out[f].join("\n\n");
+      } else if (k==="bookclub"){
+        for (const r of await getAll("book_club_questions","file_name.asc,question_number.asc")) push(r.file_name, (r.question_number||"") + ". " + r.question);
+        for (const f in out) out[f] = out[f].join("\n");
+      }
+      data.lists[k] = out;
+    }
+    else if (n==="info"){ for (const r of await api("GET","edition_info?select=file_name,english_title,whole_book_number,author,publisher,author_bio")) data.info[r.file_name]=r; }
+    loaded.add(n);
+  }
+}
+async function loadAll(){
+  setStatus("Loading…");
+  loaded.clear(); for (const k of ["stories","est","ml","fmt","sl","ser","info","lists"]) data[k]={}; data.one={};
+  const [reg, eds, storyOne, estF, mlT, fmts, slK] = await Promise.all([
+    api("GET","field_registry?select=table_name,column_name,label,group_name,sort_order").catch(()=>[]),
+    getAll("editions","sheet_order.asc.nullslast,file_name.asc"),
+    api("GET","stories?select=*&limit=1"),
+    api("GET","english_source_text?select=field&limit=5000").catch(()=>[]),
+    api("GET","marketing_links?select=link_type&limit=5000").catch(()=>[]),
+    api("GET","formats?select=format&limit=5000").catch(()=>[]),
+    getAll("store_links").catch(()=>[])
+  ]);
+  REG = {}; for (const r of reg) REG[r.table_name+"."+r.column_name] = r;
+  data.editions = eds;
+  for (const r of slK) data.sl[`${r.file_name}|${r.store}|${r.format}|${r.link_type}`]=r; loaded.add("sl");
+  const uniq = (a,k)=>[...new Set(a.map(r=>r[k]))].filter(Boolean).sort();
+  const fmtOrder = ["eBook","Paperback","Hardcover","Audiobook","Story Bible"];
+  buildCatalog({editions:eds, storyCols:Object.keys((storyOne||[])[0]||{}), estFields:uniq(estF,"field"), mlTypes:uniq(mlT,"link_type"),
+    formats:uniq(fmts,"format").sort((a,b)=>fmtOrder.indexOf(a)-fmtOrder.indexOf(b)),
+    slKeys:[...new Set(slK.map(r=>`${r.store}|${r.format}|${r.link_type}`))].sort()});
+  fillFilters();
+  renderColumnList();
+  await ensureLoaded(ticked());
+  renderGrid();
+  setStatus("Ready", "ok");
+  queueCount();
+}
+
+/* ---------- column picker ---------- */
+let checked = new Set(FAVORITES);
+function ticked(){ return COLS.filter(c=>checked.has(c.id)).sort((a,b)=>(KEY_COLS.has(b.id)-KEY_COLS.has(a.id)) || orderOf(a)-orderOf(b)); }
+function orderOf(c){ const i = FAVORITES.indexOf(c.id); return i>=0 && KEY_COLS.has(c.id) ? i-100 : c.order; }
+function groups(){
+  const g = new Map();
+  for (const c of [...COLS].sort((a,b)=>a.order-b.order || a.label.localeCompare(b.label))){ if(!g.has(c.group)) g.set(c.group,[]); g.get(c.group).push(c); }
+  return g;
+}
+function renderColumnList(){
+  const q = $("#colsearch").value.trim().toLowerCase();
+  const open = new Set([...document.querySelectorAll(".grp[open]")].map(d=>d.dataset.g));
+  let html = "";
+  for (const [g, cs] of groups()){
+    const words = q.split(/\s+/).filter(Boolean);
+    const show = cs.filter(c=>{ const hay = (c.label+" "+g+" "+(c.col||"")).toLowerCase().replace(/_/g," "); return words.every(w=>hay.includes(w)); });
+    if (!show.length) continue;
+    const n = cs.filter(c=>checked.has(c.id)).length;
+    const isOpen = q || open.has(g) || (!open.size && n>0);
+    html += `<details class="grp" data-g="${esc(g)}" ${isOpen?"open":""}><summary>${esc(g)} <span class="n">${n?n+" ticked":""}</span></summary>`;
+    for (const c of show) html += `<label class="col ${c.ro?"ro":""}"><input type="checkbox" data-id="${esc(c.id)}" ${checked.has(c.id)?"checked":""}><span><span class="lbl">${esc(c.label)}</span>${c.note?`<span class="note">${esc(c.note)}</span>`:""}</span></label>`;
+    html += `</details>`;
+  }
+  $("#collist").innerHTML = html || `<div class="empty">No column matches.</div>`;
+}
+$("#collist").addEventListener("change", async e=>{
+  const id = e.target.dataset.id; if(!id) return;
+  e.target.checked ? checked.add(id) : checked.delete(id);
+  const sum = e.target.closest(".grp").querySelector(".n"); const n = [...e.target.closest(".grp").querySelectorAll("input:checked")].length; sum.textContent = n? n+" ticked":"";
+  await refresh();
+});
+$("#colsearch").addEventListener("input", renderColumnList);
+$("#favs").onclick = async()=>{ checked = new Set(FAVORITES); renderColumnList(); await refresh(); };
+$("#none").onclick = async()=>{ checked = new Set([...KEY_COLS].filter(k=>k!=="ed:file_name")); renderColumnList(); await refresh(); };
+$("#expand").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=true);
+$("#collapse").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=false);
+async function refresh(){ try{ await ensureLoaded(ticked()); renderGrid(); setStatus("Ready","ok"); }catch(err){ setStatus(err.message,"bad"); } }
+
+/* ---------- values ---------- */
+function rowKey(ed, c){
+  switch(c.kind){
+    case "est": return ed.file_name+"|"+c.field;
+    case "ml": return ed.file_name+"|"+c.lt;
+    case "fmt": return ed.file_name+"|"+c.f;
+    case "sl": return `${ed.file_name}|${c.s}|${c.f}|${c.lt}`;
+    case "ser": return ed.series+"|"+ed.language;
+  }
+}
+function valueOf(ed, c){
+  let r;
+  switch(c.kind){
+    case "ed": return ed[c.col];
+    case "st": r = data.stories[ed.story_id]; return r ? r[c.col] : null;
+    case "one": r = (data.one[c.t]||{})[ed.file_name]; return r ? r[c.col] : null;
+    case "est": r = data.est[rowKey(ed,c)]; return r ? r.english_text : null;
+    case "ml": r = data.ml[rowKey(ed,c)]; return r ? r[c.col] : null;
+    case "fmt": r = data.fmt[rowKey(ed,c)]; return r ? r[c.col] : null;
+    case "sl": r = data.sl[rowKey(ed,c)]; return r ? r.link_or_id : null;
+    case "ser": r = data.ser[rowKey(ed,c)]; return r ? r[c.col] : null;
+    case "info": r = data.info[ed.file_name]; return r ? r[c.col] : null;
+    case "list": return (data.lists[c.col]||{})[ed.file_name] || null;
+  }
+}
+function canEdit(ed, c){
+  if (c.ro) return false;
+  if (c.kind==="st") return !!ed.story_id;
+  if (c.kind==="est") return ed.language !== "English";
+  if (c.kind==="ser") return !!ed.series && !!data.ser[rowKey(ed,c)];
+  return true;
+}
+function typeOf(c){
+  const vals = data.editions.map(ed=>valueOf(ed,c)).filter(v=>v!=null);
+  if (vals.length && vals.every(v=>typeof v==="boolean")) return "bool";
+  if (vals.length && vals.every(v=>typeof v==="number")) return "num";
+  if (c.col==="not_offered") return "bool";
+  return "text";
+}
+const show = v => v==null ? "" : (typeof v==="boolean" ? (v?"Yes":"No") : Array.isArray(v) ? v.join(", ") : String(v));
+
+/* ---------- grid ---------- */
+function fillFilters(){
+  const langs = [...new Set(data.editions.map(e=>e.language))].filter(Boolean);
+  const order = ["English","French","German","Italian","Spanish"]; langs.sort((a,b)=>(order.indexOf(a)+1||99)-(order.indexOf(b)+1||99));
+  $("#flang").innerHTML = `<option value="">All languages</option>` + langs.map(l=>`<option>${esc(l)}</option>`).join("");
+  const sers = [...new Set(data.editions.map(e=>e.series))].filter(Boolean).sort();
+  $("#fseries").innerHTML = `<option value="">All series</option>` + sers.map(s=>`<option>${esc(s)}</option>`).join("");
+}
+function visibleRows(cols){
+  const L = $("#flang").value, S = $("#fseries").value, q = $("#frow").value.trim().toLowerCase(), blanks = $("#fblank").checked;
+  const check = cols.filter(c=>!KEY_COLS.has(c.id) && !c.ro);
+  return data.editions.filter(ed=>{
+    if (L && ed.language!==L) return false;
+    if (S && ed.series!==S) return false;
+    if (q && !((ed.title||"").toLowerCase().includes(q) || (ed.file_name||"").toLowerCase().includes(q))) return false;
+    if (blanks && !check.some(c=>canEdit(ed,c) && (valueOf(ed,c)==null || valueOf(ed,c)===""))) return false;
+    return true;
+  });
+}
+let viewCols = [], viewRows = [];
+function renderGrid(){
+  viewCols = ticked();
+  viewRows = visibleRows(viewCols);
+  $("#rowcount").textContent = `${viewRows.length} of ${data.editions.length} books · ${viewCols.length} columns`;
+  if (!viewCols.length){ $("#gridwrap").innerHTML = `<div class="empty">Tick some columns on the left.</div>`; return; }
+  let h = "<table><thead><tr>";
+  viewCols.forEach((c,i)=>{ h += `<th class="${i===0?"first":""}" title="${esc(c.note||c.table)}">${esc(c.label)}<span class="tbl">${esc(c.group)}</span></th>`; });
+  h += "</tr></thead><tbody>";
+  viewRows.forEach((ed,ri)=>{
+    h += "<tr>";
+    viewCols.forEach((c,ci)=>{
+      const v = valueOf(ed,c), ok = canEdit(ed,c);
+      const cls = [ci===0?"first":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (LONG_HINT.test(c.col||c.field||c.label)?"long":"")].join(" ");
+      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc(show(v)).slice(0,600)}"><div class="v">${esc(show(v))}</div></td>`;
+    });
+    h += "</tr>";
+  });
+  h += "</tbody></table>";
+  $("#gridwrap").innerHTML = h;
+}
+["#flang","#fseries","#fblank"].forEach(s=>$(s).addEventListener("change", renderGrid));
+$("#ffull").addEventListener("change", ()=>$("#gridwrap").classList.toggle("full", $("#ffull").checked));
+let ft; $("#frow").addEventListener("input", ()=>{ clearTimeout(ft); ft=setTimeout(renderGrid,150); });
+
+/* ---------- editing ---------- */
+let editing = null; // {td, ed, c, old}
+$("#gridwrap").addEventListener("click", e=>{ const td = e.target.closest("td.edit"); if (td) openEditor(td); });
+$("#gridwrap").addEventListener("keydown", e=>{
+  const td = e.target.closest("td.edit"); if (!td || editing) return;
+  if (e.key==="Enter" || e.key==="F2"){ e.preventDefault(); openEditor(td); }
+  else if (e.key.startsWith("Arrow")) { e.preventDefault(); move(td, {ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key]); }
+});
+function cellAt(r,c){ return document.querySelector(`td[data-r="${r}"][data-c="${c}"]`); }
+function move(td, [dr,dc]){
+  let r = +td.dataset.r, c = +td.dataset.c;
+  for (let i=0;i<500;i++){ r+=dr; c+=dc; if (c>=viewCols.length){c=0;r++;} if (c<0){c=viewCols.length-1;r--;}
+    const n = cellAt(r,c); if (!n) return; if (n.classList.contains("edit")){ n.focus(); n.scrollIntoView({block:"nearest",inline:"nearest"}); return n; } }
+}
+function openEditor(td){
+  closeEditor(false);
+  const ed = viewRows[+td.dataset.r], c = viewCols[+td.dataset.c], old = valueOf(ed,c), t = typeOf(c);
+  td.classList.add("active");
+  const box = document.createElement("div"); box.className = "editor";
+  let input;
+  if (t==="bool"){
+    input = document.createElement("select");
+    input.innerHTML = `<option value="">(blank)</option><option value="true">Yes</option><option value="false">No</option>`;
+    input.value = old==null ? "" : String(old); input.style.margin="8px";
+  } else {
+    input = document.createElement("textarea"); input.value = show(old);
+    if (!LONG_HINT.test(c.col||c.field||c.label)) { input.style.minHeight="40px"; input.rows = 2; }
+    else input.style.minHeight = Math.min(360, Math.max(160, Math.round(input.value.length/2.2))) + "px";
+  }
+  box.appendChild(input);
+  const bar = document.createElement("div"); bar.className="bar";
+  bar.innerHTML = `<span>${esc(ed.title||ed.file_name)} · ${esc(c.label)}${c.note?" — "+esc(c.note):""}</span><span class="grow"></span><span>Enter saves · Shift+Enter new line · Esc cancels</span><button data-a="cancel">Cancel</button><button class="primary" data-a="save">Save</button>`;
+  box.appendChild(bar);
+  document.body.appendChild(box);
+  const rc = td.getBoundingClientRect(), W = Math.max(rc.width+40, LONG_HINT.test(c.col||c.field||c.label)?480:300);
+  box.style.left = Math.max(8, Math.min(rc.left, innerWidth - W - 16)) + "px";
+  box.style.top = Math.max(8, Math.min(rc.top, innerHeight - 260)) + "px";
+  box.style.width = W + "px";
+  if (input.tagName==="TEXTAREA") input.style.width = "100%";
+  editing = {td, ed, c, old, input, box, t};
+  box.style.top = Math.max(8, Math.min(parseFloat(box.style.top), innerHeight - box.offsetHeight - 8)) + "px";
+  input.focus(); if (input.tagName==="TEXTAREA"){ input.setSelectionRange(0,0); input.scrollTop = 0; }
+  input.addEventListener("keydown", ev=>{
+    if (ev.key==="Escape"){ ev.preventDefault(); closeEditor(false); td.focus(); }
+    else if (ev.key==="Enter" && !ev.shiftKey){ ev.preventDefault(); closeEditor(true); move(td,[1,0]) || td.focus(); }
+    else if (ev.key==="Tab"){ ev.preventDefault(); closeEditor(true); move(td, ev.shiftKey?[0,-1]:[0,1]); }
+  });
+  bar.addEventListener("mousedown", ev=>ev.preventDefault());
+  bar.addEventListener("click", ev=>{ const a = ev.target.dataset.a; if (a) { closeEditor(a==="save"); td.focus(); } });
+}
+document.addEventListener("mousedown", e=>{ if (editing && !editing.box.contains(e.target)) closeEditor(true); });
+function closeEditor(save){
+  if (!editing) return;
+  const {td, ed, c, old, input, box, t} = editing; editing = null;
+  box.remove(); td.classList.remove("active");
+  if (!save) return;
+  let v = input.value;
+  if (t==="bool") v = v==="" ? null : v==="true";
+  else if (t==="num") v = v.trim()==="" ? null : Number(v.replace(/[$,\s]/g,""));
+  else v = v === "" ? null : v;
+  if (t==="num" && v!=null && isNaN(v)) { flash(td,"err"); setStatus("That needs to be a number.","bad"); return; }
+  if (show(v) === show(old)) return;
+  saveCell(ed, c, v, old, td, true);
+}
+
+/* ---------- saving ---------- */
+const undoStack = [];
+function q(v){ return encodeURIComponent(v); }
+async function saveCell(ed, c, v, old, td, record){
+  td && (td.classList.remove("saved","err"), td.classList.add("saving"));
+  setStatus("Saving…");
+  try{
+    await write(ed, c, v);
+    if (record){ undoStack.push({ed, c, old, v}); $("#undo").disabled = false; }
+    td && (td.classList.remove("saving"), td.classList.add("saved"));
+    setStatus(`Saved ${c.label} for ${ed.title||ed.file_name}`, "ok");
+    updateCell(ed, c);
+  }catch(err){
+    td && (td.classList.remove("saving"), td.classList.add("err"));
+    setStatus("Not saved: " + friendly(err), "bad");
+  }
+}
+function friendly(err){
+  const m = err.message||String(err);
+  if (err.status===401 || /JWT|token/i.test(m)) return "your sign-in expired — reload the page and sign in again.";
+  if (/row-level security|permission|0 rows/i.test(m)) return "you don't have permission to change this.";
+  return m;
+}
+const PATCH = {"Prefer":"return=representation"};
+async function patchOne(table, filter, body){
+  const rows = await api("PATCH", `${table}?${filter}`, body, PATCH);
+  if (!rows || !rows.length) throw new Error("0 rows changed (no permission, or the row is gone)");
+  return rows[0];
+}
+async function insertOne(table, body){
+  const rows = await api("POST", table, body, PATCH);
+  if (!rows || !rows.length) throw new Error("0 rows changed (no permission)");
+  return rows[0];
+}
+async function delWhere(table, filter){ await api("DELETE", `${table}?${filter}`, null, PATCH); }
+async function write(ed, c, v){
+  const fn = "file_name=eq."+q(ed.file_name);
+  switch(c.kind){
+    case "ed": { const r = await patchOne("editions", fn, {[c.col]:v}); Object.assign(ed, r); return; }
+    case "st": { const r = await patchOne("stories", "story_id=eq."+q(ed.story_id), {[c.col]:v}); data.stories[ed.story_id] = r; return; }
+    case "one": {
+      const cur = (data.one[c.t]||{})[ed.file_name];
+      if (cur){ data.one[c.t][ed.file_name] = await patchOne(c.t, fn, {[c.col]:v}); }
+      else if (v!=null){ data.one[c.t][ed.file_name] = await insertOne(c.t, {file_name:ed.file_name, [c.col]:v}); }
+      return;
+    }
+    case "est": {
+      const k = rowKey(ed,c), cur = data.est[k], f = fn+"&field=eq."+q(c.field);
+      if (v==null){ if (cur){ await delWhere("english_source_text", f); delete data.est[k]; } return; }
+      data.est[k] = cur ? await patchOne("english_source_text", f, {english_text:v}) : await insertOne("english_source_text", {file_name:ed.file_name, field:c.field, english_text:v});
+      return;
+    }
+    case "ml": {
+      const k = rowKey(ed,c), cur = data.ml[k], f = fn+"&link_type=eq."+q(c.lt);
+      if (cur){ data.ml[k] = await patchOne("marketing_links", f, {[c.col]:v}); }
+      else if (v!=null){ data.ml[k] = await insertOne("marketing_links", {file_name:ed.file_name, link_type:c.lt, [c.col]:v}); }
+      return;
+    }
+    case "fmt": {
+      const k = rowKey(ed,c), cur = data.fmt[k], f = fn+"&format=eq."+q(c.f);
+      if (cur){ data.fmt[k] = await patchOne("formats", f, {[c.col]:v}); }
+      else if (v!=null){ data.fmt[k] = await insertOne("formats", {file_name:ed.file_name, format:c.f, [c.col]:v}); }
+      return;
+    }
+    case "sl": {
+      const k = rowKey(ed,c), cur = data.sl[k], f = `${fn}&store=eq.${q(c.s)}&format=eq.${q(c.f)}&link_type=eq.${q(c.lt)}`;
+      if (v==null){ if (cur){ await delWhere("store_links", f); delete data.sl[k]; } return; }
+      data.sl[k] = cur ? await patchOne("store_links", f, {link_or_id:v}) : await insertOne("store_links", {file_name:ed.file_name, store:c.s, format:c.f, link_type:c.lt, link_or_id:v});
+      return;
+    }
+    case "ser": { const k = rowKey(ed,c); data.ser[k] = await patchOne("series", `series=eq.${q(ed.series)}&language=eq.${q(ed.language)}`, {[c.col]:v}); return; }
+  }
+  throw new Error("This column can't be edited here.");
+}
+function updateCell(ed, c){
+  // story and series values are shared, so refresh every visible row that uses them
+  viewRows.forEach((r,ri)=>{
+    viewCols.forEach((cc,ci)=>{
+      const same = r===ed || (cc.kind==="st" && c.kind==="st" && r.story_id===ed.story_id) || (cc.kind==="ser" && c.kind==="ser" && r.series===ed.series && r.language===ed.language);
+      if (!same) return;
+      const td = cellAt(ri,ci); if (!td) return;
+      const v = valueOf(r,cc); td.querySelector(".v").textContent = show(v); td.title = show(v).slice(0,600);
+      td.classList.toggle("blank", v==null||v==="");
+    });
+  });
+}
+function flash(td, cls){ td.classList.add(cls); setTimeout(()=>td.classList.remove(cls), 1500); }
+async function undo(){
+  const u = undoStack.pop(); $("#undo").disabled = !undoStack.length; if (!u) return;
+  const ri = viewRows.indexOf(u.ed), ci = viewCols.indexOf(u.c);
+  await saveCell(u.ed, u.c, u.old, ri>=0&&ci>=0?cellAt(ri,ci):null, null, false);
+  setStatus(`Undid ${u.c.label} for ${u.ed.title||u.ed.file_name}`, "ok");
+}
+$("#undo").onclick = undo;
+document.addEventListener("keydown", e=>{ if ((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="z" && !editing && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){ e.preventDefault(); undo(); } });
+
+/* ---------- status ---------- */
+function setStatus(t, kind){ const s = $("#status"); s.textContent = t; s.className = kind||""; }
+
+/* ---------- start ---------- */
+function step(name){ document.querySelectorAll("#signin .step").forEach(d=>d.classList.toggle("hidden", d.id!=="st-"+name)); }
+function say(t){ $("#loginmsg").textContent = t||""; }
+function plain(err){ const m = (err && (err.message||err.msg)) || String(err||""); return m.replace(/^AuthApiError:\s*/,""); }
+function passkeysReady(){ const c = client(); return !!(c && c.auth && typeof c.auth.signInWithPasskey === "function" && window.PublicKeyCredential && location.protocol === "https:"); }
+function showSignin(msg){
+  $("#app").classList.add("hidden"); $("#signin").classList.remove("hidden");
+  $("#cfgurl").value = cfg.url; $("#cfgkey").value = cfg.key;
+  if (!cfg.url || !cfg.key) $("#setupbox").open = true;
+  step("main"); say(msg);
+  const em = store.get("ce_email"); if (em) $("#email").value = em;
+  $("#pknote").textContent = location.protocol !== "https:" ? "Touch ID / fingerprint works once this page is opened from its web address (https)." :
+    (!window.supabase ? "Couldn't load the sign-in library — check your internet connection." : "");
+}
+async function afterSignIn(){
+  const tok = await accessToken(); if (!tok){ showSignin("Please sign in."); return; }
+  const c = claims(tok);
+  if (c.email) store.set("ce_email", c.email);
+  if (isStrong(c)) { startApp(c.email); return; }
+  // Not strong yet: ask for the authenticator code if one is set up, otherwise set one up.
+  $("#signin").classList.remove("hidden"); $("#app").classList.add("hidden");
+  try{
+    const {data} = await client().auth.mfa.listFactors();
+    const f = (data && (data.totp||[]).find(x=>x.status==="verified"));
+    if (f){ step("code"); $("#totp").value=""; $("#totp").focus(); $("#codehint").textContent = "Lost the authenticator? Sign in with Touch ID or your phone's fingerprint, or ask the owner to reset your sign-in."; return; }
+  }catch(e){}
+  step("setup"); say("");
+}
+async function startApp(email){
+  $("#signin").classList.add("hidden"); $("#app").classList.remove("hidden");
+  $("#who").textContent = email || "";
+  try{ await loadAll(); }
+  catch(err){
+    if (err.status===401){ showSignin("Please sign in again."); return; }
+    setStatus(friendly(err),"bad"); $("#gridwrap").innerHTML = `<div class="empty">${esc(friendly(err))}</div>`;
+  }
+}
+async function signInPasskey(){
+  if (!passkeysReady()){ say("Touch ID / fingerprint sign-in isn't available here. Use “Other ways to sign in”."); $("#otherways").open = true; return; }
+  say("Waiting for Touch ID or fingerprint…");
+  try{ const {error} = await client().auth.signInWithPasskey(); if (error) throw error; say(""); await afterSignIn(); }
+  catch(err){ say("That didn't work: " + plain(err)); $("#otherways").open = true; }
+}
+$("#pkbtn").onclick = signInPasskey;
+$("#cfgsave").onclick = ()=>{ cfg.url = $("#cfgurl").value.trim().replace(/\/+$/,""); cfg.key = $("#cfgkey").value.trim(); store.set("ce_url",cfg.url); store.set("ce_key",cfg.key); sb = null; say("Settings saved on this computer."); showSignin("Settings saved on this computer."); };
+$("#loginform").addEventListener("submit", async e=>{
+  e.preventDefault();
+  if (!client()){ say("Add the Project URL and publishable key under Connection settings first."); $("#setupbox").open = true; return; }
+  say("Signing in…");
+  try{ const {error} = await client().auth.signInWithPassword({email:$("#email").value.trim(), password:$("#password").value}); if (error) throw error; $("#password").value=""; say(""); await afterSignIn(); }
+  catch(err){ say(plain(err)); }
+});
+$("#totpgo").onclick = async()=>{
+  try{
+    const {data} = await client().auth.mfa.listFactors();
+    const f = (data.totp||[]).find(x=>x.status==="verified");
+    const {error} = await client().auth.mfa.challengeAndVerify({factorId:f.id, code:$("#totp").value.trim()}); if (error) throw error;
+    say(""); await afterSignIn();
+  }catch(err){ say("That code didn't work: " + plain(err)); }
+};
+$("#totp").addEventListener("keydown", e=>{ if (e.key==="Enter") $("#totpgo").click(); });
+document.querySelectorAll("#signin .back").forEach(b=>b.onclick = async()=>{ try{ await client().auth.signOut(); }catch(e){} showSignin(""); });
+
+/* adding Touch ID or the authenticator */
+async function addPasskey(msgEl){
+  if (!passkeysReady()){ msgEl.textContent = "This needs the page opened from its web address (https) in Safari or Chrome."; return false; }
+  try{ const {error} = await client().auth.registerPasskey(); if (error) throw error; msgEl.textContent = "This device is set up."; return true; }
+  catch(err){ msgEl.textContent = "Couldn't add this device: " + plain(err); return false; }
+}
+let pendingFactor = null;
+async function startTotp(box, msgEl){
+  try{
+    const {data, error} = await client().auth.mfa.enroll({factorType:"totp", friendlyName:"LastPass Authenticator", issuer:"S.E. Smith Catalog"});
+    if (error) throw error;
+    pendingFactor = data.id;
+    box.innerHTML = `<p class="hint">In LastPass Authenticator tap <b>+</b>, scan this code (or type the key), then enter the 6-digit code it shows.</p>
+      <div id="qr2"><img alt="Authenticator QR code" src="${esc(data.totp.qr_code)}"></div>
+      <div class="hint">Key: <code>${esc(data.totp.secret)}</code></div>
+      <label>6-digit code <input type="text" inputmode="numeric" maxlength="6" class="tcode"></label>
+      <div class="row"><button class="primary tgo" type="button">Turn on</button></div>`;
+    box.classList.remove("hidden");
+    box.querySelector(".tgo").onclick = async()=>{
+      try{ const {error} = await client().auth.mfa.challengeAndVerify({factorId:pendingFactor, code:box.querySelector(".tcode").value.trim()}); if (error) throw error;
+        msgEl.textContent = "LastPass Authenticator is on."; box.innerHTML = ""; box.classList.add("hidden"); if ($("#signin").classList.contains("hidden")) loadSecurity(); else afterSignIn(); }
+      catch(err){ msgEl.textContent = "That code didn't work: " + plain(err); }
+    };
+  }catch(err){ msgEl.textContent = "Couldn't start: " + plain(err); }
+}
+$("#setuppk").onclick = async()=>{ if (await addPasskey($("#loginmsg"))) { await client().auth.signOut().catch(()=>{}); say("This device is set up. Now sign in with it."); step("main"); signInPasskey(); } };
+$("#setuptotp").onclick = ()=>{ $("#totpbox").classList.add("hidden"); startTotp($("#totpbox"), $("#loginmsg")); };
+
+/* sign-in options dialog */
+async function loadSecurity(){
+  const c = client(), list = $("#pklist");
+  try{
+    const r = c.auth.passkey && c.auth.passkey.list ? await c.auth.passkey.list() : {data:null};
+    const keys = (r && (r.data && (r.data.passkeys || r.data))) || [];
+    list.innerHTML = Array.isArray(keys) && keys.length ? keys.map(k=>`<li>${esc(k.friendly_name||k.friendlyName||"Passkey")} <span class="hint">${esc((k.created_at||k.createdAt||"").slice(0,10))}</span><button data-pk="${esc(k.id)}" type="button">Remove</button></li>`).join("") : `<li class="hint">None yet.</li>`;
+  }catch(e){ list.innerHTML = `<li class="hint">Couldn't list devices: ${esc(plain(e))}</li>`; }
+  try{
+    const {data} = await c.auth.mfa.listFactors(); const f = (data.totp||[]).find(x=>x.status==="verified");
+    $("#totpstate").textContent = f ? "On." : "Not set up.";
+    $("#deltotp").classList.toggle("hidden", !f); $("#addtotp").classList.toggle("hidden", !!f); $("#deltotp").dataset.id = f ? f.id : "";
+  }catch(e){ $("#totpstate").textContent = "Couldn't check: " + plain(e); }
+}
+$("#security").onclick = ()=>{ if (testToken) return; $("#secmsg").textContent = ""; $("#totpbox2").innerHTML = ""; $("#secdlg").showModal(); loadSecurity(); };
+$("#secclose").onclick = ()=>$("#secdlg").close();
+$("#addpk").onclick = async()=>{ if (await addPasskey($("#secmsg"))) loadSecurity(); };
+$("#addtotp").onclick = ()=>startTotp($("#totpbox2"), $("#secmsg"));
+$("#deltotp").onclick = async()=>{
+  if (!confirmTwice($("#deltotp"))) return;
+  try{ const {error} = await client().auth.mfa.unenroll({factorId:$("#deltotp").dataset.id}); if (error) throw error; $("#secmsg").textContent = "Authenticator removed."; loadSecurity(); }
+  catch(err){ $("#secmsg").textContent = plain(err); }
+};
+$("#pklist").addEventListener("click", async e=>{
+  const id = e.target.dataset.pk; if (!id) return;
+  if (!confirmTwice(e.target)) return;
+  try{ const {error} = await client().auth.passkey.delete({passkeyId:id}); if (error) throw error; $("#secmsg").textContent = "Removed."; loadSecurity(); }
+  catch(err){ $("#secmsg").textContent = plain(err); }
+});
+function confirmTwice(btn){ if (btn.dataset.sure) return true; btn.dataset.sure = "1"; const t = btn.textContent; btn.textContent = "Click again to remove"; setTimeout(()=>{ delete btn.dataset.sure; btn.textContent = t; }, 4000); return false; }
+
+$("#signout").onclick = async()=>{ try{ client() && await client().auth.signOut(); }catch(e){} showSignin("Signed out."); };
+$("#reload").onclick = ()=>afterSignIn();
+/* ---------- send to Notion (adds books to notion_sync_queue; the Notion sync script does the rest) ---------- */
+async function queueCount(){
+  try{ const r = await api("GET","notion_sync_queue?select=id&status=eq.Waiting&limit=1000"); $("#nqueue").textContent = r.length ? r.length + " waiting for Notion" : ""; }catch(e){ $("#nqueue").textContent = ""; }
+}
+async function sendToNotion(files, btn){
+  if (!files.length){ setStatus("No books to send", "bad"); return; }
+  if (!btn.dataset.sure){ btn.dataset.sure = "1"; const t = btn.textContent; btn.textContent = `Click again to send ${files.length}`; setTimeout(()=>{ delete btn.dataset.sure; btn.textContent = t; }, 4000); return; }
+  delete btn.dataset.sure; btn.textContent = btn.id === "notionAll" ? "Send all to Notion" : "Send shown to Notion";
+  try{
+    const waiting = new Set((await api("GET","notion_sync_queue?select=file_name&status=eq.Waiting&limit=5000")).map(r=>r.file_name));
+    const add = files.filter(f=>!waiting.has(f));
+    for (let i=0; i<add.length; i+=500) await api("POST","notion_sync_queue", add.slice(i,i+500).map(f=>({file_name:f})), {Prefer:"return=minimal"});
+    setStatus(`${add.length} book(s) will go to Notion at the next Notion sync` + (files.length-add.length ? ` (${files.length-add.length} were already waiting)` : ""), "ok");
+    queueCount();
+  }catch(err){ setStatus(friendly(err), "bad"); }
+}
+$("#notionShown").onclick = e=>sendToNotion(visibleRows(ticked()).map(ed=>ed.file_name), e.currentTarget);
+$("#notionAll").onclick = e=>sendToNotion(data.editions.map(ed=>ed.file_name), e.currentTarget);
+
+(async function init(){
+  if (testToken){ startApp(claims(testToken).email); return; }
+  if (!client()){ showSignin(); return; }
+  const tok = await accessToken().catch(()=>null);
+  if (tok) { afterSignIn(); return; }
+  showSignin();
+})();
+</script>
+</body>
+</html>
