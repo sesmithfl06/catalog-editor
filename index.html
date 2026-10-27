@@ -51,7 +51,7 @@ header h1{font-size:16px;margin:0 8px 0 0}
 header .grow{flex:1}
 header .who{color:var(--muted);font-size:12px}
 #status{font-size:12px;color:var(--muted);min-width:120px}
-#status.bad{color:var(--bad)} #status.ok{color:var(--ok)}
+#status.bad{color:var(--bad)} #status.ok{color:var(--ok)} #status.warn{color:var(--warn)}
 
 aside{border-right:1px solid var(--line);background:var(--panel);min-height:0;overflow:auto}
 /* the two main sidebar sections: Books (rows) first, then Columns */
@@ -124,6 +124,9 @@ td.saving{box-shadow:inset 3px 0 0 var(--warn)}
 td.saved{box-shadow:inset 3px 0 0 var(--ok)}
 td.err{box-shadow:inset 3px 0 0 var(--bad)}
 td.active{outline:2px solid var(--accent);outline-offset:-2px}
+/* cell opened from a link (#book=…&col=…): two quick pulses */
+td.jump{animation:jumpflash 1.6s ease-out 1}
+@keyframes jumpflash{0%,36%,72%{background:var(--sel);box-shadow:inset 0 0 0 3px var(--accent)}18%,54%{background:var(--panel);box-shadow:inset 0 0 0 3px var(--accent)}}
 .editor{position:fixed;z-index:20;background:var(--panel);border:2px solid var(--accent);border-radius:6px;box-shadow:0 6px 24px #0003;display:flex;flex-direction:column}
 .editor textarea{border:0;resize:both;padding:8px;min-width:260px;min-height:90px;background:transparent;outline:none}
 .editor .bar{display:flex;gap:6px;align-items:center;padding:6px 8px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
@@ -527,6 +530,7 @@ async function ensureLoaded(cols){
   }
 }
 async function loadAll(){
+  appReady = false;
   setStatus("Loading…");
   loaded.clear(); for (const k of ["stories","est","ml","fmt","sl","ser","info","lists"]) data[k]={}; data.one={};
   const [reg, refs, eds, storyOne, estF, mlT, fmts, slK] = await Promise.all([
@@ -554,6 +558,8 @@ async function loadAll(){
   renderGrid();
   setStatus("Ready", "ok");
   queueCount();
+  appReady = true;
+  await runPendingJump();   // a link that opened this tab jumps now, after sign-in and loading
 }
 
 /* ---------- column picker ---------- */
@@ -1148,6 +1154,7 @@ function say(t){ $("#loginmsg").textContent = t||""; }
 function plain(err){ const m = (err && (err.message||err.msg)) || String(err||""); return m.replace(/^AuthApiError:\s*/,""); }
 function passkeysReady(){ const c = client(); return !!(c && c.auth && typeof c.auth.signInWithPasskey === "function" && window.PublicKeyCredential && location.protocol === "https:"); }
 function showSignin(msg){
+  appReady = false;
   $("#app").classList.add("hidden"); $("#signin").classList.remove("hidden");
   $("#cfgurl").value = cfg.url; $("#cfgkey").value = cfg.key;
   if (!cfg.url || !cfg.key) $("#setupbox").open = true;
@@ -1321,6 +1328,82 @@ $("#export").onclick = e=>{
   m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); exportCsv(b.dataset.w); });
   document.body.appendChild(m); ctxMenu = m;
 };
+
+/* ---------- links straight to one cell: #book=<file_name>&col=<column id> ----------
+   The Distribution Clipboard Queue app sends these. col is optional (no col = the book's row).
+   A new tab signs in first as usual; the link waits in pendingJump and runs once loadAll finishes.
+   After jumping, book and col are taken off the address so a reload doesn't jump again. */
+let pendingJump = null, appReady = false;
+function readJumpHash(){
+  const p = new URLSearchParams(location.hash.slice(1));
+  const book = (p.get("book")||"").trim();
+  return book ? {book, col:(p.get("col")||"").trim()} : null;
+}
+function clearJumpHash(){
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (!p.has("book") && !p.has("col")) return;
+  p.delete("book"); p.delete("col");
+  const rest = p.toString();
+  history.replaceState(history.state, "", location.pathname + location.search + (rest ? "#" + rest : ""));
+}
+pendingJump = readJumpHash();
+window.addEventListener("hashchange", ()=>{
+  const j = readJumpHash(); if (!j) return;
+  pendingJump = j;
+  if (appReady) runPendingJump();   // page already open and loaded: jump right away
+});
+async function runPendingJump(){
+  const j = pendingJump; pendingJump = null;
+  if (!j) return;
+  clearJumpHash();
+  try{ await jumpTo(j.book, j.col); }catch(err){ setStatus(friendly(err), "bad"); }
+}
+async function jumpTo(book, colId){
+  closeCtx(); if (editing) closeEditor(true);
+  const low = book.toLowerCase();
+  const ed = data.editions.find(e=>e.file_name===book) || data.editions.find(e=>(e.file_name||"").toLowerCase()===low);
+  if (!ed){ setStatus(`Link: no book with the file name “${book}”.`, "bad"); return; }
+  const c = colId ? COLMAP[colId] || null : null;
+  // clear only the filters that hide this book
+  const cleared = [];
+  if (hiddenRows.delete(ed.file_name)) cleared.push("hidden row");
+  if ($("#flang").value && $("#flang").value !== ed.language){ $("#flang").value = ""; cleared.push("language filter"); }
+  if ($("#fseries").value && $("#fseries").value !== ed.series){ $("#fseries").value = ""; cleared.push("series filter"); }
+  const find = $("#frow").value.trim().toLowerCase();
+  if (find && !((ed.title||"").toLowerCase().includes(find) || (ed.file_name||"").toLowerCase().includes(find))){ $("#frow").value = ""; cleared.push("book search"); }
+  // tick the column and show its box in the sidebar
+  if (c) checked.add(c.id);
+  renderColumnList();
+  if (c){
+    const g = [...document.querySelectorAll("#collist .grp")].find(d=>d.dataset.g===c.group);
+    if (g){ g.open = true; const box = [...g.querySelectorAll("input[data-id]")].find(i=>i.dataset.id===c.id); if (box) box.closest("label").scrollIntoView({block:"nearest"}); }
+  }
+  setStatus("Opening the link…");
+  await ensureLoaded($("#fcolblank").checked ? allCols() : ticked());
+  renderGrid();
+  if (c && !viewCols.includes(c) && $("#fcolblank").checked){   // "Only columns with blanks" hid this column
+    $("#fcolblank").checked = false; cleared.push("“Only columns with blanks”");
+    await ensureLoaded(ticked()); renderGrid();
+  }
+  const ri = viewRows.indexOf(ed);
+  if (ri < 0){ setStatus(`Link: couldn't show “${ed.title||ed.file_name}”.`, "bad"); return; }
+  const ci = c ? viewCols.indexOf(c) : -1;
+  const tds = (ci >= 0 ? [cellAt(ri,ci)] : viewCols.map((_,i)=>cellAt(ri,i))).filter(Boolean);
+  const td = tds[0]; if (!td) return;
+  clearSel(); manchor = keyOf(td);   // same as clicking it: the starting cell for Shift+click
+  if (ci < 0) $("#gridwrap").scrollLeft = 0;
+  td.scrollIntoView({block:"center", inline: ci >= 0 ? "center" : "nearest"});
+  if (!td.hasAttribute("tabindex")) td.setAttribute("tabindex","-1");   // read-only cells can still take focus
+  td.focus({preventScroll:true});
+  for (const t of tds){ t.classList.remove("jump"); void t.offsetWidth; t.classList.add("jump"); t.addEventListener("animationend", ()=>t.classList.remove("jump"), {once:true}); }
+  const name = ed.title || ed.file_name;
+  let msg, kind = "ok";
+  if (c) msg = `Opened ${name} · ${c.label}` + (canEdit(ed,c) ? "" : " (can't be edited for this book)") + ".";
+  else if (colId){ msg = `Opened ${name}. The column “${colId}” isn't in the Catalog Editor, so this is the book's row.`; kind = "warn"; }
+  else msg = `Opened ${name}.`;
+  if (cleared.length) msg += ` Cleared: ${cleared.join(", ")}.`;
+  setStatus(msg, kind);
+}
 
 (async function init(){
   if (testToken){ startApp(claims(testToken).email); return; }
