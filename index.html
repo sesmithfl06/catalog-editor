@@ -152,6 +152,20 @@ code{font-size:12px;word-break:break-all}
 .ctx{position:fixed;z-index:1000;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:4px}
 .ctx button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:6px 10px;border-radius:5px;font-size:13px}
 .ctx button:hover{background:var(--soft)}
+/* Find store links */
+dialog#sldlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:1100px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
+dialog#sldlg::backdrop{background:#0006}
+#sldlg .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+#sldlg .row .grow{flex:1}
+#sllist{overflow:auto;max-height:calc(100vh - 240px);border:1px solid var(--line);border-radius:8px}
+#sllist table{width:100%}
+#sllist td{max-width:none;min-width:0}
+#sllist td.val input{width:100%;min-width:220px}
+#sllist td.acts{white-space:nowrap}
+#sllist td.acts button{padding:2px 8px;font-size:12px}
+#sllist .ev{color:var(--muted);font-size:12px;max-width:340px}
+.conf{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600;border:1px solid currentColor;white-space:nowrap}
+.conf.sure{color:var(--ok)} .conf.check{color:var(--warn)} .conf.hand{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -232,6 +246,22 @@ code{font-size:12px;word-break:break-all}
   <div class="row"><button id="secclose" class="primary" type="button">Done</button></div>
 </dialog>
 
+<!-- ============ Find store links ============ -->
+<dialog id="sldlg">
+  <h2>Find store links</h2>
+  <p class="hint">Looks up only the blank store cells of published books (publication date = wide release, already passed). Cells that already have a link are never checked. Nothing goes into the catalog until you press Approve. A rejected link is never suggested again.</p>
+  <div class="row">
+    <select id="slbook" aria-label="Book to look up" title="Books with blank store links, newest publication date first"><option value="">Loading books…</option></select>
+    <button id="slone" class="primary" type="button">Look up this book</button>
+    <button id="slfind" type="button">Look up all books</button>
+    <button id="slsure" type="button" title="Approve every row marked Sure">Approve all “Sure”</button>
+    <span class="grow"></span>
+    <span class="hint" id="slmsg"></span>
+  </div>
+  <div id="sllist"><div class="empty">Loading…</div></div>
+  <div class="row"><span class="grow"></span><button id="slclose" type="button">Done</button></div>
+</dialog>
+
 <!-- ============ App ============ -->
 <div id="app" class="hidden">
   <header>
@@ -243,6 +273,7 @@ code{font-size:12px;word-break:break-all}
     <button id="export" title="Download a CSV file (opens in Excel): what you see now, or everything">Export</button>
     <button id="notionShown" title="Send the books shown in the grid (after your filters) to Notion at the next Notion sync">Send shown to Notion</button>
     <button id="notionAll" title="Send every book to Notion at the next Notion sync">Send all to Notion</button>
+    <button id="storelinks" title="Look up blank store links for published books, then approve or reject each one">Find store links</button>
     <span class="who" id="nqueue"></span>
     <span class="who" id="who"></span>
     <button id="security" title="Touch ID, authenticator and backups">Sign-in options</button>
@@ -1294,6 +1325,96 @@ async function sendToNotion(files, btn){
 }
 $("#notionShown").onclick = e=>sendToNotion(visibleRows().map(ed=>ed.file_name), e.currentTarget);
 $("#notionAll").onclick = e=>sendToNotion(data.editions.map(ed=>ed.file_name), e.currentTarget);
+
+/* ---------- Find store links (Edge Function find-store-links fills store_link_suggestions; Approve adds to store_links) ---------- */
+let slRows = [], slChanged = 0;
+function slMsg(t){ $("#slmsg").textContent = t||""; }
+async function slLoad(){
+  try{
+    slRows = await api("GET","store_link_suggestions?select=*&status=eq.waiting&order=file_name,store,format&limit=2000") || [];
+    slRender();
+  }catch(err){ $("#sllist").innerHTML = `<div class="empty">${esc(friendly(err))}</div>`; }
+}
+function slRender(){
+  const titles = {}; (data.editions||[]).forEach(e=>{ titles[e.file_name] = e.title; });
+  $("#slsure").disabled = !slRows.some(r=>r.confidence==="sure");
+  if (!slRows.length){ $("#sllist").innerHTML = `<div class="empty">Nothing waiting. Pick a book and press “Look up this book”, or “Look up all books”.</div>`; return; }
+  const cls = c => c==="sure" ? "sure" : c==="check" ? "check" : "hand";
+  const lbl = c => c==="sure" ? "Sure" : c==="check" ? "Check" : "Add by hand";
+  $("#sllist").innerHTML = `<table><thead><tr><th>Book</th><th>Store</th><th>Link or ID</th><th>How sure</th><th>Why</th><th></th></tr></thead><tbody>` +
+    slRows.map(r=>{
+      const v = r.suggested_value||"";
+      const open = /^https?:\/\//.test(v) ? ` <a href="${esc(v)}" target="_blank" rel="noopener">open</a>` : "";
+      return `<tr data-id="${r.id}">
+        <td>${esc(titles[r.file_name]||r.file_name)}<div class="ev">${esc(r.file_name)}</div></td>
+        <td>${esc(r.store)}<div class="ev">${esc(r.format)} · ${esc(r.link_type)}</div></td>
+        <td class="val"><input type="text" value="${esc(v)}" placeholder="Paste the link or ID">${open}</td>
+        <td><span class="conf ${cls(r.confidence)}">${lbl(r.confidence)}</span></td>
+        <td class="ev">${esc(r.evidence||"")}</td>
+        <td class="acts"><button type="button" class="primary" data-a="ok">Approve</button> <button type="button" data-a="no">Reject</button></td>
+      </tr>`;
+    }).join("") + `</tbody></table>`;
+}
+async function slApprove(id, value){
+  const msg = await api("POST","rpc/approve_store_link", {p_id:id, p_value:value||null});
+  if (msg === "Added.") slChanged++;
+  return msg;
+}
+async function slReject(id){
+  await api("PATCH", `store_link_suggestions?id=eq.${id}`, {status:"rejected", decided_at:new Date().toISOString()}, {Prefer:"return=minimal"});
+}
+// Books that still have blank store cells, newest publication date first (the first one is picked).
+async function slBooks(){
+  const sel = $("#slbook");
+  try{
+    const rows = await api("GET","store_link_blanks?select=file_name&limit=5000") || [];
+    const count = {}; rows.forEach(r=>{ count[r.file_name] = (count[r.file_name]||0) + 1; });
+    const eds = {}; (data.editions||[]).forEach(e=>{ eds[e.file_name] = e; });
+    const files = Object.keys(count).sort((a,b)=>String((eds[b]||{}).publication_date||"").localeCompare(String((eds[a]||{}).publication_date||"")) || a.localeCompare(b));
+    sel.innerHTML = files.length
+      ? files.map(f=>{ const e = eds[f]||{}; return `<option value="${esc(f)}">${esc(e.title||f)}${e.language && e.language!=="English" ? " ("+esc(e.language)+")" : ""}${e.publication_date ? " · "+esc(e.publication_date) : ""} · ${count[f]} blank</option>`; }).join("")
+      : `<option value="">No published book has blank store links</option>`;
+    $("#slone").disabled = !files.length;
+  }catch(err){ sel.innerHTML = `<option value="">${esc(friendly(err))}</option>`; $("#slone").disabled = true; }
+}
+async function slRun(btn, file){
+  btn.disabled = true; slMsg(file ? "Looking up this book…" : "Looking up… this can take a minute.");
+  try{
+    const r = await fetch(cfg.url + "/functions/v1/find-store-links", {method:"POST", headers: await headers(), body: JSON.stringify(file ? {file_name:file} : {})});
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(j.error || j.message || ("Error " + r.status));
+    slMsg(`${j.blanks} blank cells · ${j.checked} looked up: ${j.sure} sure, ${j.check} to check, ${j.by_hand} to add by hand.`);
+    await slLoad();
+  }catch(err){ slMsg(friendly(err)); }
+  finally{ btn.disabled = false; }
+}
+$("#storelinks").onclick = ()=>{ slChanged = 0; slMsg(""); $("#sldlg").showModal(); slLoad(); slBooks(); };
+$("#slone").onclick = e=>{ const f = $("#slbook").value; if (f) slRun(e.currentTarget, f); };
+$("#slclose").onclick = ()=>{
+  $("#sldlg").close();
+  if (slChanged) setStatus(`${slChanged} store link(s) added. Press Reload to see them in the grid.`, "ok");
+};
+$("#slfind").onclick = e=>slRun(e.currentTarget, "");
+$("#slsure").onclick = async e=>{
+  const b = e.currentTarget, sure = slRows.filter(r=>r.confidence==="sure");
+  if (!sure.length) return;
+  if (!b.dataset.sure){ b.dataset.sure = "1"; const t = b.textContent; b.textContent = `Click again to approve ${sure.length}`; setTimeout(()=>{ delete b.dataset.sure; b.textContent = t; }, 4000); return; }
+  delete b.dataset.sure; b.textContent = "Approve all “Sure”"; b.disabled = true;
+  let done = 0;
+  try{ for (const r of sure){ await slApprove(r.id, r.suggested_value); done++; } slMsg(`Approved ${done}.`); }
+  catch(err){ slMsg(`Approved ${done}, then: ${friendly(err)}`); }
+  await slLoad();
+};
+$("#sllist").addEventListener("click", async ev=>{
+  const btn = ev.target.closest("button[data-a]"); if (!btn) return;
+  const tr = btn.closest("tr"), id = Number(tr.dataset.id);
+  tr.querySelectorAll("button").forEach(x=>x.disabled = true);
+  try{
+    if (btn.dataset.a === "ok") slMsg(await slApprove(id, tr.querySelector("input").value.trim()));
+    else { await slReject(id); slMsg("Rejected."); }
+    slRows = slRows.filter(r=>r.id !== id); slRender();
+  }catch(err){ slMsg(friendly(err)); tr.querySelectorAll("button").forEach(x=>x.disabled = false); }
+});
 
 /* ---------- export to CSV (shown = the grid as it looks now; all = every column and every book) ---------- */
 function csvCell(v){ const t = show(v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g,'""') + '"' : t; }
