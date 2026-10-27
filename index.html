@@ -108,7 +108,7 @@ td.title,th.title{width:23ch;min-width:23ch;max-width:23ch}
 td.title .v{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #gridwrap.full td .v{display:block;-webkit-line-clamp:unset;overflow:visible}
 #gridwrap.full td.long{--w:460px}
-td.edit{cursor:text}
+td.edit{cursor:default}
 .cpy{position:absolute;top:2px;right:2px;z-index:4;display:flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 4px;font-size:12px;line-height:1;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:5px;box-shadow:0 1px 3px #0002;cursor:pointer}
 .cpy:hover{color:var(--accent);border-color:var(--accent)}
 .cpy.done{color:var(--ok);border-color:var(--ok);font-weight:600}
@@ -692,10 +692,12 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   if (td){
     const ed = viewRows[+td.dataset.r]; if(!ed) return;
     e.preventDefault(); closeCtx();
+    if (!msel.has(keyOf(td))){ clearSel(); manchor = keyOf(td); msel.add(manchor); paintSel(); }   // right-click on an unselected cell selects it first
+    const canEd = td.classList.contains("edit");
     const m = document.createElement("div"); m.className = "ctx";
-    m.innerHTML = `<button type="button" data-a="hide">Hide row</button><button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
-    m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-90)+"px";
-    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
+    m.innerHTML = `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="hide">Hide row</button><button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
+    m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
+    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="edit"){ openEditor(td); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
     document.body.appendChild(m); ctxMenu = m;
     return;
   }
@@ -975,7 +977,9 @@ $("#gridwrap").addEventListener("click", e=>{
     }
     paintSel(); return;
   }
-  clearSel(); manchor = keyOf(td); // plain click: forget the selection; this cell is the starting cell for the next Shift+click
+  clearSel(); manchor = keyOf(td); msel.add(manchor); paintSel(); // plain click: select just this cell (also the starting cell for the next Shift+click)
+  if (!td.hasAttribute("tabindex")) td.setAttribute("tabindex","-1");
+  td.focus({preventScroll:true});
 });
 document.addEventListener("keydown", e=>{ if (e.key==="Escape" && !editing && msel.size) clearSel(); });
 fillBar.addEventListener("mousedown", e=>e.preventDefault());
@@ -1010,7 +1014,7 @@ function parseFor(c, text){
 }
 
 let editing = null; // {td, ed, c, old}
-$("#gridwrap").addEventListener("click", e=>{ const td = e.target.closest("td.edit"); if (td) openEditor(td); });
+/* left click only selects a cell; editing is right-click → Edit (or Enter / F2 on the selected cell) */
 $("#gridwrap").addEventListener("keydown", e=>{
   const td = e.target.closest("td.edit"); if (!td || editing) return;
   if (e.key==="Enter" || e.key==="F2"){ e.preventDefault(); openEditor(td); }
