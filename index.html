@@ -104,8 +104,8 @@ th.first{z-index:3}
 td{max-width:var(--w,220px);min-width:90px}
 td .v{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;word-break:break-word}
 td.long{--w:340px}
-td.title{max-width:none}
-td.title .v{display:block;white-space:nowrap;overflow:visible}
+td.title,th.title{width:23ch;min-width:23ch;max-width:23ch}
+td.title .v{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #gridwrap.full td .v{display:block;-webkit-line-clamp:unset;overflow:visible}
 #gridwrap.full td.long{--w:460px}
 td.edit{cursor:text}
