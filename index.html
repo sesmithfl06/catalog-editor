@@ -288,7 +288,7 @@ dialog#sldlg::backdrop{background:#0006}
         <select id="flang" aria-label="Language"><option value="">All languages</option></select>
         <select id="fseries" aria-label="Series"><option value="">All series</option></select>
         <input id="frow" type="search" placeholder="Find a book (title or file name)…">
-        <div id="rowtools"><button id="showrows" type="button" class="hidden" title="Bring back every book you hid with right-click → Hide row">Show hidden rows</button></div>
+        <div id="rowtools"><button id="addrows" type="button" class="hidden" title="Keep the books found by this search in the list (same as pressing Enter), then search for the next one">Add to list</button> <button id="clearpins" type="button" class="hidden" title="Remove every book you added by searching">Clear list</button> <button id="showrows" type="button" class="hidden" title="Bring back every book you hid with right-click → Hide row">Show hidden rows</button></div>
       </div>
     </details>
     <details class="sec" id="colsec" open>
@@ -696,9 +696,9 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     if (!msel.has(keyOf(td))){ clearSel(); manchor = keyOf(td); msel.add(manchor); paintSel(); }   // right-click on an unselected cell selects it first
     const canEd = td.classList.contains("edit");
     const m = document.createElement("div"); m.className = "ctx";
-    m.innerHTML = `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="hide">Hide row</button><button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
+    m.innerHTML = `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
     m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
-    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="edit"){ openEditor(td); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
+    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
     document.body.appendChild(m); ctxMenu = m;
     return;
   }
@@ -808,9 +808,25 @@ function fillFilters(){
   $("#fseries").innerHTML = `<option value="">All series</option>` + sers.map(s=>`<option>${esc(s)}</option>`).join("");
 }
 const hiddenRows = new Set();   // file_names of books hidden with right-click → Hide row (this view only; nothing is changed in Supabase)
+const pinned = [];   // file_names kept in the list by searching one after the other (this view only)
 function visibleRows(){
   if (linkView) return data.editions.filter(ed=>ed.file_name===linkView.file);   // opened from a link: just that book
   const L = $("#flang").value, S = $("#fseries").value, q = $("#frow").value.trim().toLowerCase();
+  const matches = searchRows(L, S, q);
+  if (!pinned.length) return matches;
+  const kept = pinned.map(fn=>data.editions.find(ed=>ed.file_name===fn)).filter(ed=>ed && !hiddenRows.has(ed.file_name));
+  return q ? kept.concat(matches.filter(ed=>!pinned.includes(ed.file_name))) : kept;   // kept books first, then what you are typing right now
+}
+function addPins(){
+  const q = $("#frow").value.trim().toLowerCase(); if (!q) return;
+  const found = searchRows($("#flang").value, $("#fseries").value, q);
+  if (!found.length){ setStatus("No book matches that search","warn"); return; }
+  found.forEach(ed=>{ if (!pinned.includes(ed.file_name)) pinned.push(ed.file_name); });
+  $("#frow").value = ""; renderGrid(); $("#frow").focus();
+}
+function unpin(fn){ const i = pinned.indexOf(fn); if (i>=0) pinned.splice(i,1); renderGrid(); }
+function clearPins(){ pinned.length = 0; renderGrid(); }
+function searchRows(L, S, q){
   return data.editions.filter(ed=>{
     if (hiddenRows.has(ed.file_name)) return false;
     if (L && ed.language!==L) return false;
@@ -856,6 +872,9 @@ function renderGrid(){
   $("#rowcount").textContent = `${viewRows.length} of ${data.editions.length} books · ${viewCols.length} columns` + (hidden ? ` (${hidden} column${hidden>1?"s":""} hidden: no blanks)` : "") + (hiddenRows.size ? ` · ${hiddenRows.size} row${hiddenRows.size>1?"s":""} hidden` : "") + (linkView ? " · opened from a link" : "");
   $("#linkexit").classList.toggle("hidden", !linkView);
   $("#showrows").classList.toggle("hidden", !hiddenRows.size);
+  $("#addrows").classList.toggle("hidden", !$("#frow").value.trim());
+  $("#clearpins").classList.toggle("hidden", !pinned.length);
+  $("#clearpins").textContent = `Clear list (${pinned.length})`;
   $("#showrows").textContent = `Show hidden rows (${hiddenRows.size})`;
   if (!viewCols.length){ $("#gridwrap").innerHTML = `<div class="empty">Tick some columns on the left.</div>`; return; }
   let h = "<table><thead><tr>";
@@ -893,6 +912,9 @@ $("#gridwrap").addEventListener("click", e=>{
 });
 $("#ffull").addEventListener("change", ()=>$("#gridwrap").classList.toggle("full", $("#ffull").checked));
 let ft; $("#frow").addEventListener("input", ()=>{ clearTimeout(ft); ft=setTimeout(renderGrid,150); });
+$("#frow").addEventListener("keydown", e=>{ if (e.key==="Enter"){ e.preventDefault(); clearTimeout(ft); addPins(); } });
+$("#addrows").onclick = addPins;
+$("#clearpins").onclick = clearPins;
 
 /* ---------- editing ---------- */
 /* ---------- hover copy icon: one shared button, moved into whichever cell the mouse is over ---------- */
