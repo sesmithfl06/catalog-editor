@@ -267,6 +267,7 @@ dialog#sldlg::backdrop{background:#0006}
   <header>
     <h1>Catalog Editor</h1>
     <span id="status">Loading…</span>
+    <button id="linkexit" type="button" class="hidden" title="This view shows only the book and cell the link opened. Click to go back to your usual books and columns.">Show all books &amp; columns</button>
     <span class="grow"></span>
     <button id="undo" title="Undo your last edit (Ctrl/⌘+Z)" disabled>Undo</button>
     <button id="reload" title="Reload everything from Supabase">Reload</button>
@@ -808,6 +809,7 @@ function fillFilters(){
 }
 const hiddenRows = new Set();   // file_names of books hidden with right-click → Hide row (this view only; nothing is changed in Supabase)
 function visibleRows(){
+  if (linkView) return data.editions.filter(ed=>ed.file_name===linkView.file);   // opened from a link: just that book
   const L = $("#flang").value, S = $("#fseries").value, q = $("#frow").value.trim().toLowerCase();
   return data.editions.filter(ed=>{
     if (hiddenRows.has(ed.file_name)) return false;
@@ -841,17 +843,18 @@ function sortRows(rows){
 let viewCols = [], viewRows = [];
 function renderGrid(){
   clearSel();
-  const blanksOnly = $("#fcolblank").checked;
-  const picked = blanksOnly ? allCols() : ticked();   // blanks mode looks at EVERY column, not only the ticked ones
+  const blanksOnly = !linkView && $("#fcolblank").checked;
+  const picked = linkCols() || (blanksOnly ? allCols() : ticked());   // blanks mode looks at EVERY column, not only the ticked ones
   const rows = visibleRows();
   const blankN = {};
   if (blanksOnly) for (const c of picked) blankN[c.id] = rows.reduce((n,ed)=>n + (isBlank(ed,c)?1:0), 0);
   viewCols = blanksOnly ? picked.filter(c=>KEY_COLS.has(c.id) || blankN[c.id] > 0) : picked;
-  if (sortBy.id && !viewCols.some(c=>c.id===sortBy.id)) sortBy = {id:null, dir:1};
+  if (!linkView && sortBy.id && !viewCols.some(c=>c.id===sortBy.id)) sortBy = {id:null, dir:1};
   viewRows = sortRows(rows);
   $("#bookcount").textContent = `${rows.length} of ${data.editions.length}`;
   const hidden = picked.length - viewCols.length;
-  $("#rowcount").textContent = `${viewRows.length} of ${data.editions.length} books · ${viewCols.length} columns` + (hidden ? ` (${hidden} column${hidden>1?"s":""} hidden: no blanks)` : "") + (hiddenRows.size ? ` · ${hiddenRows.size} row${hiddenRows.size>1?"s":""} hidden` : "");
+  $("#rowcount").textContent = `${viewRows.length} of ${data.editions.length} books · ${viewCols.length} columns` + (hidden ? ` (${hidden} column${hidden>1?"s":""} hidden: no blanks)` : "") + (hiddenRows.size ? ` · ${hiddenRows.size} row${hiddenRows.size>1?"s":""} hidden` : "") + (linkView ? " · opened from a link" : "");
+  $("#linkexit").classList.toggle("hidden", !linkView);
   $("#showrows").classList.toggle("hidden", !hiddenRows.size);
   $("#showrows").textContent = `Show hidden rows (${hiddenRows.size})`;
   if (!viewCols.length){ $("#gridwrap").innerHTML = `<div class="empty">Tick some columns on the left.</div>`; return; }
@@ -1483,33 +1486,40 @@ async function runPendingJump(){
   clearJumpHash();
   try{ await jumpTo(j.book, j.col); }catch(err){ setStatus(friendly(err), "bad"); }
 }
+/* Link view: a link shows ONLY that book, and only its title plus the linked column. Your own
+   filters, hidden rows and ticked columns are left as they were and come back with
+   "Show all books & columns", or as soon as you change a filter or tick a column. */
+let linkView = null;   // {file, col} while a link's view is showing
+function linkCols(){
+  if (!linkView || !linkView.col) return null;   // no column in the link: the book with your usual columns
+  return [COLMAP["ed:title"], COLMAP[linkView.col]].filter((c,i,a)=>c && a.indexOf(c)===i);
+}
+function leaveLinkView(){ if (!linkView) return false; linkView = null; $("#linkexit").classList.add("hidden"); return true; }
+$("#linkexit").onclick = async ()=>{
+  leaveLinkView();
+  try{ await ensureLoaded($("#fcolblank").checked ? allCols() : ticked()); renderGrid(); setStatus("Ready","ok"); }catch(err){ setStatus(friendly(err),"bad"); }
+};
+// Changing a filter, the book search, a column tick or a preset leaves the link view first (capture
+// runs before those controls' own handlers, which then redraw the grid the usual way).
+["change","input"].forEach(t=>$("aside").addEventListener(t, e=>{
+  if (e.target.closest("#flang,#fseries,#frow,#fcolblank,#collist,#presetsel")) leaveLinkView();
+}, true));
+
 async function jumpTo(book, colId){
   closeCtx(); if (editing) closeEditor(true);
   const low = book.toLowerCase();
   const ed = data.editions.find(e=>e.file_name===book) || data.editions.find(e=>(e.file_name||"").toLowerCase()===low);
   if (!ed){ setStatus(`Link: no book with the file name “${book}”.`, "bad"); return; }
   const c = colId ? COLMAP[colId] || null : null;
-  // clear only the filters that hide this book
-  const cleared = [];
-  if (hiddenRows.delete(ed.file_name)) cleared.push("hidden row");
-  if ($("#flang").value && $("#flang").value !== ed.language){ $("#flang").value = ""; cleared.push("language filter"); }
-  if ($("#fseries").value && $("#fseries").value !== ed.series){ $("#fseries").value = ""; cleared.push("series filter"); }
-  const find = $("#frow").value.trim().toLowerCase();
-  if (find && !((ed.title||"").toLowerCase().includes(find) || (ed.file_name||"").toLowerCase().includes(find))){ $("#frow").value = ""; cleared.push("book search"); }
-  // tick the column and show its box in the sidebar
-  if (c) checked.add(c.id);
-  renderColumnList();
+  linkView = {file: ed.file_name, col: c ? c.id : null};
+  // show the column's box in the sidebar (not ticked: the link view shows it without changing your columns)
   if (c){
     const g = [...document.querySelectorAll("#collist .grp")].find(d=>d.dataset.g===c.group);
     if (g){ g.open = true; const box = [...g.querySelectorAll("input[data-id]")].find(i=>i.dataset.id===c.id); if (box) box.closest("label").scrollIntoView({block:"nearest"}); }
   }
   setStatus("Opening the link…");
-  await ensureLoaded($("#fcolblank").checked ? allCols() : ticked());
+  await ensureLoaded(linkCols() || ticked());
   renderGrid();
-  if (c && !viewCols.includes(c) && $("#fcolblank").checked){   // "Only columns with blanks" hid this column
-    $("#fcolblank").checked = false; cleared.push("“Only columns with blanks”");
-    await ensureLoaded(ticked()); renderGrid();
-  }
   const ri = viewRows.indexOf(ed);
   if (ri < 0){ setStatus(`Link: couldn't show “${ed.title||ed.file_name}”.`, "bad"); return; }
   const ci = c ? viewCols.indexOf(c) : -1;
@@ -1526,7 +1536,6 @@ async function jumpTo(book, colId){
   if (c) msg = `Opened ${name} · ${c.label}` + (canEdit(ed,c) ? "" : " (can't be edited for this book)") + ".";
   else if (colId){ msg = `Opened ${name}. The column “${colId}” isn't in the Catalog Editor, so this is the book's row.`; kind = "warn"; }
   else msg = `Opened ${name}.`;
-  if (cleared.length) msg += ` Cleared: ${cleared.join(", ")}.`;
   setStatus(msg, kind);
 }
 
