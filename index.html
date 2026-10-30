@@ -79,7 +79,8 @@ aside{border-right:1px solid var(--line);background:var(--panel);min-height:0;ov
 .grp > summary{list-style:none;cursor:pointer;padding:7px 12px;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);display:flex;align-items:center;gap:6px}
 .grp > summary .n{font-weight:400;text-transform:none;margin-left:auto}
 .grp[open] > summary{color:var(--ink)}
-.has-help{text-decoration:underline dotted var(--muted);text-underline-offset:3px}
+.qm{display:inline-block;box-sizing:border-box;margin-left:5px;width:14px;height:14px;line-height:12px;text-align:center;border:1px solid var(--muted);border-radius:50%;color:var(--muted);font-size:10px;font-weight:700;font-style:normal;cursor:help;vertical-align:middle}
+.qm:hover{color:var(--accent);border-color:var(--accent)}
 .col{display:flex;gap:8px;align-items:flex-start;padding:3px 12px 3px 18px;cursor:pointer;font-size:13px}
 .col:hover{background:var(--soft)}
 .col input{margin-top:3px}
@@ -299,7 +300,7 @@ dialog#sldlg::backdrop{background:#0006}
           <button id="presetsave" type="button" title="Save the current columns, filters and sort as a preset">Save preset</button>
           <button id="presetdel" type="button" title="Delete the selected preset" disabled>Delete preset</button>
         </div>
-        <label class="chk" title="Checks every column (ticked or not) and shows only the ones that have a blank for at least one book shown. Title, language, series, book number and file name always stay."><input type="checkbox" id="fcolblank"> Only columns with blanks</label>
+        <label class="chk" title="Shows the title plus every column that has a blank for at least one book shown. Tick or untick a column on the left to add it to or remove it from this view."><input type="checkbox" id="fcolblank"> Blanks</label>
         <input id="colsearch" type="search" placeholder="Find a column…">
         <div class="btns">
           <button id="none" title="Untick everything">Clear</button>
@@ -423,11 +424,78 @@ function refListFor(c){
   const k = Object.keys(REF).find(n => col.endsWith("_"+n)); // e.g. paperback_page_size -> page_size
   return k ? REF[k] : null;
 }
+/* ---------- built-in explanations (used when field_registry.description is blank) ---------- */
+// Heat level numbers for Spice (0-5); they appear in the ? hover and on each cell.
+const SPICE_SCALE = {0:"no romance", 1:"flirting or kissing", 2:"fade to black", 3:"one or two descriptively sexy scenes", 4:"three or more sexy scenes", 5:"a strong sexy focus throughout"};
+const LINK_TYPE_HELP = {"ASIN":"ASIN = Amazon's product ID for the book.", "Universal Link":"Universal Link = one link meant to work for readers in any country.", "Custom Link":"Custom Link = a custom-made (branded or shortened) link.", "Deactivated Link":"Deactivated Link = a link that has been switched off and should not be used."};
+const HELP = {
+  "editions.file_name":"The book's unique file name. It is the row's ID and ties it to its manuscript, story bible and every other table.",
+  "editions.story_id":"ID of the story this edition tells. Every language edition of the same story shares one Story ID, so the Story columns are shared between them.",
+  "editions.number_in_series":"Book number within its series. It can be a decimal. Barnes & Noble needs a whole number, see \"Book # with no decimals (B&N)\".",
+  "editions.archived_long_synopsis":"An older long description, kept for reference. No longer the live one.",
+  "editions.archived_short_synopsis":"An older short description, kept for reference. No longer the live one.",
+  "editions.essential_description":"The book's essential description: the plain core description.",
+  "editions.loglines":"One-sentence hooks that sum up the story.",
+  "editions.new_end_of_story_promo_file_name":"File name of the book that the new end-of-story promo advertises.",
+  "editions.new_end_of_story_promo_rule":"The rule used to pick which book the new end-of-story promo advertises.",
+  "editions.bisac":"BISAC subject codes (the US book-industry category codes), e.g. FIC009010 = Fiction / Fantasy / Contemporary.",
+  "editions.thema":"Thema subject codes (the international book category codes), e.g. FMR = Fantasy romance.",
+  "editions.bowker_genres":"Genres as entered with Bowker (the ISBN agency).",
+  "editions.kindle_unlimited":"Whether the eBook is in Kindle Unlimited (KU), which means it is sold only on Amazon.",
+  "editions.vellum_link_created":"Whether the Vellum link for this book has been created.",
+    "stories.spice":"0 = no romance, 1 = flirting or kissing, 2 = fade to black, 3 = one or two descriptively sexy scenes, 4 = three or more sexy scenes, 5 = a strong sexy focus throughout. Exception: a story with a strong sexy focus, or a polyamorous one, but only one or two explicit scenes is a 4.",
+  "stories.age_max":"The maximum age of the story's intended audience.",
+  "stories.connected_universe":"The shared universe this story belongs to, linking it with other series.",
+  "stories.main_genre_differentiated":"The story's main genre, in finer detail than the store genres.",
+  "stories.display_tags":"The tags shown to readers (a trimmed set of Tags).",
+  "formats.not_offered":"Tick when this format is not offered for this book.",
+  "formats.library_price_usd":"Price libraries pay, in US dollars.",
+  "formats.word_count":"Word count of the story bible.",
+  "series.reading_note":"Note to readers about the reading order of the series.",
+  "edition_awards.badge":"Badge for that award, shown on the book.",
+  "edition_release_notes.subscription_publication":"Notes on when the book was published in a subscription service.",
+  "edition_release_notes.collection_publication":"Notes on when the book was published in a collection.",
+  "long_synopsis_inserts.insert_line":"Extra line added into the long synopsis.",
+  "long_synopsis_inserts.insert_place":"Where in the long synopsis the extra line goes.",
+  "long_synopsis_inserts.closing_place":"Where the closing line goes in the long synopsis.",
+  "info.whole_book_number":"Worked out: the book number as a whole number with no decimal, because Barnes & Noble does not accept decimals.",
+  "list.char_facts":"Facts about the characters.",
+  "list.char_settings":"Where each character lives or appears (their settings).",
+  "list.char_rels":"How the characters are related to each other.",
+  "list.language":"Pet names and invented words used in the book.",
+  "list.rare":"Rare details worth noting in the book.",
+  "list.reviews":"Reviews of the book. Edit them in Notion.",
+  "list.copy":"Marketing copy for the book. Edit it in Notion.",
+  "list.pron":"How to pronounce names and invented words.",
+  "list.scenes":"Prompts for scene images.",
+};
+const ML_HELP = {
+  "Giphy (Facebook & Twitter)":"Giphy link used for sharing the animated cover on Facebook and Twitter.",
+  "BookFunnel (email collection)":"BookFunnel download link that asks readers for their email address.", "BookFunnel (no email collection)":"BookFunnel download link that does not ask for an email address."
+};
+function ownHelp(c){
+  const col = c.col || c.field || "";
+  if (c.kind==="sl") return LINK_TYPE_HELP[c.lt] || "";
+  if (c.kind==="ml") return ML_HELP[c.lt] || "";
+  if (c.kind==="est") return "The English text kept next to the translation, so you can compare them.";
+  let h = HELP[({ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", info:"info", list:"list"}[c.kind]) + "." + col] || "";
+  return h;
+}
+// Meaning of one coded value (shown when hovering a cell), or "" for ordinary values.
+function valueHelp(c, v){
+  if (v==null || v==="") return "";
+  if (c.id==="st:spice") return SPICE_SCALE[v] ? "Heat level " + v + " = " + SPICE_SCALE[v] : "";
+  const list = (c.id==="st:rating" ? REF.rating : c.id==="ed:paperback_page_size" ? REF.page_size : null);
+  const hit = list && list.find(x=>String(x.value)===String(v) && x.note);
+  return hit ? v + " = " + hit.note : "";
+}
+function qm(text){ return `<span class="qm" title="${esc(text)}" aria-label="Explanation">?</span>`; }
 function helpFor(c){
   const parts = [];
   const regTable = {ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", ml:"marketing_links", info:"editions"}[c.kind];
   const r = regTable && REG[regTable+"."+(c.col||"")];
-  if (r && r.description) parts.push(r.description);
+  const own = (r && r.description) || ownHelp(c);
+  if (own) parts.push(own);
   const list = refListFor(c);
   if (list && list.length <= 12){
     const withNotes = list.filter(x=>x.note);
@@ -445,7 +513,7 @@ const GROUP_ITEMS = {
     "ed:loglines","ed:short_synopsis","ed:medium_synopsis","ed:long_synopsis","ed:essential_description","ed:long_synopsis_lead_in","ed:long_synopsis_closing_line",
     "one:long_synopsis_inserts:insert_line","one:long_synopsis_inserts:insert_place","one:long_synopsis_inserts:closing_place","ed:archived_short_synopsis","ed:archived_long_synopsis",
     "st:rating","st:explicit_content","st:spice","st:age_max","st:audience","st:main_genre_differentiated",
-    "ed:word_count","ed:chapters","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
+    "ed:word_count","fmt:Story Bible:word_count","ed:chapters","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
     "one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","one:edition_release_notes:not_released_reason",
     "list:authors_note","info:author","info:publisher","info:author_bio","ed:sheet_order","ed:story_id","st:story_id"],
   "Story": ["st:main_plot","st:subplots","st:tags","st:display_tags","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
@@ -473,7 +541,7 @@ function buildCatalog(sample){
   for (const l of sample.mlTypes){ addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:6000, ro:false});
     if (l==="Cover image") addCol({id:"ml:"+l+":alt_text", kind:"ml", lt:l, col:"alt_text", table:"marketing_links", label:"Cover alt text", group:"Marketing links", order:6001, ro:false}); }
   const fmtFields = ["not_offered","price_usd","library_price_usd","payhip_price_usd","isbn","amazon_isbn","bn_isbn","publication_date","word_count","narrator","runtime","notes"];
-  for (const f of sample.formats) for (const c of fmtFields) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
+  for (const f of sample.formats) for (const c of fmtFields) if (c!=="word_count" || f==="Story Bible") addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
   for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
   for (const c of ["series_synopsis","series_url","reading_note"]) addCol({id:"ser:"+c, kind:"ser", col:c, table:"series", label:regLabel("series",c), group:"Series (shared by the whole series)", order:9000+regOrder("series",c), ro:false});
   // Story details kept as lists per book (read-only here)
@@ -596,6 +664,21 @@ async function loadAll(){
 
 /* ---------- column picker ---------- */
 let checked = new Set(FAVORITES);
+// Blanks view: columns you added (even with no blanks) or removed (even with blanks), and the ids now shown.
+let blankAdd = new Set(), blankOff = new Set(), blankIds = new Set();
+const BLANK_KEEP = "ed:title";
+function blanksOn(){ return !linkView && $("#fcolblank").checked; }
+function onSet(){ return blanksOn() ? blankIds : checked; }
+function setColOn(id, on){
+  if (blanksOn()){ if (id===BLANK_KEEP) return; if (on){ blankOff.delete(id); blankAdd.add(id); } else { blankAdd.delete(id); blankOff.add(id); } }
+  else on ? checked.add(id) : checked.delete(id);
+}
+function syncColList(){
+  const on = onSet();
+  document.querySelectorAll("#collist input[data-id]").forEach(i=>{ i.checked = on.has(i.dataset.id); });
+  document.querySelectorAll("#collist .grp").forEach(g=>{ const n = g.querySelectorAll("input:checked").length; g.querySelector(".n").textContent = n ? n+" ticked" : ""; });
+  updateColCount();
+}
 function sortCols(list){ return list.sort((a,b)=>(KEY_COLS.has(b.id)-KEY_COLS.has(a.id)) || orderOf(a)-orderOf(b)); }
 function ticked(){ return sortCols(COLS.filter(c=>checked.has(c.id))); }
 function allCols(){ return sortCols(COLS.slice()); }
@@ -613,22 +696,21 @@ function renderColumnList(){
     const words = q.split(/\s+/).filter(Boolean);
     const show = cs.filter(c=>{ const hay = (c.label+" "+g+" "+(c.col||"")).toLowerCase().replace(/_/g," "); return words.every(w=>hay.includes(w)); });
     if (!show.length) continue;
-    const n = cs.filter(c=>checked.has(c.id)).length;
+    const n = cs.filter(c=>onSet().has(c.id)).length;
     const isOpen = q || open.has(g);
     html += `<details class="grp" data-g="${esc(g)}" ${isOpen?"open":""}><summary>${esc(g)} <span class="n">${n?n+" ticked":""}</span></summary>`;
     for (const c of show){ const hp = [helpFor(c), c.ro ? "Read-only" : ""].filter(Boolean).join("\n");
-      html += `<label class="col ${c.ro?"ro":""}" ${hp?`title="${esc(hp)}"`:""}><input type="checkbox" data-id="${esc(c.id)}" ${checked.has(c.id)?"checked":""}><span><span class="lbl ${hp?"has-help":""}">${esc(c.label)}</span></span></label>`; }
+      html += `<label class="col ${c.ro?"ro":""}"><input type="checkbox" data-id="${esc(c.id)}" ${onSet().has(c.id)?"checked":""}><span><span class="lbl">${esc(c.label)}</span>${hp?qm(hp):""}</span></label>`; }
     html += `</details>`;
   }
   $("#collist").innerHTML = html || `<div class="empty">No column matches.</div>`;
   updateColCount();
 }
-function updateColCount(){ const n = checked.size; $("#colcount").textContent = n ? n + " ticked" : ""; }
+function updateColCount(){ const n = onSet().size; $("#colcount").textContent = n ? n + " ticked" : ""; }
+$("#collist").addEventListener("click", e=>{ if (e.target.closest(".qm")) e.preventDefault(); });   // the ? icon only explains, it must not tick the column
 $("#collist").addEventListener("change", async e=>{
   const id = e.target.dataset.id; if(!id) return;
-  e.target.checked ? checked.add(id) : checked.delete(id);
-  const sum = e.target.closest(".grp").querySelector(".n"); const n = [...e.target.closest(".grp").querySelectorAll("input:checked")].length; sum.textContent = n? n+" ticked":"";
-  updateColCount();
+  setColOn(id, e.target.checked);
   await refresh();
 });
 $("#colsearch").addEventListener("input", renderColumnList);
@@ -636,15 +718,12 @@ $("#colsearch").addEventListener("input", renderColumnList);
 let ctxMenu = null;
 function closeCtx(){ if(ctxMenu){ ctxMenu.remove(); ctxMenu = null; } }
 async function setSection(grp, on){
-  const keep = id => KEY_COLS.has(id) && id !== "ed:file_name";
+  const keep = id => blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
   grp.querySelectorAll("input[data-id]").forEach(i=>{
     const id = i.dataset.id;
-    if (on) { checked.add(id); i.checked = true; }
-    else if (!keep(id)) { checked.delete(id); i.checked = false; }
+    if (on) setColOn(id, true);
+    else if (!keep(id)) setColOn(id, false);
   });
-  const n = grp.querySelectorAll("input:checked").length;
-  grp.querySelector(".n").textContent = n ? n+" ticked" : "";
-  updateColCount();
   await refresh();
 }
 $("#collist").addEventListener("contextmenu", e=>{
@@ -663,22 +742,15 @@ document.addEventListener("scroll", closeCtx, true);
 window.addEventListener("resize", closeCtx);
 /* right-click a column header: Hide column (unticks its box in the sidebar; re-tick the box to show it again) */
 async function hideColumn(id){
-  checked.delete(id);
-  const box = [...document.querySelectorAll("#collist input[data-id]")].find(i=>i.dataset.id===id);
-  if (box){
-    box.checked = false;
-    const grp = box.closest(".grp");
-    if (grp){ const n = grp.querySelectorAll("input:checked").length; grp.querySelector(".n").textContent = n ? n+" ticked" : ""; }
-  }
-  updateColCount();
+  setColOn(id, false);
   await refresh();
 }
 /* right-click a column header: Hide from here to end (unticks this column and every column to its right in the grid; the locked ones always stay) */
 async function hideColumnsFrom(id){
   const i = viewCols.findIndex(c=>c.id===id); if(i<0) return;
   for (const c of viewCols.slice(i)){
-    if (KEY_COLS.has(c.id) && c.id !== "ed:file_name") continue;
-    checked.delete(c.id);
+    if (blanksOn() ? c.id===BLANK_KEEP : KEY_COLS.has(c.id) && c.id !== "ed:file_name") continue;
+    setColOn(c.id, false);
   }
   renderColumnList();
   await refresh();
@@ -705,9 +777,9 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   const th = e.target.closest("th[data-sort]"); if(!th) return;
   e.preventDefault(); closeCtx();
   const id = th.dataset.sort;
-  const locked = KEY_COLS.has(id) && id !== "ed:file_name";
+  const locked = blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
   const m = document.createElement("div"); m.className = "ctx";
-  m.innerHTML = (locked ? `<button type="button" disabled title="Title, language, series and book number always stay">Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`;
+  m.innerHTML = (locked ? `<button type="button" disabled title="The title always stays">Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`;
   m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-90)+"px";
   m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); b.dataset.a==="end" ? hideColumnsFrom(id) : hideColumn(id); });
   document.body.appendChild(m); ctxMenu = m;
@@ -728,6 +800,7 @@ async function applyPreset(p){
   sortBy = p.sort && p.sort.id ? p.sort : {id:null, dir:1};
   $("#flang").value = p.lang || ""; $("#fseries").value = p.series || ""; $("#frow").value = p.find || "";
   $("#fcolblank").checked = !!p.blanks;
+  blankAdd = new Set(p.blankAdd||[]); blankOff = new Set(p.blankOff||[]);
   renderColumnList();
   try{ await ensureLoaded(p.blanks ? allCols() : ticked()); renderGrid(); setStatus("Ready","ok"); }catch(err){ setStatus(err.message,"bad"); }
 }
@@ -742,7 +815,7 @@ $("#presetsave").onclick = ()=>{
   const name = (prompt("Name this view preset:", def)||"").trim(); if (!name) return;
   const all = loadPresets();
   if (all[name] && name!==def && !confirm(`A preset named "${name}" already exists. Replace it?`)) return;
-  all[name] = {cols:[...checked], lang:$("#flang").value, series:$("#fseries").value, find:$("#frow").value, blanks:$("#fcolblank").checked, sort:sortBy};
+  all[name] = {cols:[...checked], lang:$("#flang").value, series:$("#fseries").value, find:$("#frow").value, blanks:$("#fcolblank").checked, blankAdd:[...blankAdd], blankOff:[...blankOff], sort:sortBy};
   savePresets(all); renderPresetMenu("p:"+name); setStatus(`Saved preset "${name}"`,"ok");
 };
 $("#presetdel").onclick = ()=>{
@@ -751,7 +824,7 @@ $("#presetdel").onclick = ()=>{
   const all = loadPresets(); delete all[name]; savePresets(all); renderPresetMenu(""); setStatus(`Deleted preset "${name}"`,"ok");
 };
 renderPresetMenu("");
-$("#none").onclick = async()=>{ checked = new Set([...KEY_COLS].filter(k=>k!=="ed:file_name")); renderColumnList(); await refresh(); };
+$("#none").onclick = async()=>{ if (blanksOn()){ viewCols.forEach(c=>setColOn(c.id,false)); renderColumnList(); renderGrid(); return; } checked = new Set([...KEY_COLS].filter(k=>k!=="ed:file_name")); renderColumnList(); await refresh(); };
 $("#expand").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=true);
 $("#collapse").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=false);
 async function refresh(){ try{ await ensureLoaded(ticked()); renderGrid(); setStatus("Ready","ok"); }catch(err){ setStatus(err.message,"bad"); } }
@@ -864,11 +937,12 @@ function renderGrid(){
   const rows = visibleRows();
   const blankN = {};
   if (blanksOnly) for (const c of picked) blankN[c.id] = rows.reduce((n,ed)=>n + (isBlank(ed,c)?1:0), 0);
-  viewCols = blanksOnly ? picked.filter(c=>KEY_COLS.has(c.id) || blankN[c.id] > 0) : picked;
+  viewCols = blanksOnly ? picked.filter(c=>c.id===BLANK_KEEP || (!blankOff.has(c.id) && (blankAdd.has(c.id) || blankN[c.id] > 0))) : picked;
+  if (blanksOnly){ blankIds = new Set(viewCols.map(c=>c.id)); syncColList(); }
   if (!linkView && sortBy.id && !viewCols.some(c=>c.id===sortBy.id)) sortBy = {id:null, dir:1};
   viewRows = sortRows(rows);
   $("#bookcount").textContent = `${rows.length} of ${data.editions.length}`;
-  const hidden = picked.length - viewCols.length;
+  const hidden = blanksOnly ? picked.filter(c=>c.id!==BLANK_KEEP && !blankN[c.id] && !blankAdd.has(c.id)).length : 0;
   $("#rowcount").textContent = `${viewRows.length} of ${data.editions.length} books · ${viewCols.length} columns` + (hidden ? ` (${hidden} column${hidden>1?"s":""} hidden: no blanks)` : "") + (hiddenRows.size ? ` · ${hiddenRows.size} row${hiddenRows.size>1?"s":""} hidden` : "") + (linkView ? " · opened from a link" : "");
   $("#linkexit").classList.toggle("hidden", !linkView);
   $("#showrows").classList.toggle("hidden", !hiddenRows.size);
@@ -880,9 +954,8 @@ function renderGrid(){
   let h = "<table><thead><tr>";
   viewCols.forEach((c,i)=>{
     const on = sortBy.id===c.id, icon = on ? (sortBy.dir>0 ? "▲" : "▼") : "⇅";
-    const hp = helpFor(c), tip = (hp ? hp + "\n\n" : "") + (on ? (sortBy.dir>0 ? "Sorted A→Z / low→high. Click for Z→A." : "Sorted Z→A / high→low. Click to go back to the usual order.") : "Click to sort by this column.");
-    const sub = blanksOnly && !KEY_COLS.has(c.id) ? `<span class="tbl blk">${blankN[c.id]} blank</span>` : "";
-    h += `<th class="sortable ${i===0?"first":""} ${on?"sorted":""}" data-sort="${esc(c.id)}" aria-sort="${on?(sortBy.dir>0?"ascending":"descending"):"none"}" title="${esc(tip)}"><span class="${hp?"has-help":""}">${esc(c.label)}</span><span class="sic" aria-hidden="true">${icon}</span>${sub}</th>`;
+    const hp = helpFor(c), tip = "You can sort by this column by clicking the sort icon." + (on ? (sortBy.dir>0 ? "\nNow sorted A→Z / low→high. Click again for Z→A." : "\nNow sorted Z→A / high→low. Click again to go back to the usual order.") : "");
+    h += `<th class="sortable ${i===0?"first":""} ${on?"sorted":""}" data-sort="${esc(c.id)}" aria-sort="${on?(sortBy.dir>0?"ascending":"descending"):"none"}"><span>${esc(c.label)}</span>${hp?qm(hp):""}<span class="sic" title="${esc(tip)}">${icon}</span></th>`;
   });
   h += "</tr></thead><tbody>";
   viewRows.forEach((ed,ri)=>{
@@ -890,7 +963,7 @@ function renderGrid(){
     viewCols.forEach((c,ci)=>{
       const v = valueOf(ed,c), ok = canEdit(ed,c);
       const cls = [ci===0?"first":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (LONG_HINT.test(c.col||c.field||c.label)?"long":""), (c.id==="ed:title"?"title":"")].join(" ");
-      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc(disp(v,c)).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
+      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
     });
     h += "</tr>";
   });
@@ -899,10 +972,11 @@ function renderGrid(){
 }
 ["#flang","#fseries"].forEach(s=>$(s).addEventListener("change", renderGrid));
 $("#fcolblank").addEventListener("change", async()=>{
-  try{ if ($("#fcolblank").checked){ setStatus("Checking every column for blanks…","ok"); await ensureLoaded(allCols()); } else await ensureLoaded(ticked()); renderGrid(); setStatus("Ready","ok"); }
+  try{ if ($("#fcolblank").checked){ setStatus("Checking every column for blanks…","ok"); await ensureLoaded(allCols()); } else await ensureLoaded(ticked()); renderGrid(); renderColumnList(); setStatus("Ready","ok"); }
   catch(err){ setStatus(err.message,"bad"); }
 });
 $("#gridwrap").addEventListener("click", e=>{
+  if (e.target.closest(".qm")) return;   // the ? icon only explains, it does not sort
   const th = e.target.closest("th[data-sort]"); if (!th) return;
   const id = th.dataset.sort;
   if (sortBy.id !== id) sortBy = {id, dir:1};
