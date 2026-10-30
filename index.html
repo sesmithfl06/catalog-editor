@@ -8,16 +8,17 @@
 :root{
   --bg:#f6f5f2; --panel:#ffffff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e3e1dc; --soft:#efeee9;
   --accent:#2f5d8a; --accent-ink:#ffffff; --ok:#2e7d4f; --warn:#a15c00; --bad:#b3261e; --ro:#f1f0ec;
-  --sel:#e7eef6; --focus:#2f5d8a55;
+  --sel:#e7eef6; --focus:#2f5d8a55; --band:#f8f7f4; --roband:#eae8e3;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#17181a; --panel:#1f2023; --ink:#ececee; --muted:#9a9aa1; --line:#33343a; --soft:#26272b;
     --accent:#7fb0e0; --accent-ink:#0d1a26; --ok:#6cc58f; --warn:#e0a54f; --bad:#ef7f77; --ro:#232428;
-    --sel:#22303d; --focus:#7fb0e055;
+    --sel:#22303d; --focus:#7fb0e055; --band:#25262a; --roband:#2b2c31;
   }
 }
 :root[data-theme="dark"]{
+  --band:#25262a; --roband:#2b2c31;
   --bg:#17181a; --panel:#1f2023; --ink:#ececee; --muted:#9a9aa1; --line:#33343a; --soft:#26272b;
   --accent:#7fb0e0; --accent-ink:#0d1a26; --ok:#6cc58f; --warn:#e0a54f; --bad:#ef7f77; --ro:#232428;
   --sel:#22303d; --focus:#7fb0e055;
@@ -33,6 +34,11 @@ button:disabled{opacity:.5;cursor:default}
 input[type=text],input[type=email],input[type=password],input[type=search],select{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 8px}
 input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .hidden{display:none !important}
+.helptip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:-4px;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:var(--muted);font-size:12px;font-weight:600;cursor:help;user-select:none}
+.helptip:hover,.helptip:focus{border-color:var(--accent);color:var(--ink);outline:none}
+.helptip::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);right:-8px;width:240px;padding:8px 10px;background:var(--ink);color:var(--bg);border-radius:6px;font-size:12px;font-weight:400;line-height:1.4;text-align:left;white-space:normal;box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .12s;z-index:50}
+.helptip:hover::after,.helptip:focus::after{opacity:1}
+
 
 /* sign-in */
 #signin{max-width:380px;margin:12vh auto;padding:28px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
@@ -79,8 +85,9 @@ aside{border-right:1px solid var(--line);background:var(--panel);min-height:0;ov
 .grp > summary{list-style:none;cursor:pointer;padding:7px 12px;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);display:flex;align-items:center;gap:6px}
 .grp > summary .n{font-weight:400;text-transform:none;margin-left:auto}
 .grp[open] > summary{color:var(--ink)}
-.qm{display:inline-block;box-sizing:border-box;margin-left:5px;width:14px;height:14px;line-height:12px;text-align:center;border:1px solid var(--muted);border-radius:50%;color:var(--muted);font-size:10px;font-weight:700;font-style:normal;cursor:help;vertical-align:middle}
-.qm:hover{color:var(--accent);border-color:var(--accent)}
+.qm{text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.qm:hover{color:var(--accent)}
+.qmpop{position:fixed;z-index:9999;max-width:320px;padding:8px 10px;background:var(--panel);color:var(--ink);border:1px solid var(--accent);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.2);font-size:12px;font-weight:400;line-height:1.4;white-space:pre-line}
 .col{display:flex;gap:8px;align-items:flex-start;padding:3px 12px 3px 18px;cursor:pointer;font-size:13px}
 .col:hover{background:var(--soft)}
 .col input{margin-top:3px}
@@ -95,15 +102,48 @@ th,td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);pad
 th{position:sticky;top:0;z-index:2;background:var(--soft);font-weight:600;white-space:nowrap}
 th .tbl{display:block;font-weight:400;color:var(--muted);font-size:11px}
 th .tbl.blk{color:var(--warn)}
-th.sortable{cursor:pointer;user-select:none}
-th.sortable:hover{background:var(--sel)}
-th .sic{display:inline-block;margin-left:6px;color:var(--muted);font-size:11px;opacity:.6}
+th.sortable{user-select:none}
+th .sic{display:inline-block;cursor:pointer;padding:0 4px;border-radius:4px;margin-left:6px;color:var(--muted);font-size:11px;opacity:.6}
+th .sic:hover{background:var(--sel)}
 th.sorted .sic{color:var(--accent);opacity:1;font-weight:700}
 th.sorted{box-shadow:inset 0 -2px 0 var(--accent)}
-td.first,th.first{position:sticky;left:0;z-index:1}
-th.first{z-index:3}
+th .fic{display:inline-block;margin-left:4px;padding:0 4px;border-radius:4px;color:var(--muted);font-size:11px;opacity:.7;cursor:pointer}
+th .fic:hover{background:var(--panel);color:var(--accent);opacity:1}
+th.filtered .fic{color:var(--accent-ink);background:var(--accent);opacity:1;font-weight:700}
+.fpop{width:290px;padding:8px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.fpop .fhead{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fpop .fsort{display:flex;gap:6px}
+.fpop .fsort button,.fpop .fbtns button{width:auto;display:inline-block;border:1px solid var(--line);background:var(--soft);padding:4px 10px;border-radius:5px}
+.fpop .fsort button:hover,.fpop .fbtns button:hover{border-color:var(--accent)}
+.fpop .fbtns{display:flex;gap:6px;justify-content:flex-end}
+.fpop .fbtns .ok{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.fpop input[type=search]{width:100%;box-sizing:border-box}
+.fpop .flist{max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:4px 0}
+.fpop .flist label{display:flex;gap:6px;align-items:flex-start;padding:2px 8px;cursor:pointer}
+.fpop .flist label:hover{background:var(--soft)}
+.fpop .flist label.all{font-weight:600;border-bottom:1px solid var(--line);margin-bottom:2px;padding-bottom:4px}
+.fpop .flist .fv{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fpop .flist .fn{color:var(--muted);font-size:11px}
+.fpop .fmsg{color:var(--warn);font-size:12px;min-height:0}
+.fpop .fcond{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:6px;padding:6px}
+.fpop .fcond .fcl{font-size:11px;color:var(--muted)}
+.fpop .fcond select,.fpop .fcond input{width:100%;box-sizing:border-box}
+.fpop .fcond .fab{display:flex;gap:4px;align-items:center}
+.fpop .fcond .fab span{color:var(--muted);font-size:12px}
+.filters .sortinfo{font-size:12px;color:var(--muted)}
+td.frz,th.frz{position:sticky;left:0;z-index:1}
+th.frz{z-index:3}
+td.frzlast,th.frzlast{box-shadow:2px 0 0 var(--accent)}
+th.sorted.frzlast{box-shadow:inset 0 -2px 0 var(--accent),2px 0 0 var(--accent)}
+th .rsz{position:absolute;top:0;right:-3px;width:7px;height:100%;cursor:col-resize;z-index:4}
+th .rsz:hover,body.colresizing th .rsz.on{background:var(--accent);opacity:.5}
+body.colresizing,body.colresizing *{cursor:col-resize !important;user-select:none !important}
+th.sized{overflow:hidden;text-overflow:ellipsis}
+th.dragging{opacity:.45}
+th.dropL{box-shadow:inset 3px 0 0 var(--accent)}
+th.dropR{box-shadow:inset -3px 0 0 var(--accent)}
 td{max-width:var(--w,220px);min-width:90px}
-td .v{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;word-break:break-word}
+td .v{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;word-break:break-word}
 td.long{--w:340px}
 td.title,th.title{width:23ch;min-width:23ch;max-width:23ch}
 td.title .v{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -117,9 +157,12 @@ td.msel{background:var(--sel);outline:2px solid var(--accent);outline-offset:-2p
 td.msel.anchor{outline-width:3px;outline-style:double}
 #fillbar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel);border:1px solid var(--accent);border-radius:10px;box-shadow:0 4px 16px #0004;max-width:min(94vw,680px)}
 #fillbar .fv{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-td:not(.first){position:relative}
+td:not(.frz){position:relative}
 td.edit:hover{background:var(--sel)}
 td.ro{background:var(--ro);color:var(--muted)}
+:where(tbody tr:nth-child(even)) td{background:var(--band)}
+:where(tbody tr:nth-child(even)) td.ro{background:var(--roband)}
+.qmpop a{color:var(--accent);text-decoration:underline;cursor:pointer}
 td.blank .v::before{content:"—";color:var(--line)}
 td.saving{box-shadow:inset 3px 0 0 var(--warn)}
 td.saved{box-shadow:inset 3px 0 0 var(--ok)}
@@ -189,14 +232,13 @@ dialog#sldlg::backdrop{background:#0006}
         <div class="row">
           <button class="primary" type="submit">Sign in with password</button>
         </div>
-        <div class="hint">After the password you'll be asked for your LastPass Authenticator code.</div>
       </form>
     </details>
   </div>
 
   <div id="st-code" class="step hidden">
     <label for="totp">Code from LastPass Authenticator</label>
-    <input id="totp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+    <input id="totp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
     <div class="row"><button class="primary" id="totpgo" type="button">Continue</button><button type="button" class="back">Back</button></div>
     <div class="hint" id="codehint"></div>
   </div>
@@ -209,7 +251,6 @@ dialog#sldlg::backdrop{background:#0006}
       <button id="setuptotp" type="button">Set up LastPass Authenticator</button>
     </div>
     <div id="totpbox" class="hidden">
-      <p class="hint">In LastPass Authenticator tap <b>+</b>, then scan this code (or type the key below), and enter the 6-digit code it shows.</p>
       <div id="qr"></div>
       <div class="hint">Key: <code id="totpsecret"></code></div>
       <label for="totpnew">6-digit code</label>
@@ -250,12 +291,12 @@ dialog#sldlg::backdrop{background:#0006}
 <!-- ============ Find store links ============ -->
 <dialog id="sldlg">
   <h2>Find store links</h2>
-  <p class="hint">Looks up only the blank store cells of published books (publication date = wide release, already passed). Cells that already have a link are never checked. Nothing goes into the catalog until you press Approve. A rejected link is never suggested again.</p>
+  <p class="hint">Nothing goes into the catalog until you press Approve. A rejected link is never suggested again.</p>
   <div class="row">
     <select id="slbook" aria-label="Book to look up" title="Books with blank store links, newest publication date first"><option value="">Loading books…</option></select>
     <button id="slone" class="primary" type="button">Look up this book</button>
     <button id="slfind" type="button">Look up all books</button>
-    <button id="slsure" type="button" title="Approve every row marked Sure">Approve all “Sure”</button>
+    <button id="slsure" type="button">Approve all “Sure”</button>
     <span class="grow"></span>
     <span class="hint" id="slmsg"></span>
   </div>
@@ -270,15 +311,17 @@ dialog#sldlg::backdrop{background:#0006}
     <span id="status">Loading…</span>
     <button id="linkexit" type="button" class="hidden" title="This view shows only the book and cell the link opened. Click to go back to your usual books and columns.">Show all books &amp; columns</button>
     <span class="grow"></span>
-    <button id="undo" title="Undo your last edit (Ctrl/⌘+Z)" disabled>Undo</button>
-    <button id="reload" title="Reload everything from Supabase">Reload</button>
+    <button id="undo" title="Ctrl/⌘+Z" disabled>Undo</button>
+    <button id="redo" title="⌘+Shift+Z, or Ctrl+Y" disabled>Redo</button>
+    <button id="reload">Reload</button>
+    <span class="helptip" tabindex="0" role="note" aria-label="About Reload" data-tip="Reload pulls the latest data from Supabase. It does not reload the Catalog Editor webpage itself.">?</span>
     <button id="export" title="Download a CSV file (opens in Excel): what you see now, or everything">Export</button>
     <button id="notionShown" title="Send the books shown in the grid (after your filters) to Notion at the next Notion sync">Send shown to Notion</button>
     <button id="notionAll" title="Send every book to Notion at the next Notion sync">Send all to Notion</button>
-    <button id="storelinks" title="Look up blank store links for published books, then approve or reject each one">Find store links</button>
+    <button id="storelinks">Find store links</button>
     <span class="who" id="nqueue"></span>
     <span class="who" id="who"></span>
-    <button id="security" title="Touch ID, authenticator and backups">Sign-in options</button>
+    <button id="security">Sign-in options</button>
     <button id="signout">Sign out</button>
   </header>
 
@@ -288,24 +331,24 @@ dialog#sldlg::backdrop{background:#0006}
       <div class="body">
         <select id="flang" aria-label="Language"><option value="">All languages</option></select>
         <select id="fseries" aria-label="Series"><option value="">All series</option></select>
-        <input id="frow" type="search" placeholder="Find a book (title or file name)…">
-        <div id="rowtools"><button id="addrows" type="button" class="hidden" title="Keep the books found by this search in the list (same as pressing Enter), then search for the next one">Add to list</button> <button id="clearpins" type="button" class="hidden" title="Remove every book you added by searching">Clear list</button> <button id="showrows" type="button" class="hidden" title="Bring back every book you hid with right-click → Hide row">Show hidden rows</button></div>
+        <input id="frow" type="search" placeholder="Find a book…" title="Looks in the title, the file name and every ticked column. With several words, a book must have each word somewhere in its row.">
+        <div id="rowtools"><button id="addrows" type="button" class="hidden" title="Keep the books found by this search in the list (same as pressing Enter), then search for the next one">Add to list</button> <button id="clearpins" type="button" class="hidden">Clear list</button> <button id="showrows" type="button" class="hidden" title="Bring back every book you hid with right-click → Hide row">Show hidden rows</button></div>
       </div>
     </details>
     <details class="sec" id="colsec" open>
       <summary>Columns <span class="n" id="colcount"></span></summary>
       <div id="coltools">
         <div id="presetrow">
-          <select id="presetsel" aria-label="View presets" title="Ticked columns, filters and sort, saved under a name in Supabase (works on any device)"></select>
-          <button id="presetsave" type="button" title="Save the current columns, filters and sort as a view in Supabase">Save view</button>
-          <button id="presetdel" type="button" title="Delete the selected view" disabled>Delete view</button>
+          <select id="presetsel" aria-label="View presets"></select>
+          <button id="presetsave" type="button" title="Saved in Supabase, works on any device">Save view</button>
+          <button id="presetdel" type="button" disabled>Delete view</button>
         </div>
-        <label class="chk" title="Shows the title plus every column that has a blank for at least one book shown. Tick or untick a column on the left to add it to or remove it from this view."><input type="checkbox" id="fcolblank"> Blanks</label>
+        <label class="chk" title="Shows the title plus every column that has a blank for at least one book shown."><input type="checkbox" id="fcolblank"> Blanks</label>
         <input id="colsearch" type="search" placeholder="Find a column…">
         <div class="btns">
           <button id="none" title="Untick everything">Clear</button>
-          <button id="expand" title="Open every column group">Open all</button>
-          <button id="collapse" title="Close every column group">Close all</button>
+          <button id="expand">Open all</button>
+          <button id="collapse">Close all</button>
         </div>
       </div>
       <div id="collist"></div>
@@ -314,7 +357,10 @@ dialog#sldlg::backdrop{background:#0006}
 
   <main>
     <div class="filters">
-      <label class="chk" title="Long cells show only their first 3 lines. Tick this to show every cell in full."><input type="checkbox" id="ffull"> Show full text</label>
+      <label class="chk" title="Long cells show only their first line."><input type="checkbox" id="ffull"> Show full text</label>
+      <button id="clearfilters" type="button" class="hidden">Clear all filters</button>
+      <span class="sortinfo" id="sortinfo"></span>
+      <button id="clearsort" type="button" class="hidden">Clear sort</button>
       <span class="count" id="rowcount"></span>
     </div>
     <div id="gridwrap"><div class="empty">Loading…</div></div>
@@ -402,7 +448,7 @@ async function getAll(table, order){
 /* ---------- column catalog ---------- */
 // kinds: ed (editions), st (stories, shared by all languages), one (one row per edition),
 // est (English text kept on a translation), ml (marketing link), fmt (format), sb (story bible, the companion book), sl (store link), ser (series), info (worked out, read-only)
-const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","badge"], edition_release_notes:["subscription_publication","collection_publication","payhip_publication","not_released_reason"], long_synopsis_inserts:["insert_line","insert_place","closing_place"]};
+const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","badge"], edition_release_notes:["subscription_publication","collection_publication","payhip_publication","not_released_reason"]};
 // Which fields each format uses. eBook and paperback share the book's Publication date (editions); hardcover and audiobook keep their own.
 // The story bible is a companion book with its own row in story_bibles (SB_FIELDS below), not a format.
 // Payhip prices are not here: they come from payhip_products (read-only "Payhip … price" columns).
@@ -417,12 +463,12 @@ const SB_GROUP = "Story Bible (companion book)";
 const SB_FIELDS = ["price_usd","library_price_usd","isbn","publication_date","word_count","notes"];
 const SB_SELECT = "id,file_name," + SB_FIELDS.join(",");   // never the bible text itself (bible_md), which is large
 // Column ids that changed with the October 2026 data changes, so saved views and links still find them.
-const RENAMED = {"ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"]};
+const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:long_synopsis_series_intro"], "ed:long_synopsis_closing_line":["promo:line"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"]};
 function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
-const SKIP_ED = new Set(["id","created_at","updated_at"]);
+const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id"]);
 let COLS = [], COLMAP = {};
 let REG = {};   // field_registry by "table.column"
-const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sb:{}, sl:{}, ser:{}, info:{}, lists:{}, php:{}};
+const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sb:{}, sl:{}, ser:{}, info:{}, lists:{}, php:{}, promo:{}};
 const loaded = new Set();
 
 function regLabel(table, col){ const r = REG[table+"."+col]; return r ? (r.label||col) : col.replace(/_/g," ").replace(/^./,c=>c.toUpperCase()); }
@@ -441,66 +487,37 @@ function refListFor(c){
 /* ---------- built-in explanations (used when field_registry.description is blank) ---------- */
 // Heat level numbers for Spice (0-5); they appear in the ? hover and on each cell.
 const SPICE_SCALE = {0:"no romance", 1:"flirting or kissing", 2:"fade to black", 3:"one or two descriptively sexy scenes", 4:"three or more sexy scenes", 5:"a strong sexy focus throughout"};
-const LINK_TYPE_HELP = {"ASIN":"ASIN = Amazon's product ID for the book.", "Universal Link":"Universal Link = one link meant to work for readers in any country.", "Custom Link":"Custom Link = a custom-made (branded or shortened) link.", "Deactivated Link":"Deactivated Link = a link that has been switched off and should not be used."};
+const LINK_TYPE_HELP = {"ASIN":"ASIN = Amazon's product ID for the book.", "Universal Link":"Universal Link = one link meant to work for readers in any country.", "Deactivated Link":"Deactivated Link = a link that has been switched off and should not be used."};
 const HELP = {
-  "editions.file_name":"The book's unique file name. It is the row's ID and ties it to its manuscript, story bible and every other table.",
-  "editions.story_id":"ID of the story this edition tells. Every language edition of the same story shares one Story ID, so the Story columns are shared between them.",
+  "editions.file_name":"Series_Book#_Title_Language. The book's unique identifier that ties it to all related items.",
+  "editions.story_id":"Series_Book#_Title. The root name that all languages and related files share.",
   "editions.number_in_series":"Book number within its series. It can be a decimal. Barnes & Noble needs a whole number, see \"Book # with no decimals (B&N)\".",
-  "editions.archived_long_synopsis":"An older long description, kept for reference. No longer the live one.",
-  "editions.archived_short_synopsis":"An older short description, kept for reference. No longer the live one.",
-  "editions.essential_description":"The book's essential description: the plain core description.",
-  "editions.loglines":"One-sentence hooks that sum up the story.",
-  "editions.new_end_of_story_promo_file_name":"File name of the book that the new end-of-story promo advertises.",
-  "editions.new_end_of_story_promo_rule":"The rule used to pick which book the new end-of-story promo advertises.",
-  "editions.bisac":"BISAC subject codes (the US book-industry category codes), e.g. FIC009010 = Fiction / Fantasy / Contemporary.",
-  "editions.thema":"Thema subject codes (the international book category codes), e.g. FMR = Fantasy romance.",
-  "editions.bowker_genres":"Genres as entered with Bowker (the ISBN agency).",
+  "editions.essential_description":"The story text only: the long synopsis without the award line, series intro or promo line. Use it when you need the plain version.",
+  "editions.long_synopsis_award_line":"Award or bestseller line, e.g. USA Today Bestseller! It starts the Long Synopsis, in the same paragraph as the next text (its own paragraph only when the next text is a story title).",
+  "editions.long_synopsis_series_intro":"Series intro, e.g. The Dragon Lords of Valdier universe is vast… Its own paragraph after the award line. Not in the Essential Description.",
   "editions.kindle_unlimited":"Whether the eBook is in Kindle Unlimited (KU), which means it is sold only on Amazon.",
-  "editions.vellum_link_created":"Whether the Vellum link for this book has been created.",
+  "editions.vellum_link_created":"Has the complete store link been saved in booklinks copy.vellum?",
     "stories.spice":"0 = no romance, 1 = flirting or kissing, 2 = fade to black, 3 = one or two descriptively sexy scenes, 4 = three or more sexy scenes, 5 = a strong sexy focus throughout. Exception: a story with a strong sexy focus, or a polyamorous one, but only one or two explicit scenes is a 4.",
-  "stories.age_max":"The maximum age of the story's intended audience.",
-  "stories.connected_universe":"The shared universe this story belongs to, linking it with other series.",
-  "stories.main_genre_differentiated":"The story's main genre, in finer detail than the store genres.",
-  "stories.display_tags":"The tags shown to readers (a trimmed set of Tags).",
-  "formats.not_offered":"Tick when this format is not offered for this book.",
-  "formats.library_price_usd":"Price libraries pay, in US dollars.",
-  "formats.narrator_bio":"Short bio of the audiobook narrator.",
-  "formats.publication_date":"Publication date of this format (hardcover or audiobook). The eBook and paperback go on sale together, so their date is the book's Publication date.",
-  "editions.publication_date":"Publication date of the eBook and paperback (they go on sale together). Hardcover and audiobook dates are in their own columns, and the story bible's is with the story bible.",
+  "stories.main_genre_differentiated":"The main genre that differentiates the book from other S.E. Smith books, not from books by other authors.",
+  "stories.display_tags":"Shown on Payhip, differentiating S.E. Smith books from each other. Only meaningful filters are allowed, not tags that will apply to most of the catalog.",
+  "editions.publication_date":"Wide release of ebook and paperback.",
   "editions.audio_files":"Number of audio files in the audiobook: one per chapter, plus the prologue, epilogue and author's note, plus 2 for the opening and closing credits, plus 1 'coming soon' file for subscription books. Blank where the chapter notes didn't say it plainly.",
   "editions.chapter_notes":"How the book is split, e.g. pro-23+epi = prologue, chapters 1-23 and epilogue. Things that aren't audio files, like a glossary, are noted here too.",
   "editions.word_count":"Word count of the story only (no pre-story or post-story pages), as a number.",
   "editions.character_sheet_included":"Whether the book includes a character sheet. A glossary doesn't count; it's noted in Chapter notes.",
-  "story_bibles.word_count":"Word count of the story bible (the companion book). The novel's own word count is the book's Word count.",
-  "story_bibles.publication_date":"Publication date of the story bible.",
-  "story_bibles.notes":"Notes about the story bible (the companion book).",
-  "info.long_synopsis":"Worked out: Long synopsis lead-in + Essential description + the inserted line + Long synopsis closing line. To change it, edit those.",
+  "info.long_synopsis":"Worked out: Award line + Series intro + Essential description + Promo line, each its own paragraph (the award line shares the first one). To change it, edit those.",
   "info.series_and_book_number":"Worked out: the series, the word for 'Book' in the book's language (Book, Tome, Buch, Volume, Libro) and the book number. For a different label on one book, add it in edition_differences (field series_and_book_number).",
-  "edition_release_notes.payhip_publication":"Date the book was published on Payhip.",
-  "series.reading_note":"Note to readers about the reading order of the series.",
-  "edition_awards.badge":"Badge for that award, shown on the book.",
-  "edition_release_notes.subscription_publication":"Notes on when the book was published in a subscription service.",
-  "edition_release_notes.collection_publication":"Notes on when the book was published in a collection.",
-  "long_synopsis_inserts.insert_line":"Extra line added into the long synopsis.",
-  "long_synopsis_inserts.insert_place":"Where in the long synopsis the extra line goes.",
-  "long_synopsis_inserts.closing_place":"Where the closing line goes in the long synopsis.",
   "info.whole_book_number":"Worked out: the book number as a whole number with no decimal, because Barnes & Noble does not accept decimals.",
-  "list.char_facts":"Facts about the characters.",
-  "list.char_settings":"Where each character lives or appears (their settings).",
-  "list.char_rels":"How the characters are related to each other.",
-  "list.language":"Pet names and invented words used in the book.",
-  "list.rare":"Rare details worth noting in the book.",
   "list.reviews":"Reviews of the book. Edit them in Notion.",
   "list.copy":"Marketing copy for the book. Edit it in Notion.",
-  "list.pron":"How to pronounce names and invented words.",
-  "list.scenes":"Prompts for scene images.",
 };
 const ML_HELP = {
-  "Giphy (Facebook & Twitter)":"Giphy link used for sharing the animated cover on Facebook and Twitter.",
-  "BookFunnel (email collection)":"BookFunnel download link that asks readers for their email address.", "BookFunnel (no email collection)":"BookFunnel download link that does not ask for an email address."
+  "Giphy (Facebook & Twitter)":"Giphy link used for sharing the animated cover on Facebook and Twitter."
 };
 function ownHelp(c){
   const col = c.col || c.field || "";
+  if (c.id==="promo:line") return "The promo line that ends this book's Long Synopsis, picked from the shared list for the book's language. Pick \"New promo line…\" to add a wording.";
+  if (c.id==="promo:text") return "The wording of this book's promo line. It is shared: changing it here changes it in every book that uses the same promo line.";
   if (c.kind==="sl") return LINK_TYPE_HELP[c.lt] || "";
   if (c.kind==="ml") return ML_HELP[c.lt] || "";
   if (c.kind==="est") return "The English text kept next to the translation, so you can compare them.";
@@ -511,19 +528,58 @@ function ownHelp(c){
 // Meaning of one coded value (shown when hovering a cell), or "" for ordinary values.
 function valueHelp(c, v){
   if (v==null || v==="") return "";
-  if (c.id==="st:spice") return SPICE_SCALE[v] ? "Heat level " + v + " = " + SPICE_SCALE[v] : "";
   const list = (c.id==="st:rating" ? REF.rating : c.id==="ed:paperback_page_size" ? REF.page_size : null);
   const hit = list && list.find(x=>String(x.value)===String(v) && x.note);
   return hit ? v + " = " + hit.note : "";
 }
-function qm(text){ return `<span class="qm" title="${esc(text)}" aria-label="Explanation">?</span>`; }
+function qm(text, label){ return `<span class="qm" role="button" tabindex="0" data-tip="${esc(text)}" aria-label="Help: ${esc(label)}">${esc(label)}</span>`; }
+/* underlined column name: click opens the explanation, a second click or a click elsewhere (or Esc) closes it */
+let qmOpen=null, qmPop=null;
+function qmClose(){ if(qmPop){ qmPop.remove(); qmPop=null; } qmOpen=null; }
+function qmShow(el){
+  qmClose(); qmOpen=el;
+  qmPop=document.createElement("div"); qmPop.className="qmpop";
+  const tip=el.dataset.tip||"", PH="Book # with no decimals (B&N)", pi=tip.indexOf(PH);
+  if (pi<0) qmPop.textContent=tip;
+  else {   // the column name is a link: it ticks that column (if it wasn't) and shows it
+    qmPop.append(tip.slice(0,pi));
+    const a=document.createElement("a"); a.href="#"; a.textContent=PH;
+    a.addEventListener("click", async ev=>{ ev.preventDefault(); ev.stopPropagation(); qmClose(); await showColumn("info:whole_book_number"); });
+    qmPop.append(a, tip.slice(pi+PH.length));
+  }
+  document.body.appendChild(qmPop);
+  const r=el.getBoundingClientRect(), w=qmPop.offsetWidth, h=qmPop.offsetHeight;
+  let x=Math.max(8,Math.min(r.left, innerWidth-w-8)), y=r.bottom+6; if(y+h>innerHeight-8) y=Math.max(8,r.top-h-6);
+  qmPop.style.left=x+"px"; qmPop.style.top=y+"px";
+}
+document.addEventListener("click", e=>{
+  const q=e.target.closest(".qm");
+  if(q){ e.preventDefault(); e.stopPropagation(); if(qmOpen===q) qmClose(); else qmShow(q); return; }
+  if(qmPop && !e.target.closest(".qmpop")) qmClose();
+}, true);
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape") qmClose();
+  else if((e.key==="Enter"||e.key===" ") && e.target.classList && e.target.classList.contains("qm")){ e.preventDefault(); e.target.click(); }
+});
+window.addEventListener("scroll", qmClose, true);
+async function showColumn(id){
+  leaveLinkView();
+  const c = COLMAP[id]; if (!c) return;
+  if (blanksOn()) $("#fcolblank").checked = false;   // the Blanks view would hide a column that has no blanks
+  setColOn(id, true);
+  const g = [...document.querySelectorAll("#collist .grp")].find(d=>d.dataset.g===c.group);
+  if (g){ g.open = true; const box = [...g.querySelectorAll("input[data-id]")].find(i=>i.dataset.id===id); if (box) box.closest("label").scrollIntoView({block:"nearest"}); }
+  syncColList();
+  await refresh();
+}
 function helpFor(c){
+  if (c.kind==="list" && c.col==="language") return "";   // no explanation for the Pet names & invented words column
   const parts = [];
-  const regTable = {ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", sb:"story_bibles", ml:"marketing_links", info:"editions"}[c.kind];
+  const regTable = {promo:c.table, ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", sb:"story_bibles", ml:"marketing_links", info:"editions"}[c.kind];
   const r = regTable && (REG[regTable+"."+(c.col||"")] || (c.kind==="info" && REG["edition_info."+(c.col||"")]));
-  const own = (r && r.description) || ownHelp(c);
+  const own = (c.id==="ed:publication_date" ? ownHelp(c) : "") || (r && r.description) || ownHelp(c);   // Publication date: this short wording wins over the Supabase description
   if (own) parts.push(own);
-  const list = refListFor(c);
+  const list = c.col==="language" ? null : refListFor(c);   // no value list for the Language column
   if (list && list.length <= 12){
     const withNotes = list.filter(x=>x.note);
     parts.push(withNotes.length ? list.map(x=>x.value + (x.note ? " = " + x.note : "")).join("\n") : "Values: " + list.map(x=>x.value).join(", "));
@@ -534,11 +590,10 @@ function helpFor(c){
 
 /* ---------- sidebar groups (what a person looks for) ---------- */
 // Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
-const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Translations"];
+const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Translations","Archive"];
 const GROUP_ITEMS = {
-  "Book Basics": ["ed:file_name","ed:language","ed:title","one:edition_subtitles:subtitle","st:english_title","info:english_title","ed:series","ed:number_in_series","info:series_and_book_number",
-    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:essential_description","ed:long_synopsis_lead_in","ed:long_synopsis_closing_line",
-    "one:long_synopsis_inserts:insert_line","one:long_synopsis_inserts:insert_place","one:long_synopsis_inserts:closing_place","ed:archived_short_synopsis","ed:archived_long_synopsis",
+  "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","st:english_title","info:english_title","ed:language","ed:series","ed:number_in_series","info:series_and_book_number",
+    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","ed:essential_description","promo:line","promo:text",
     "st:rating","st:explicit_content","st:spice","st:age_max","st:audience","st:main_genre_differentiated",
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
     "one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","one:edition_release_notes:payhip_publication","one:edition_release_notes:not_released_reason",
@@ -549,9 +604,10 @@ const GROUP_ITEMS = {
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
   "Story Bible (companion book)": ["sb:price_usd","sb:library_price_usd","sb:isbn","sb:publication_date","sb:word_count","sb:notes","php:Story Bible"],
   "Links": [],
-  "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"]
+  "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"],
+  "Archive": ["ed:archived_short_synopsis","ed:archived_long_synopsis"]
 };
-const KIND_GROUP = {ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", est:"Translations"};
+const KIND_GROUP = {promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", est:"Translations"};
 const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
 function placeCol(c){
   for (const g of GROUP_ORDER){ const i = GROUP_ITEMS[g].indexOf(c.id); if (i>=0){ c.group = g; c.so = i; return; } }
@@ -579,6 +635,10 @@ function buildCatalog(sample){
     ["technology","Technology"],["language","Pet names & invented words"],["rare","Rare details"],["bookclub","Book club questions"],
     ["reviews","Reviews (edit in Notion)"],["copy","Marketing copy (edit in Notion)"],["pron","Pronunciations"],["scenes","Scene image prompts"],["authors_note","Author's Note"]];
   LISTS.forEach(([k,l],i)=>addCol({id:"list:"+k, kind:"list", col:k, table:"story details", label:l, group:"Story", order:9800+i, ro:true}));
+  // promo line: pick one from the shared list (promo_lines), or change the shared wording
+  addCol({id:"promo:line", kind:"promo", col:"promo_line_id", table:"editions", label:regLabel("editions","promo_line_id"), group:"Edition", order:regOrder("editions","promo_line_id"), ro:false});
+  addCol({id:"promo:text", kind:"promo", col:"promo_line", table:"promo_lines", label:"Promo Line Wording (shared)", group:"Edition", order:regOrder("editions","promo_line_id")+0.5, ro:false,
+          note:"Shared: this changes every book that uses this promo line"});
   // worked out in edition_info (read-only); long synopsis and series + book number keep their usual place in the grid
   for (const c of ["english_title","whole_book_number","author","publisher","author_bio","long_synopsis","series_and_book_number"]){
     const inInfo = !!REG["edition_info."+c];
@@ -587,7 +647,7 @@ function buildCatalog(sample){
 }
 
 /* ---------- loading ---------- */
-function needTable(c){ return {st:"stories", one:"one:"+c.t, est:"est", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", ser:"ser", info:"info", php:"php", list:"list:"+c.col}[c.kind]; }
+function needTable(c){ return {promo:"promo", st:"stories", one:"one:"+c.t, est:"est", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", ser:"ser", info:"info", php:"php", list:"list:"+c.col}[c.kind]; }
 // The Payhip product code is the last part of the book's Payhip link (payhip.com/b/<code>).
 const payhipCode = l => { const m = /\/b\/([^\/?#]+)/.exec((l && (l.link_or_id || l.reader_link)) || ""); return m ? m[1] : null; };
 async function ensureLoaded(cols){
@@ -665,14 +725,23 @@ async function ensureLoaded(cols){
       }
       data.lists[k] = out;
     }
-    else if (n==="info"){ for (const r of await api("GET","edition_info?select=file_name,english_title,whole_book_number,author,publisher,author_bio,long_synopsis,series_and_book_number")) data.info[r.file_name]=r; }
+    else if (n==="info"){ for (const r of await api("GET","edition_info?select="+INFO_SELECT+"&limit=5000")) data.info[r.file_name]=r; }
+    else if (n==="promo"){ data.promo = {}; for (const r of await getAll("promo_lines","id.asc")) data.promo[r.id]=r; }
     loaded.add(n);
   }
 }
+const INFO_SELECT = "file_name,english_title,whole_book_number,author,publisher,author_bio,long_synopsis,series_and_book_number";
+// After a long synopsis piece changes, read the worked-out Long Synopsis again (one book, or every book when a shared promo wording changed).
+async function refreshInfo(file){
+  if (!loaded.has("info")) return;
+  try{ for (const r of await api("GET","edition_info?select="+INFO_SELECT+(file ? "&file_name=eq."+encodeURIComponent(file) : "&limit=5000"))) data.info[r.file_name]=r; }catch(e){}
+}
+const SYN_PIECES = new Set(["long_synopsis_award_line","long_synopsis_series_intro","essential_description"]);
 async function loadAll(){
+  for (const k in condTypes) delete condTypes[k];
   appReady = false;
   setStatus("Loading…");
-  loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","php"]) data[k]={}; data.one={};
+  loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","php","promo"]) data[k]={}; data.one={};
   const [reg, refs, eds, storyOne, estF, mlT, fmts, slK] = await Promise.all([
     api("GET","field_registry?select=*").catch(()=>[]),
     api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000").catch(()=>[]),
@@ -722,10 +791,12 @@ function syncColList(){
   document.querySelectorAll("#collist .grp").forEach(g=>{ const n = g.querySelectorAll("input:checked").length; g.querySelector(".n").textContent = n ? n+" ticked" : ""; });
   updateColCount();
 }
-function sortCols(list){ return list.sort((a,b)=>(KEY_COLS.has(b.id)-KEY_COLS.has(a.id)) || orderOf(a)-orderOf(b)); }
+const TITLE_NEXT = {"one:edition_subtitles:subtitle":-99.8, "st:english_title":-99.7, "info:english_title":-99.6};   // right after the title: subtitle, then English title
+function isFront(c){ return KEY_COLS.has(c.id) || c.id in TITLE_NEXT; }
+function sortCols(list){ return list.sort((a,b)=>(isFront(b)-isFront(a)) || orderOf(a)-orderOf(b)); }
 function ticked(){ return sortCols(COLS.filter(c=>checked.has(c.id))); }
 function allCols(){ return sortCols(COLS.slice()); }
-function orderOf(c){ const i = FAVORITES.indexOf(c.id); return i>=0 && KEY_COLS.has(c.id) ? i-100 : c.order; }
+function orderOf(c){ if (c.id in TITLE_NEXT) return TITLE_NEXT[c.id]; const i = FAVORITES.indexOf(c.id); return i>=0 && KEY_COLS.has(c.id) ? i-100 : c.order; }
 function groups(){
   const g = new Map(GROUP_ORDER.map(n=>[n,[]]));
   for (const c of [...COLS].sort((a,b)=>a.so-b.so || a.label.localeCompare(b.label))){ if(!g.has(c.group)) g.set(c.group,[]); g.get(c.group).push(c); }
@@ -743,14 +814,14 @@ function renderColumnList(){
     const isOpen = q || open.has(g);
     html += `<details class="grp" data-g="${esc(g)}" ${isOpen?"open":""}><summary>${esc(g)} <span class="n">${n?n+" ticked":""}</span></summary>`;
     for (const c of show){ const hp = [helpFor(c), c.ro ? "Read-only" : ""].filter(Boolean).join("\n");
-      html += `<label class="col ${c.ro?"ro":""}"><input type="checkbox" data-id="${esc(c.id)}" ${onSet().has(c.id)?"checked":""}><span><span class="lbl">${esc(c.label)}</span>${hp?qm(hp):""}</span></label>`; }
+      html += `<label class="col ${c.ro?"ro":""}"><input type="checkbox" data-id="${esc(c.id)}" ${onSet().has(c.id)?"checked":""}><span><span class="lbl">${hp?qm(hp,c.label):esc(c.label)}</span></span></label>`; }
     html += `</details>`;
   }
   $("#collist").innerHTML = html || `<div class="empty">No column matches.</div>`;
   updateColCount();
 }
 function updateColCount(){ const n = onSet().size; $("#colcount").textContent = n ? n + " ticked" : ""; }
-$("#collist").addEventListener("click", e=>{ if (e.target.closest(".qm")) e.preventDefault(); });   // the ? icon only explains, it must not tick the column
+$("#collist").addEventListener("click", e=>{ if (e.target.closest(".qm")) e.preventDefault(); });   // the underlined name only explains, it must not tick the column
 $("#collist").addEventListener("change", async e=>{
   const id = e.target.dataset.id; if(!id) return;
   setColOn(id, e.target.checked);
@@ -781,7 +852,7 @@ $("#collist").addEventListener("contextmenu", e=>{
 });
 document.addEventListener("click", closeCtx);
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeCtx(); });
-document.addEventListener("scroll", closeCtx, true);
+document.addEventListener("scroll", e=>{ if (ctxMenu && e.target instanceof Node && ctxMenu.contains(e.target)) return; closeCtx(); }, true);
 window.addEventListener("resize", closeCtx);
 /* right-click a column header: Hide column (unticks its box in the sidebar; re-tick the box to show it again) */
 async function hideColumn(id){
@@ -824,9 +895,21 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   const id = th.dataset.sort;
   const locked = blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
   const m = document.createElement("div"); m.className = "ctx";
-  m.innerHTML = (locked ? `<button type="button" disabled title="The title always stays">Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`;
-  m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-90)+"px";
-  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); b.dataset.a==="end" ? hideColumnsFrom(id) : hideColumn(id); });
+  m.innerHTML = `<button type="button" data-a="filter">Filter…</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "") + (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`
+    + `<button type="button" data-a="freeze">Freeze up to this column</button>` + (frozenN>1 ? `<button type="button" data-a="unfreeze">Unfreeze (first column only)</button>` : "")
+    + (colWidths[id] ? `<button type="button" data-a="unsize">Reset this column's width</button>` : "")
+    + (Object.keys(colWidths).length ? `<button type="button" data-a="unsizeall">Reset all column widths</button>` : "")
+    + (colOrder.length ? `<button type="button" data-a="unorder">Reset column order</button>` : "");
+  m.style.left = Math.min(e.clientX, innerWidth-200)+"px"; m.style.top = Math.min(e.clientY, innerHeight-290)+"px";
+  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx();
+    if (b.dataset.a==="filter"){ ev.stopPropagation(); openFilter(id, th); return; }
+    if (b.dataset.a==="unfilter"){ clearFilter(id); return; }
+    if (b.dataset.a==="freeze"){ freezeTo(id); return; }
+    if (b.dataset.a==="unfreeze"){ frozenN = 1; renderGrid(); return; }
+    if (b.dataset.a==="unsize"){ delete colWidths[id]; renderGrid(); return; }
+    if (b.dataset.a==="unsizeall"){ colWidths = {}; renderGrid(); return; }
+    if (b.dataset.a==="unorder"){ colOrder = []; renderGrid(); setStatus("Columns back in the order from the Supabase column list","ok"); return; }
+    b.dataset.a==="end" ? hideColumnsFrom(id) : hideColumn(id); });
   document.body.appendChild(m); ctxMenu = m;
 });
 /* ---------- view presets (saved in Supabase: column_presets, so they follow you to any device) ----------
@@ -851,7 +934,7 @@ async function moveLocalPresets(){
 }
 function presetRow(name, p){
   return {preset_name:name, purpose:"Catalog Editor view", columns:p.cols,
-    editor_view:{lang:p.lang||"", series:p.series||"", find:p.find||"", blanks:!!p.blanks, blankAdd:p.blankAdd||[], blankOff:p.blankOff||[], sort:p.sort||{id:null,dir:1}}};
+    editor_view:{lang:p.lang||"", series:p.series||"", find:p.find||"", blanks:!!p.blanks, blankAdd:p.blankAdd||[], blankOff:p.blankOff||[], sort:(p.sorts||[])[0]||{id:null,dir:1}, sorts:p.sorts||[], filters:p.filters||{}, conds:p.conds||{}, layout:p.layout||{order:[],widths:{},frozen:1}}};
 }
 // Excel-era column names (e.g. "formats(eBook).isbn", "store_links(Amazon, eBook, ASIN)") -> this page's column ids
 function mapLegacyCol(name){
@@ -871,25 +954,31 @@ function presetToView(row){
   const fix = ids => [...new Set((ids||[]).flatMap(renamed))].filter(id => COLMAP[id]);
   const cols = v ? fix(row.columns) : (row.columns||[]).map(mapLegacyCol).filter(id => id && COLMAP[id]);
   if (!v) return {cols};
-  const sort = v.sort && v.sort.id ? {id: renamed(v.sort.id)[0], dir: v.sort.dir} : v.sort;
-  return Object.assign({}, v, {cols, blankAdd: fix(v.blankAdd), blankOff: fix(v.blankOff), sort});
+  // older views saved one sort ({id,dir}); newer ones save every level in "sorts"
+  const sorts = (Array.isArray(v.sorts) && v.sorts.length ? v.sorts : (v.sort && v.sort.id ? [v.sort] : []))
+    .map(k=>({id: renamed(k.id)[0], dir: k.dir < 0 ? -1 : 1})).filter(k=>COLMAP[k.id]);
+  const filters = {}; for (const [k, vals] of Object.entries(v.filters||{})){ const id = renamed(k)[0]; if (COLMAP[id]) filters[id] = vals; }
+  const conds = {}; for (const [k, cd] of Object.entries(v.conds||{})){ const id = renamed(k)[0]; if (COLMAP[id] && cd && cd.op) conds[id] = {op:cd.op, a:cd.a??"", b:cd.b??""}; }
+  return Object.assign({}, v, {cols, blankAdd: fix(v.blankAdd), blankOff: fix(v.blankOff), sorts, filters, conds});
 }
 function renderPresetMenu(sel){
-  const mine = PRESETS.filter(p=>p.editor_view), excel = PRESETS.filter(p=>!p.editor_view);
+  const mine = PRESETS.filter(p=>p.editor_view);
   const opt = p => `<option value="id:${esc(p.id)}"${p.purpose && !p.editor_view ? ` title="${esc(p.purpose)}"` : ""}>${esc(p.preset_name)}</option>`;
   $("#presetsel").innerHTML = `<option value="">Views…</option><option value="@fav">Favorites</option>` +
-    (mine.length ? `<optgroup label="Saved views">` + mine.map(opt).join("") + `</optgroup>` : "") +
-    (excel.length ? `<optgroup label="Excel views (columns only)">` + excel.map(opt).join("") + `</optgroup>` : "");
+    (mine.length ? `<optgroup label="Saved views">` + mine.map(opt).join("") + `</optgroup>` : "");
   $("#presetsel").value = sel && [...$("#presetsel").options].some(o=>o.value===sel) ? sel : "";
   const cur = presetById($("#presetsel").value.slice(3));
   $("#presetdel").disabled = !(cur && cur.editor_view);
 }
 async function applyPreset(p){
   checked = new Set(p.cols);
-  sortBy = p.sort && p.sort.id ? p.sort : {id:null, dir:1};
+  sortKeys = (p.sorts||[]).map(k=>({id:k.id, dir:k.dir}));
   $("#flang").value = p.lang || ""; $("#fseries").value = p.series || ""; $("#frow").value = p.find || "";
   $("#fcolblank").checked = !!p.blanks;
   blankAdd = new Set(p.blankAdd||[]); blankOff = new Set(p.blankOff||[]);
+  colFilters = {}; for (const [id, vals] of Object.entries(p.filters||{})) if (COLMAP[id] && Array.isArray(vals) && vals.length) colFilters[id] = new Set(vals);
+  colConds = {}; for (const [id, cd] of Object.entries(p.conds||{})) if (COLMAP[id] && cd && cd.op) colConds[id] = {op:cd.op, a:cd.a??"", b:cd.b??""};
+  applyLayout(p.layout);   // views without a saved layout get the normal order, widths and only the first column frozen
   renderColumnList();
   try{ await ensureLoaded(p.blanks ? allCols() : ticked()); renderGrid(); setStatus("Ready","ok"); }catch(err){ setStatus(err.message,"bad"); }
 }
@@ -904,7 +993,7 @@ $("#presetsave").onclick = async()=>{
   const name = (prompt("Name this view:", def)||"").trim(); if (!name) return;
   const same = PRESETS.find(p=>p.editor_view && p.preset_name===name);
   if (same && name!==def && !confirm(`A view named "${name}" already exists. Replace it?`)) return;
-  const body = presetRow(name, {cols:[...checked], lang:$("#flang").value, series:$("#fseries").value, find:$("#frow").value, blanks:$("#fcolblank").checked, blankAdd:[...blankAdd], blankOff:[...blankOff], sort:sortBy});
+  const body = presetRow(name, {cols:[...checked], lang:$("#flang").value, series:$("#fseries").value, find:$("#frow").value, blanks:$("#fcolblank").checked, blankAdd:[...blankAdd], blankOff:[...blankOff], sorts:sortKeys.map(k=>({id:k.id, dir:k.dir})), filters:filtersForSave(), conds:condsForSave(), layout:layoutForSave()});
   try{
     const row = same ? await patchOne("column_presets", "id=eq."+q(same.id), body) : await insertOne("column_presets", body);
     PRESETS = PRESETS.filter(p=>p.id!==row.id).concat(row);
@@ -947,6 +1036,7 @@ function valueOf(ed, c){
     case "sl": r = data.sl[rowKey(ed,c)]; return r ? r.link_or_id : null;
     case "ser": r = data.ser[rowKey(ed,c)]; return r ? r[c.col] : null;
     case "info": r = data.info[ed.file_name]; return r ? r[c.col] : null;
+    case "promo": r = data.promo[ed.promo_line_id]; return r ? r.promo_line : null;
     case "list": return (data.lists[c.col]||{})[ed.file_name] || null;
   }
 }
@@ -957,6 +1047,7 @@ function canEdit(ed, c){
   if (c.kind==="ser") return !!ed.series && !!data.ser[rowKey(ed,c)];
   if (c.kind==="fmt") return !!data.fmt[rowKey(ed,c)];   // only formats the book has; add one with right-click → Add format
   if (c.kind==="sb") return !!data.sb[ed.file_name];      // only books that have a story bible; add one with right-click
+  if (c.id==="promo:text") return !!ed.promo_line_id;      // pick the book's Promo Line first
   return true;
 }
 // A format cell (or that format's store link / Payhip price) for a format the book doesn't have, or doesn't offer.
@@ -989,12 +1080,12 @@ function fillFilters(){
 }
 const hiddenRows = new Set();   // file_names of books hidden with right-click → Hide row (this view only; nothing is changed in Supabase)
 const pinned = [];   // file_names kept in the list by searching one after the other (this view only)
-function visibleRows(){
+function visibleRows(skipId){
   if (linkView) return data.editions.filter(ed=>ed.file_name===linkView.file);   // opened from a link: just that book
   const L = $("#flang").value, S = $("#fseries").value, q = $("#frow").value.trim().toLowerCase();
-  const matches = searchRows(L, S, q);
+  const matches = searchRows(L, S, q).filter(ed=>passesFilters(ed, skipId));
   if (!pinned.length) return matches;
-  const kept = pinned.map(fn=>data.editions.find(ed=>ed.file_name===fn)).filter(ed=>ed && !hiddenRows.has(ed.file_name));
+  const kept = pinned.map(fn=>data.editions.find(ed=>ed.file_name===fn)).filter(ed=>ed && !hiddenRows.has(ed.file_name) && passesFilters(ed, skipId));
   return q ? kept.concat(matches.filter(ed=>!pinned.includes(ed.file_name))) : kept;   // kept books first, then what you are typing right now
 }
 function addPins(){
@@ -1006,12 +1097,21 @@ function addPins(){
 }
 function unpin(fn){ const i = pinned.indexOf(fn); if (i>=0) pinned.splice(i,1); renderGrid(); }
 function clearPins(){ pinned.length = 0; renderGrid(); }
+// The book search looks in the title, the file name and every ticked column that has loaded.
+// Several words: each word has to be somewhere in the book's row (not necessarily in the same cell).
 function searchRows(L, S, q){
+  const words = (q||"").split(/\s+/).filter(Boolean);
+  const cols = words.length ? ticked().filter(c=>{ const t = needTable(c); return !t || loaded.has(t); }) : [];
   return data.editions.filter(ed=>{
     if (hiddenRows.has(ed.file_name)) return false;
     if (L && ed.language!==L) return false;
     if (S && ed.series!==S) return false;
-    if (q && !((ed.title||"").toLowerCase().includes(q) || (ed.file_name||"").toLowerCase().includes(q))) return false;
+    if (words.length){
+      let hay = (ed.title||"") + "\n" + (ed.file_name||"");
+      for (const c of cols){ if (formatMissing(ed,c)) continue; const v = valueOf(ed,c); if (v!=null && v!=="") hay += "\n" + show(v) + "\n" + disp(v,c); }
+      hay = hay.toLowerCase();
+      if (!words.every(w=>hay.includes(w))) return false;
+    }
     return true;
   });
 }
@@ -1019,22 +1119,178 @@ function searchRows(L, S, q){
 // Formats a book doesn't have or doesn't offer are not blanks.
 function isBlank(ed, c){ if (formatMissing(ed,c)) return false; const v = valueOf(ed,c); return (v==null || v==="" || (Array.isArray(v) && !v.length)) && (c.ro || canEdit(ed,c)); }
 
-/* ---------- sorting (click a column heading: A→Z, Z→A, then back to the usual order) ---------- */
-let sortBy = {id:null, dir:1};
+/* ---------- column filters (like Excel: click ▾ in a heading and tick the values to keep) ----------
+   Filters only change what the grid shows; nothing is changed in Supabase. Several columns can be
+   filtered at once (a book has to pass all of them). A filter goes when its column is unticked. */
+let colFilters = {};   // column id -> Set of kept values, as the grid shows them ("" = blank)
+const BLANK_LABEL = "(Blanks)";
+function cellVals(ed, c){   // the value(s) a filter compares; a list cell counts as each of its items
+  if (formatMissing(ed,c)) return [""];
+  const v = valueOf(ed,c);
+  if (Array.isArray(v)) return v.length ? v.map(x=>show(x).trim()) : [""];
+  return [show(v).trim()];
+}
+/* Conditions (top of the ▾ box): contains / doesn't contain / equals / greater than / less than / between / blank.
+   A column can have a condition and ticked values at once; a book has to pass both. */
+let colConds = {};     // column id -> {op, a, b}
+const COND_OPS = {
+  has:{label:"Contains", n:1}, nhas:{label:"Doesn't contain", n:1}, eq:{label:"Equals", n:1}, neq:{label:"Doesn't equal", n:1},
+  gt:{label:"Greater than", date:"After", n:1}, lt:{label:"Less than", date:"Before", n:1}, btw:{label:"Between", n:2},
+  blank:{label:"Is blank", n:0}, nblank:{label:"Is not blank", n:0}
+};
+const condTypes = {};   // column id -> "num" | "date" | "text" (worked out once per load)
+function condType(c){
+  if (condTypes[c.id]) return condTypes[c.id];
+  if (typeOf(c)==="num") return condTypes[c.id] = "num";
+  const vals = []; for (const ed of data.editions){ for (const v of cellVals(ed,c)) if (v!=="") vals.push(v); if (vals.length > 400) break; }
+  if (vals.length && vals.every(v=>/^\d{4}-\d{2}-\d{2}/.test(v))) return condTypes[c.id] = "date";
+  if (vals.length && vals.every(v=>/^-?[\d,]+(\.\d+)?$/.test(v))) return condTypes[c.id] = "num";
+  return vals.length ? (condTypes[c.id] = "text") : "text";   // not loaded yet: don't remember a guess
+}
+const toNum = x => Number(String(x).replace(/,/g,"").trim());
+function cmpTo(v, x, t){
+  if (t==="num"){ const a = toNum(v), b = toNum(x); if (!isNaN(a) && !isNaN(b)) return a<b ? -1 : a>b ? 1 : 0; }
+  if (t==="date"){ const a = v.slice(0,10), b = String(x).slice(0,10); return a<b ? -1 : a>b ? 1 : 0; }
+  return collator.compare(v, String(x));
+}
+function condLabel(k, t){ const o = COND_OPS[k.op]; if (!o) return ""; const name = (t==="date" && o.date) || o.label; return o.n===0 ? name : o.n===2 ? `${name} ${k.a} and ${k.b}` : `${name} “${k.a}”`; }
+function passesCond(ed, c, k){
+  const t = condType(c), vs = cellVals(ed,c), full = vs.filter(v=>v!==""), a = String(k.a??"").trim(), b = String(k.b??"").trim();
+  switch(k.op){
+    case "blank": return !full.length;
+    case "nblank": return full.length > 0;
+    case "has": return vs.join("\n").toLowerCase().includes(a.toLowerCase());
+    case "nhas": return !vs.join("\n").toLowerCase().includes(a.toLowerCase());
+    case "eq": return full.some(v=>cmpTo(v,a,t)===0);
+    case "neq": return !full.some(v=>cmpTo(v,a,t)===0);
+    case "gt": return full.some(v=>cmpTo(v,a,t) > 0);
+    case "lt": return full.some(v=>cmpTo(v,a,t) < 0);
+    case "btw": { const [lo, hi] = cmpTo(a,b,t) <= 0 ? [a,b] : [b,a]; return full.some(v=>cmpTo(v,lo,t) >= 0 && cmpTo(v,hi,t) <= 0); }
+  }
+  return true;
+}
+function filterIds(){ return [...new Set([...Object.keys(colFilters), ...Object.keys(colConds)])]; }
+function passesFilters(ed, skipId){
+  for (const id in colFilters){
+    if (id===skipId) continue;
+    const c = COLMAP[id]; if (!c) continue;
+    const keep = colFilters[id];
+    if (!cellVals(ed,c).some(v=>keep.has(v))) return false;
+  }
+  for (const id in colConds){
+    if (id===skipId) continue;
+    const c = COLMAP[id]; if (!c) continue;
+    if (!passesCond(ed, c, colConds[id])) return false;
+  }
+  return true;
+}
+function filtersForSave(){ const o = {}; for (const id in colFilters) o[id] = [...colFilters[id]]; return o; }
+function condsForSave(){ const o = {}; for (const id in colConds) o[id] = {op:colConds[id].op, a:colConds[id].a??"", b:colConds[id].b??""}; return o; }
+function clearFilter(id){ delete colFilters[id]; delete colConds[id]; renderGrid(); }
+function clearAllFilters(){ colFilters = {}; colConds = {}; renderGrid(); }
+function openFilter(id, th){
+  const c = COLMAP[id]; if (!c) return;
+  closeCtx();
+  const counts = new Map();
+  for (const ed of visibleRows(id)) for (const v of new Set(cellVals(ed,c))) counts.set(v, (counts.get(v)||0) + 1);
+  const keep = colFilters[id], cond = colConds[id], ct = condType(c);
+  if (keep) for (const v of keep) if (!counts.has(v)) counts.set(v, 0);   // kept values that other filters now hide
+  const t = typeOf(c);
+  const vals = [...counts.keys()].sort((a,b)=>{
+    if (a==="" || b==="") return a===b ? 0 : (a==="" ? 1 : -1);   // (Blanks) last
+    if (t==="num" && !isNaN(a) && !isNaN(b)) return Number(a)-Number(b);
+    return collator.compare(a,b);
+  });
+  const m = document.createElement("div"); m.className = "ctx fpop";
+  const label = v => v==="" ? BLANK_LABEL : v.split("\n")[0].slice(0,120);
+  m.innerHTML = `<div class="fhead" title="${esc(c.label)}">Filter: ${esc(c.label)}</div>
+    <div class="fsort"><button type="button" data-s="1">Sort A→Z</button><button type="button" data-s="-1">Sort Z→A</button></div>` +
+    (sortKeys.some(k=>k.id!==id) ? `<div class="fsort" title="Keep the current sort and add this column as the next level"><button type="button" data-t="1">Then A→Z</button><button type="button" data-t="-1">Then Z→A</button></div>` : "") +
+    `<div class="fcond"><span class="fcl">Condition${ct==="num" ? " (numbers)" : ct==="date" ? " (dates)" : ""}</span>
+      <select data-op aria-label="Condition"><option value="">None</option>${Object.entries(COND_OPS).map(([k,o])=>`<option value="${k}"${cond && cond.op===k ? " selected" : ""}>${esc((ct==="date" && o.date) || o.label)}</option>`).join("")}</select>
+      <div class="fab"><input data-ca type="${ct==="date" ? "date" : "text"}" ${ct==="num" ? 'inputmode="decimal"' : ""} aria-label="Value" value="${esc(cond ? cond.a : "")}"><span data-and>and</span><input data-cb type="${ct==="date" ? "date" : "text"}" ${ct==="num" ? 'inputmode="decimal"' : ""} aria-label="Second value" value="${esc(cond ? cond.b : "")}"></div>
+    </div>
+    <input type="search" placeholder="Search values…" aria-label="Search values">
+    <div class="flist"><label class="all"><input type="checkbox" data-all="1"> <span class="fv">(Select all)</span></label>` +
+    vals.map((v,i)=>`<label data-i="${i}" title="${esc(v==="" ? BLANK_LABEL : v).slice(0,600)}"><input type="checkbox" data-i="${i}"${!keep || keep.has(v) ? " checked" : ""}> <span class="fv">${esc(label(v))}</span> <span class="fn">${counts.get(v)}</span></label>`).join("") +
+    `</div><div class="fmsg"></div>
+    <div class="fbtns">${keep || cond ? `<button type="button" data-b="clear">Clear filter</button>` : ""}<button type="button" data-b="cancel">Cancel</button><button type="button" data-b="ok" class="ok">OK</button></div>`;
+  const boxes = [...m.querySelectorAll(".flist input[data-i]")], all = m.querySelector("input[data-all]"), search = m.querySelector("input[type=search]");
+  const shown = () => boxes.filter(b=>!b.closest("label").classList.contains("hidden"));
+  const opSel = m.querySelector("select[data-op]"), ca = m.querySelector("input[data-ca]"), cb = m.querySelector("input[data-cb]"), and = m.querySelector("[data-and]");
+  const syncCond = () => { const o = COND_OPS[opSel.value], n = o ? o.n : 0; m.querySelector(".fab").style.display = n ? "" : "none"; cb.style.display = and.style.display = n===2 ? "" : "none"; };
+  syncCond();
+  const syncAll = () => { const s = shown(), n = s.filter(b=>b.checked).length; all.checked = s.length > 0 && n === s.length; all.indeterminate = n > 0 && n < s.length; };
+  syncAll();
+  m.addEventListener("click", ev=>{
+    ev.stopPropagation();   // clicks inside the filter box keep it open
+    const sb = ev.target.closest("button[data-s]");
+    if (sb){ sortKeys = [{id, dir:+sb.dataset.s}]; closeCtx(); leaveLinkView(); renderGrid(); return; }
+    const tb = ev.target.closest("button[data-t]");
+    if (tb){ sortKeys = sortKeys.filter(k=>k.id!==id).concat({id, dir:+tb.dataset.t}); closeCtx(); leaveLinkView(); renderGrid(); return; }
+    const b = ev.target.closest("button[data-b]"); if (!b) return;
+    if (b.dataset.b==="cancel"){ closeCtx(); return; }
+    if (b.dataset.b==="clear"){ closeCtx(); clearFilter(id); return; }
+    // OK. While searching, only the values you can see count (like Excel).
+    const op = opSel.value, need = op ? COND_OPS[op].n : 0, va = ca.value.trim(), vb = cb.value.trim();
+    if (need >= 1 && !va){ m.querySelector(".fmsg").textContent = "Type a value for the condition (or pick None)."; ca.focus(); return; }
+    if (need === 2 && !vb){ m.querySelector(".fmsg").textContent = "Type both values for Between."; cb.focus(); return; }
+    if (ct==="num" && ["gt","lt","btw"].includes(op) && (isNaN(toNum(va)) || (need===2 && isNaN(toNum(vb))))){ m.querySelector(".fmsg").textContent = "Use numbers for this condition."; return; }
+    const pick = (search.value.trim() ? shown() : boxes).filter(x=>x.checked).map(x=>vals[+x.dataset.i]);
+    if (!pick.length){ m.querySelector(".fmsg").textContent = "Tick at least one value."; return; }
+    if (!search.value.trim() && pick.length === vals.length) delete colFilters[id];
+    else colFilters[id] = new Set(pick);
+    if (op) colConds[id] = {op, a: need >= 1 ? va : "", b: need === 2 ? vb : ""}; else delete colConds[id];
+    closeCtx(); leaveLinkView(); renderGrid();
+  });
+  m.addEventListener("change", ev=>{
+    if (ev.target === opSel){ syncCond(); m.querySelector(".fmsg").textContent = ""; if (COND_OPS[opSel.value] && COND_OPS[opSel.value].n) ca.focus(); return; }
+    if (ev.target === ca || ev.target === cb) return;
+    if (ev.target === all) shown().forEach(b=>b.checked = all.checked);
+    syncAll(); m.querySelector(".fmsg").textContent = "";
+  });
+  search.addEventListener("input", ()=>{
+    const words = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    boxes.forEach(b=>{ const v = vals[+b.dataset.i], hay = (v==="" ? BLANK_LABEL : v).toLowerCase(); b.closest("label").classList.toggle("hidden", !words.every(w=>hay.includes(w))); });
+    if (words.length) shown().forEach(b=>b.checked = true);   // like Excel: searching ticks what it finds
+    syncAll();
+  });
+  [search, ca, cb].forEach(inp=>inp.addEventListener("keydown", ev=>{ if (ev.key==="Enter"){ ev.preventDefault(); m.querySelector("button[data-b=ok]").click(); } }));
+  const r = th.getBoundingClientRect();
+  m.style.left = Math.max(4, Math.min(r.left, innerWidth-300))+"px";
+  m.style.top = Math.max(4, Math.min(r.bottom+2, innerHeight-580))+"px";
+  document.body.appendChild(m); ctxMenu = m;
+  search.focus();
+}
+$("#clearfilters").onclick = clearAllFilters;
+
+/* ---------- sorting ----------
+   Click a column heading's sort icon: A→Z, Z→A, then back to the usual order.
+   Shift+click another heading (or ▾ → Then A→Z) to add it as the next level, e.g. heat, then title. */
+let sortKeys = [];   // [{id, dir}] first = main sort, then the tie-breakers
 const collator = new Intl.Collator(undefined, {numeric:true, sensitivity:"base"});
+function cmpSortVals(av, bv){
+  const ea = av==null||av==="", eb = bv==null||bv==="";
+  if (ea || eb) return null;
+  if (typeof av==="number" && typeof bv==="number") return av-bv;
+  if (typeof av==="boolean" && typeof bv==="boolean") return av===bv ? 0 : av ? -1 : 1;
+  return collator.compare(show(av), show(bv));
+}
 function sortRows(rows){
-  const c = sortBy.id && COLMAP[sortBy.id];
-  if (!c) return rows;
-  const d = sortBy.dir;
-  return rows.map((ed,i)=>({ed,i,v:valueOf(ed,c)})).sort((a,b)=>{
-    const ea = a.v==null||a.v==="", eb = b.v==null||b.v==="";
-    if (ea || eb) return ea===eb ? a.i-b.i : (ea ? 1 : -1);            // blanks always at the bottom
-    let r;
-    if (typeof a.v==="number" && typeof b.v==="number") r = a.v-b.v;
-    else if (typeof a.v==="boolean" && typeof b.v==="boolean") r = (a.v===b.v ? 0 : a.v ? -1 : 1);
-    else r = collator.compare(show(a.v), show(b.v));
-    return r*d || a.i-b.i;
+  const keys = sortKeys.map(k=>({c:COLMAP[k.id], d:k.dir})).filter(k=>k.c);
+  if (!keys.length) return rows;
+  return rows.map((ed,i)=>({ed,i,v:keys.map(k=>valueOf(ed,k.c))})).sort((a,b)=>{
+    for (let j=0; j<keys.length; j++){
+      const av = a.v[j], bv = b.v[j], ea = av==null||av==="", eb = bv==null||bv==="";
+      if (ea || eb){ if (ea===eb) continue; return ea ? 1 : -1; }   // blanks always at the bottom of each level
+      const r = cmpSortVals(av, bv) * keys[j].d;
+      if (r) return r;
+    }
+    return a.i-b.i;
   }).map(x=>x.ed);
+}
+function sortSummary(){
+  return sortKeys.map(k=>{ const c = COLMAP[k.id]; return c ? `${c.label} ${k.dir>0 ? "▲" : "▼"}` : ""; }).filter(Boolean).join(", then ");
 }
 
 let viewCols = [], viewRows = [];
@@ -1042,35 +1298,47 @@ function renderGrid(){
   clearSel();
   const blanksOnly = !linkView && $("#fcolblank").checked;
   const picked = linkCols() || (blanksOnly ? allCols() : ticked());   // blanks mode looks at EVERY column, not only the ticked ones
+  if (!linkView) for (const id of filterIds()) if (!picked.some(c=>c.id===id)){ delete colFilters[id]; delete colConds[id]; }   // unticked column: its filter goes
   const rows = visibleRows();
   const blankN = {};
   if (blanksOnly) for (const c of picked) blankN[c.id] = rows.reduce((n,ed)=>n + (isBlank(ed,c)?1:0), 0);
   viewCols = blanksOnly ? picked.filter(c=>c.id===BLANK_KEEP || (!blankOff.has(c.id) && (blankAdd.has(c.id) || blankN[c.id] > 0))) : picked;
   if (blanksOnly){ blankIds = new Set(viewCols.map(c=>c.id)); syncColList(); }
-  if (!linkView && sortBy.id && !viewCols.some(c=>c.id===sortBy.id)) sortBy = {id:null, dir:1};
+  if (!linkView) sortKeys = sortKeys.filter(k=>viewCols.some(c=>c.id===k.id));
   viewRows = sortRows(rows);
   $("#bookcount").textContent = `${rows.length} of ${data.editions.length}`;
+  const nf = filterIds().length;
   const hidden = blanksOnly ? picked.filter(c=>c.id!==BLANK_KEEP && !blankN[c.id] && !blankAdd.has(c.id)).length : 0;
-  $("#rowcount").textContent = `${viewRows.length} of ${data.editions.length} books · ${viewCols.length} columns` + (hidden ? ` (${hidden} column${hidden>1?"s":""} hidden: no blanks)` : "") + (hiddenRows.size ? ` · ${hiddenRows.size} row${hiddenRows.size>1?"s":""} hidden` : "") + (linkView ? " · opened from a link" : "");
+  $("#rowcount").textContent = `${viewRows.length} of ${data.editions.length} books · ${viewCols.length} columns` + (hidden ? ` (${hidden} column${hidden>1?"s":""} hidden: no blanks)` : "") + (hiddenRows.size ? ` · ${hiddenRows.size} row${hiddenRows.size>1?"s":""} hidden` : "") + (nf && !linkView ? ` · ${nf} column filter${nf>1?"s":""}` : "") + (linkView ? " · opened from a link" : "");
+  $("#clearfilters").classList.toggle("hidden", !nf || !!linkView);
+  $("#clearfilters").textContent = nf > 1 ? `Clear all filters (${nf})` : "Clear filter";
   $("#linkexit").classList.toggle("hidden", !linkView);
+  const ss = linkView ? "" : sortSummary();
+  $("#sortinfo").textContent = ss ? "Sorted by " + ss : "";
+  $("#clearsort").classList.toggle("hidden", !ss);
   $("#showrows").classList.toggle("hidden", !hiddenRows.size);
   $("#addrows").classList.toggle("hidden", !$("#frow").value.trim());
   $("#clearpins").classList.toggle("hidden", !pinned.length);
   $("#clearpins").textContent = `Clear list (${pinned.length})`;
   $("#showrows").textContent = `Show hidden rows (${hiddenRows.size})`;
-  if (!viewCols.length){ $("#gridwrap").innerHTML = `<div class="empty">Tick some columns on the left.</div>`; return; }
+  if (!viewCols.length){ $("#gridwrap").innerHTML = `<div class="empty">Tick some columns on the left.</div>`; layoutCss(); return; }
+  if (!linkView) viewCols = applyColOrder(viewCols);
+  const nFrz = Math.min(frozenN, viewCols.length);
   let h = "<table><thead><tr>";
   viewCols.forEach((c,i)=>{
-    const on = sortBy.id===c.id, icon = on ? (sortBy.dir>0 ? "▲" : "▼") : "⇅";
-    const hp = helpFor(c), tip = "You can sort by this column by clicking the sort icon." + (on ? (sortBy.dir>0 ? "\nNow sorted A→Z / low→high. Click again for Z→A." : "\nNow sorted Z→A / high→low. Click again to go back to the usual order.") : "");
-    h += `<th class="sortable ${i===0?"first":""} ${on?"sorted":""}" data-sort="${esc(c.id)}" aria-sort="${on?(sortBy.dir>0?"ascending":"descending"):"none"}"><span>${esc(c.label)}</span>${hp?qm(hp):""}<span class="sic" title="${esc(tip)}">${icon}</span></th>`;
+    const si = sortKeys.findIndex(k=>k.id===c.id), sk = sortKeys[si], on = !!sk;
+    const icon = on ? (sk.dir>0 ? "▲" : "▼") + (sortKeys.length>1 ? si+1 : "") : "⇅";
+    const hp = helpFor(c), tip = "Click to sort. Shift+click to add it as the next sort level (for example heat, then title)." + (on ? (sortKeys.length>1 ? `\nSort level ${si+1} of ${sortKeys.length}.` : "") + (sk.dir>0 ? "\nNow sorted A→Z / low→high. Click again for Z→A." : "\nNow sorted Z→A / high→low. Click again to remove this sort.") : "");
+    const fk = colFilters[c.id], fc = colConds[c.id];
+    const ftip = fk || fc ? "Filtered: " + [fc ? condLabel(fc, condType(c)) : "", fk ? `showing ${fk.size} value${fk.size>1?"s":""}` : ""].filter(Boolean).join("; ") + ". Click to change." : "Filter: pick values or a condition";
+    h += `<th class="sortable ${i===0?"first":""} ${i<nFrz?"frz":""} ${i===nFrz-1?"frzlast":""} ${colWidths[c.id]?"sized":""} ${on?"sorted":""} ${fk||fc?"filtered":""}" data-sort="${esc(c.id)}" data-c="${i}" draggable="true" aria-sort="${on?(sk.dir>0?"ascending":"descending"):"none"}"><span>${hp?qm(hp,c.label):esc(c.label)}</span><span class="sic" role="button" title="${esc(tip)}">${icon}</span><span class="fic" role="button" title="${esc(ftip)}" aria-label="${esc(ftip)}">▾</span><span class="rsz" draggable="false" title="Double-click to reset width"></span></th>`;
   });
   h += "</tr></thead><tbody>";
   viewRows.forEach((ed,ri)=>{
     h += "<tr>";
     viewCols.forEach((c,ci)=>{
       const v = valueOf(ed,c), ok = canEdit(ed,c);
-      const cls = [ci===0?"first":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (LONG_HINT.test(c.col||c.field||c.label)?"long":""), (c.id==="ed:title"?"title":"")].join(" ");
+      const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (LONG_HINT.test(c.col||c.field||c.label)?"long":""), (c.id==="ed:title"?"title":"")].join(" ");
       const noFmt = c.kind==="fmt" && !data.fmt[rowKey(ed,c)] ? `This book has no ${c.f}. Right-click → Add ${c.f} to add it.`
         : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it." : "";
       h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt, valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
@@ -1079,21 +1347,119 @@ function renderGrid(){
   });
   h += "</tbody></table>";
   $("#gridwrap").innerHTML = h;
+  layoutCss();
 }
+/* ---------- column layout: widths, order and frozen columns (saved with a view) ----------
+   colOrder: the column ids in the order you dragged them to (empty = the order from the Supabase column list).
+   Columns not in colOrder keep their normal place. colWidths: id -> pixels. frozenN: how many columns on the left stay put. */
+let colOrder = [], colWidths = {}, frozenN = 1;
+function applyColOrder(cols){
+  const pos = new Map(colOrder.map((id,i)=>[id,i]));
+  const moved = cols.filter(c=>pos.has(c.id)).sort((a,b)=>pos.get(a.id)-pos.get(b.id));
+  let k = 0;
+  return cols.map(c=>pos.has(c.id) ? moved[k++] : c);
+}
+function layoutCss(){
+  let st = $("#colcss"); if (!st){ st = document.createElement("style"); st.id = "colcss"; document.head.appendChild(st); }
+  let css = "";
+  viewCols.forEach((c,i)=>{ const w = colWidths[c.id]; if (w) css += `#gridwrap th[data-c="${i}"],#gridwrap td[data-c="${i}"]{width:${w}px;min-width:${w}px;max-width:${w}px;box-sizing:border-box}\n`; });
+  st.textContent = css;
+  // frozen columns: each one sticks at the total width of the frozen columns to its left
+  const ths = [...document.querySelectorAll("#gridwrap thead th")];
+  let left = 0;
+  for (let i=0; i<Math.min(frozenN, ths.length); i++){ if (i) css += `#gridwrap th[data-c="${i}"],#gridwrap td[data-c="${i}"]{left:${left}px}\n`; left += ths[i].getBoundingClientRect().width; }
+  st.textContent = css;
+}
+function moveColumn(id, toId, after){
+  if (id===toId) return;
+  const ids = viewCols.map(c=>c.id).filter(x=>x!==id);
+  let j = ids.indexOf(toId); if (j<0) return;
+  ids.splice(after ? j+1 : j, 0, id);
+  // keep the dragged order for the columns you see, and any earlier order for columns not shown now
+  colOrder = ids.concat(colOrder.filter(x=>!ids.includes(x) && x!==id));
+  renderGrid();
+}
+function layoutForSave(){ return {order:[...colOrder], widths:Object.assign({}, colWidths), frozen:frozenN}; }
+function applyLayout(v){
+  v = v || {};
+  const fix = id => renamed(id)[0];
+  colOrder = (Array.isArray(v.order) ? v.order : []).map(fix).filter(id=>COLMAP[id]);
+  colWidths = {}; for (const [k,w] of Object.entries(v.widths||{})){ const id = fix(k); if (COLMAP[id] && +w > 20) colWidths[id] = Math.round(+w); }
+  frozenN = Math.max(1, Math.min(30, parseInt(v.frozen,10) || 1));
+}
+/* drag a heading's right edge to resize */
+let rsz = null, swallowClick = false;
+$("#gridwrap").addEventListener("mousedown", e=>{
+  const h = e.target.closest("th .rsz"); if (!h) return;
+  e.preventDefault(); e.stopPropagation();
+  const th = h.closest("th");
+  rsz = {id: th.dataset.sort, x: e.clientX, w: th.getBoundingClientRect().width, h};
+  h.classList.add("on"); document.body.classList.add("colresizing");
+});
+document.addEventListener("mousemove", e=>{
+  if (!rsz) return;
+  colWidths[rsz.id] = Math.max(40, Math.round(rsz.w + e.clientX - rsz.x));
+  const th = rsz.h.closest("th"); if (th) th.classList.add("sized");
+  layoutCss();
+});
+document.addEventListener("mouseup", ()=>{
+  if (!rsz) return;
+  rsz.h.classList.remove("on"); document.body.classList.remove("colresizing");
+  rsz = null; swallowClick = true; setTimeout(()=>swallowClick=false, 0);   // the mouse-up must not also sort the column
+});
+$("#gridwrap").addEventListener("dblclick", e=>{
+  const h = e.target.closest("th .rsz"); if (!h) return;
+  e.preventDefault(); e.stopPropagation();
+  delete colWidths[h.closest("th").dataset.sort]; renderGrid();
+});
+/* drag a heading to move the column */
+let dragCol = null;
+function clearDrop(){ document.querySelectorAll("#gridwrap th.dropL,#gridwrap th.dropR").forEach(t=>t.classList.remove("dropL","dropR")); }
+$("#gridwrap").addEventListener("dragstart", e=>{
+  const th = e.target.closest && e.target.closest("th[data-sort]");
+  if (!th || rsz){ if (th) e.preventDefault(); return; }
+  dragCol = th.dataset.sort; th.classList.add("dragging"); closeCtx();
+  e.dataTransfer.effectAllowed = "move"; try{ e.dataTransfer.setData("text/plain", dragCol); }catch(err){}
+});
+$("#gridwrap").addEventListener("dragover", e=>{
+  if (!dragCol) return;
+  const th = e.target.closest("th[data-sort]"); if (!th) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = "move";
+  const r = th.getBoundingClientRect(), after = e.clientX > r.left + r.width/2;
+  clearDrop(); if (th.dataset.sort !== dragCol) th.classList.add(after ? "dropR" : "dropL");
+});
+$("#gridwrap").addEventListener("drop", e=>{
+  if (!dragCol) return;
+  const th = e.target.closest("th[data-sort]"); if (!th) return;
+  e.preventDefault();
+  const r = th.getBoundingClientRect(), after = e.clientX > r.left + r.width/2, id = dragCol;
+  dragCol = null; clearDrop(); moveColumn(id, th.dataset.sort, after);
+});
+$("#gridwrap").addEventListener("dragend", ()=>{ dragCol = null; clearDrop(); document.querySelectorAll("#gridwrap th.dragging").forEach(t=>t.classList.remove("dragging")); });
+function freezeTo(id){ const i = viewCols.findIndex(c=>c.id===id); if (i<0) return; frozenN = i+1; renderGrid(); setStatus(frozenN>1 ? `Froze ${frozenN} columns on the left` : "Only the first column is frozen","ok"); }
 ["#flang","#fseries"].forEach(s=>$(s).addEventListener("change", renderGrid));
 $("#fcolblank").addEventListener("change", async()=>{
   try{ if ($("#fcolblank").checked){ setStatus("Checking every column for blanks…","ok"); await ensureLoaded(allCols()); } else await ensureLoaded(ticked()); renderGrid(); renderColumnList(); setStatus("Ready","ok"); }
   catch(err){ setStatus(err.message,"bad"); }
 });
 $("#gridwrap").addEventListener("click", e=>{
-  if (e.target.closest(".qm")) return;   // the ? icon only explains, it does not sort
+  if (e.target.closest(".qm")) return;   // the underlined name only explains
+  if (swallowClick || e.target.closest(".rsz")) return;   // finishing a resize does not sort
+  const fic = e.target.closest(".fic");
+  if (fic){ e.stopPropagation(); const fth = fic.closest("th[data-sort]"); const had = ctxMenu && ctxMenu.classList.contains("fpop") && ctxMenu.dataset.col === fth.dataset.sort; if (had){ closeCtx(); return; } openFilter(fth.dataset.sort, fth); if (ctxMenu) ctxMenu.dataset.col = fth.dataset.sort; return; }
+  if (!e.target.closest(".sic")) return;   // only the sort icon sorts
   const th = e.target.closest("th[data-sort]"); if (!th) return;
-  const id = th.dataset.sort;
-  if (sortBy.id !== id) sortBy = {id, dir:1};
-  else if (sortBy.dir > 0) sortBy.dir = -1;
-  else sortBy = {id:null, dir:1};
+  const id = th.dataset.sort, i = sortKeys.findIndex(k=>k.id===id);
+  if (e.shiftKey && sortKeys.length && !(sortKeys.length===1 && i===0)){   // Shift+click: add / flip / remove this level, keep the others
+    if (i < 0) sortKeys.push({id, dir:1});
+    else if (sortKeys[i].dir > 0) sortKeys[i].dir = -1;
+    else sortKeys.splice(i, 1);
+  }
+  else if (sortKeys.length===1 && i===0){ if (sortKeys[0].dir > 0) sortKeys[0].dir = -1; else sortKeys = []; }
+  else sortKeys = [{id, dir:1}];
   renderGrid();
 });
+$("#clearsort").onclick = ()=>{ sortKeys = []; renderGrid(); };
 $("#ffull").addEventListener("change", ()=>$("#gridwrap").classList.toggle("full", $("#ffull").checked));
 let ft; $("#frow").addEventListener("input", ()=>{ clearTimeout(ft); ft=setTimeout(renderGrid,150); });
 $("#frow").addEventListener("keydown", e=>{ if (e.key==="Enter"){ e.preventDefault(); clearTimeout(ft); addPins(); } });
@@ -1231,6 +1597,7 @@ function rowExists(ed, c){
     case "sl": return !!data.sl[rowKey(ed,c)];
     case "fmt": return !!data.fmt[rowKey(ed,c)];
     case "sb": return !!data.sb[ed.file_name];
+    case "promo": return c.id==="promo:line" || !!ed.promo_line_id;
   }
   return true;   // ed, st, ser always edit an existing row
 }
@@ -1245,6 +1612,7 @@ function rowTable(ed, c){
     case "sb": return ["story_bibles", ed.file_name];
     case "sl": return ["store_links", rowKey(ed,c)];
     case "ser": return ["series", rowKey(ed,c)];
+    case "promo": return c.id==="promo:line" ? ["editions", ed.file_name] : ["promo_lines", String(ed.promo_line_id)];
   }
   return [c.table||c.kind, ed.file_name];
 }
@@ -1280,7 +1648,19 @@ function openEditor(td){
   td.classList.add("active");
   const box = document.createElement("div"); box.className = "editor";
   let input;
-  if (t==="bool"){
+  if (c.id==="promo:line"){
+    const uses = {}; for (const e2 of data.editions) if (e2.promo_line_id) uses[e2.promo_line_id] = (uses[e2.promo_line_id]||0) + 1;
+    const opts = Object.values(data.promo).filter(p=>p.language===ed.language).sort((a,b)=>(uses[b.id]||0)-(uses[a.id]||0) || a.promo_line.localeCompare(b.promo_line));
+    const short = t => t.replace(/\s+/g," ").slice(0,140) + (t.length>140 ? "…" : "");
+    input = document.createElement("select");
+    input.innerHTML = `<option value="">(no promo line)</option>` + opts.map(p=>`<option value="${esc(p.promo_line)}">${esc(short(p.promo_line))} (${uses[p.id]||0} book${uses[p.id]===1?"":"s"})</option>`).join("") + `<option value="__new__">New promo line…</option>`;
+    input.value = old==null ? "" : old; input.style.margin="8px"; input.style.width="calc(100% - 16px)";
+    input.addEventListener("change", ()=>{
+      if (input.value!=="__new__") return;
+      const ta = document.createElement("textarea"); ta.style.width="100%"; ta.style.minHeight="120px"; ta.placeholder = "Type the new promo line for " + ed.language + " books";
+      input.replaceWith(ta); editing.input = ta; ta.addEventListener("keydown", onKey); ta.focus();
+    });
+  } else if (t==="bool"){
     input = document.createElement("select");
     input.innerHTML = `<option value="">(blank)</option><option value="true">Yes</option><option value="false">No</option>`;
     input.value = old==null ? "" : String(old); input.style.margin="8px";
@@ -1302,11 +1682,12 @@ function openEditor(td){
   editing = {td, ed, c, old, input, box, t};
   box.style.top = Math.max(8, Math.min(parseFloat(box.style.top), innerHeight - box.offsetHeight - 8)) + "px";
   input.focus(); if (input.tagName==="TEXTAREA"){ input.setSelectionRange(0,0); input.scrollTop = 0; }
-  input.addEventListener("keydown", ev=>{
+  function onKey(ev){
     if (ev.key==="Escape"){ ev.preventDefault(); closeEditor(false); td.focus(); }
     else if (ev.key==="Enter" && !ev.shiftKey){ ev.preventDefault(); closeEditor(true); move(td,[1,0]) || td.focus(); }
     else if (ev.key==="Tab"){ ev.preventDefault(); closeEditor(true); move(td, ev.shiftKey?[0,-1]:[0,1]); }
-  });
+  }
+  input.addEventListener("keydown", onKey);
   bar.addEventListener("mousedown", ev=>ev.preventDefault());
   bar.addEventListener("click", ev=>{ const a = ev.target.dataset.a; if (a) { closeEditor(a==="save"); td.focus(); } });
 }
@@ -1317,6 +1698,7 @@ function closeEditor(save){
   box.remove(); td.classList.remove("active");
   if (!save) return;
   let v = input.value;
+  if (v==="__new__") return;
   if (t==="bool") v = v==="" ? null : v==="true";
   else if (t==="num") v = v.trim()==="" ? null : Number(v.replace(/[$,\s]/g,""));
   else v = v === "" ? null : v;
@@ -1326,14 +1708,15 @@ function closeEditor(save){
 }
 
 /* ---------- saving ---------- */
-const undoStack = [];
+const undoStack = [], redoStack = [];   // redoStack holds groups of edits you undid (a whole fill is one group)
+function syncUndoBtns(){ $("#undo").disabled = !undoStack.length; $("#redo").disabled = !redoStack.length; }
 function q(v){ return encodeURIComponent(v); }
 async function saveCell(ed, c, v, old, td, record){
   td && (td.classList.remove("saved","err"), td.classList.add("saving"));
   setStatus("Saving…");
   try{
     await write(ed, c, v);
-    if (record){ undoStack.push({ed, c, old, v, grp:undoGrp}); $("#undo").disabled = false; }
+    if (record){ undoStack.push({ed, c, old, v, grp:undoGrp}); redoStack.length = 0; syncUndoBtns(); }
     td && (td.classList.remove("saving"), td.classList.add("saved"));
     setStatus(`Saved ${c.label} for ${ed.title||ed.file_name}`, "ok");
     updateCell(ed, c);
@@ -1347,6 +1730,7 @@ async function saveCell(ed, c, v, old, td, record){
 function friendly(err){
   const m = err.message||String(err);
   if (err.status===401 || /JWT|token/i.test(m)) return "your sign-in expired — reload the page and sign in again.";
+  if (/promo_lines_language_promo_line_key/i.test(m)) return "that wording is already another promo line. Pick it in Promo Line instead.";
   if (/row-level security|permission|0 rows/i.test(m)) return "you don't have permission to change this.";
   return m;
 }
@@ -1375,7 +1759,22 @@ async function addStoryBible(ed){
 async function write(ed, c, v){
   const fn = "file_name=eq."+q(ed.file_name);
   switch(c.kind){
-    case "ed": { const r = await patchOne("editions", fn, {[c.col]:v}); Object.assign(ed, r); return; }
+    case "ed": { const r = await patchOne("editions", fn, {[c.col]:v}); Object.assign(ed, r); if (SYN_PIECES.has(c.col)) await refreshInfo(ed.file_name); return; }
+    case "promo": {
+      if (c.id==="promo:text"){
+        if (!ed.promo_line_id) throw new Error("Pick this book's Promo Line first.");
+        if (v==null) throw new Error("The shared wording can't be blank. To take the promo line off this book, clear its Promo Line instead.");
+        const r = await patchOne("promo_lines", "id=eq."+ed.promo_line_id, {promo_line:v}); data.promo[r.id] = r; await refreshInfo(null); return;
+      }
+      let id = null;
+      if (v!=null){
+        const t = v.trim();
+        let hit = Object.values(data.promo).find(p=>p.language===ed.language && p.promo_line===t);
+        if (!hit){ hit = await insertOne("promo_lines", {language:ed.language, promo_line:t}); data.promo[hit.id] = hit; }
+        id = hit.id;
+      }
+      const r = await patchOne("editions", fn, {promo_line_id:id}); Object.assign(ed, r); await refreshInfo(ed.file_name); return;
+    }
     case "st": { const r = await patchOne("stories", "story_id=eq."+q(ed.story_id), {[c.col]:v}); data.stories[ed.story_id] = r; return; }
     case "one": {
       const cur = (data.one[c.t]||{})[ed.file_name];
@@ -1420,7 +1819,8 @@ function updateCell(ed, c){
   // story and series values are shared, so refresh every visible row that uses them
   viewRows.forEach((r,ri)=>{
     viewCols.forEach((cc,ci)=>{
-      const same = r===ed || (cc.kind==="st" && c.kind==="st" && r.story_id===ed.story_id) || (cc.kind==="ser" && c.kind==="ser" && r.series===ed.series && r.language===ed.language);
+      const same = r===ed || (cc.kind==="st" && c.kind==="st" && r.story_id===ed.story_id) || (cc.kind==="ser" && c.kind==="ser" && r.series===ed.series && r.language===ed.language)
+        || (c.id==="promo:text" && (cc.kind==="promo" || cc.id==="info:long_synopsis") && r.promo_line_id===ed.promo_line_id);
       if (!same) return;
       const td = cellAt(ri,ci); if (!td) return;
       const v = valueOf(r,cc); td.querySelector(".v").textContent = disp(v,cc); td.title = disp(v,cc).slice(0,600);
@@ -1433,15 +1833,41 @@ async function undo(){
   const u = undoStack.pop(); if (!u) return;
   const batch = [u];
   if (u.grp) while (undoStack.length && undoStack[undoStack.length-1].grp === u.grp) batch.push(undoStack.pop());
-  $("#undo").disabled = !undoStack.length;
+  const done = [];
   for (const x of batch){
     const ri = viewRows.indexOf(x.ed), ci = viewCols.indexOf(x.c);
-    await saveCell(x.ed, x.c, x.old, x.v, ri>=0&&ci>=0?cellAt(ri,ci):null, false);
+    if (await saveCell(x.ed, x.c, x.old, x.v, ri>=0&&ci>=0?cellAt(ri,ci):null, false)) done.push(x);
   }
+  if (done.length) redoStack.push(done);
+  syncUndoBtns();
+  if (done.length < batch.length) return;   // saveCell already showed why
   setStatus(batch.length>1 ? `Undid a fill of ${batch.length} cells` : `Undid ${u.c.label} for ${u.ed.title||u.ed.file_name}`, "ok");
 }
+let redoing = false;
+async function redo(){
+  if (redoing) return;
+  const grp = redoStack.pop(); if (!grp) return;
+  redoing = true; syncUndoBtns();
+  let n = 0;
+  try{
+    for (const x of grp.slice().reverse()){   // put the edits back in the order you first made them
+      const ri = viewRows.indexOf(x.ed), ci = viewCols.indexOf(x.c);
+      if (!(await saveCell(x.ed, x.c, x.v, x.old, ri>=0&&ci>=0?cellAt(ri,ci):null, false))) break;
+      undoStack.push(x); n++;
+    }
+  } finally { redoing = false; syncUndoBtns(); }
+  if (n < grp.length) return;
+  setStatus(grp.length>1 ? `Redid a fill of ${grp.length} cells` : `Redid ${grp[0].c.label} for ${grp[0].ed.title||grp[0].ed.file_name}`, "ok");
+}
 $("#undo").onclick = undo;
-document.addEventListener("keydown", e=>{ if ((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="z" && !editing && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){ e.preventDefault(); undo(); } });
+$("#redo").onclick = redo;
+document.addEventListener("keydown", e=>{
+  if (!(e.metaKey||e.ctrlKey) || editing || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k==="z" && e.shiftKey){ e.preventDefault(); redo(); }        // ⌘+Shift+Z
+  else if (k==="z"){ e.preventDefault(); undo(); }                  // ⌘+Z
+  else if (k==="y" && e.ctrlKey && !e.metaKey){ e.preventDefault(); redo(); }   // Ctrl+Y (Windows habit)
+});
 
 /* ---------- status ---------- */
 function setStatus(t, kind){ const s = $("#status"); s.textContent = t; s.className = kind||""; }
@@ -1525,8 +1951,7 @@ async function startTotp(box, msgEl){
     const {data, error} = await client().auth.mfa.enroll({factorType:"totp", friendlyName:"LastPass Authenticator", issuer:"S.E. Smith Catalog"});
     if (error) throw error;
     pendingFactor = data.id;
-    box.innerHTML = `<p class="hint">In LastPass Authenticator tap <b>+</b>, scan this code (or type the key), then enter the 6-digit code it shows.</p>
-      <div id="qr2"><img alt="Authenticator QR code" src="${esc(data.totp.qr_code)}"></div>
+    box.innerHTML = `<div id="qr2"><img alt="Authenticator QR code" src="${esc(data.totp.qr_code)}"></div>
       <div class="hint">Key: <code>${esc(data.totp.secret)}</code></div>
       <label>6-digit code <input type="text" inputmode="numeric" maxlength="6" class="tcode"></label>
       <div class="row"><button class="primary tgo" type="button">Turn on</button></div>`;
@@ -1615,7 +2040,7 @@ function slRender(){
       return `<tr data-id="${r.id}">
         <td>${esc(titles[r.file_name]||r.file_name)}<div class="ev">${esc(r.file_name)}</div></td>
         <td>${esc(r.store)}<div class="ev">${esc(r.format)} · ${esc(r.link_type)}</div></td>
-        <td class="val"><input type="text" value="${esc(v)}" placeholder="Paste the link or ID">${open}</td>
+        <td class="val"><input type="text" value="${esc(v)}">${open}</td>
         <td><span class="conf ${cls(r.confidence)}">${lbl(r.confidence)}</span></td>
         <td class="ev">${esc(r.evidence||"")}</td>
         <td class="acts"><button type="button" class="primary" data-a="ok">Approve</button> <button type="button" data-a="no">Reject</button></td>
