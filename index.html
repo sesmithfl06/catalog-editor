@@ -199,6 +199,17 @@ code{font-size:12px;word-break:break-all}
 /* Find store links */
 dialog#sldlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:1100px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
 dialog#sldlg::backdrop{background:#0006}
+dialog#pfdlg,dialog#nfdlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:820px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
+dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
+#pfdlg label{display:block;margin:10px 0 0;font-size:13px}
+#pfdlg textarea{display:block;width:100%;box-sizing:border-box;min-height:110px;margin-top:4px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+#pfdlg input[type=file]{display:block;margin-top:4px}
+#pfdlg .row,#nfdlg .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
+#pfdlg .row .grow,#nfdlg .row .grow{flex:1}
+#pfout ul,#nflist ul{margin:8px 0;padding-left:20px;font-size:13px}
+#pfout details{margin-top:8px;font-size:13px}
+#nflist li{margin:6px 0}
+#nqueue.fail{color:var(--bad,#c0392b);cursor:pointer;text-decoration:underline}
 #sldlg .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
 #sldlg .row .grow{flex:1}
 #sllist{overflow:auto;max-height:calc(100vh - 240px);border:1px solid var(--line);border-radius:8px}
@@ -304,6 +315,26 @@ dialog#sldlg::backdrop{background:#0006}
   <div class="row"><span class="grow"></span><button id="slclose" type="button">Done</button></div>
 </dialog>
 
+<!-- ============ Payhip footer code ============ -->
+<dialog id="pfdlg">
+  <h2>Payhip footer code</h2>
+  <p class="hint">Makes new footer code from the catalog: A Connected World picks, series lists and release days, paperback pages, audiobook runtime and narrator, badges, and tags for books that have none yet.</p>
+  <label>Current footer code from Payhip (Settings → Custom code → Footer code). Leave empty to start from the last one saved.
+    <textarea id="pfin" spellcheck="false" placeholder="Paste the footer code here (optional)"></textarea></label>
+  <label>Payhip product list (optional, .md): refreshes which Payhip products are live.
+    <input id="pfprod" type="file" accept=".md,.txt,text/markdown,text/plain"></label>
+  <div class="row"><button id="pfgo" class="primary" type="button">Make footer code</button><span class="hint" id="pfmsg"></span></div>
+  <div id="pfout"></div>
+  <div class="row"><button id="pfcopy" type="button" class="hidden">Copy new code</button><button id="pfdown" type="button" class="hidden">Download</button><span class="grow"></span><button id="pfclose" type="button">Done</button></div>
+</dialog>
+
+<!-- ============ Notion sync problems ============ -->
+<dialog id="nfdlg">
+  <h2>Books Notion could not sync</h2>
+  <div id="nflist"></div>
+  <div class="row"><button id="nfretry" class="primary" type="button">Try these again</button><span class="hint" id="nfmsg"></span><span class="grow"></span><button id="nfclose" type="button">Done</button></div>
+</dialog>
+
 <!-- ============ App ============ -->
 <div id="app" class="hidden">
   <header>
@@ -313,11 +344,11 @@ dialog#sldlg::backdrop{background:#0006}
     <span class="grow"></span>
     <button id="undo" title="Ctrl/⌘+Z" disabled>Undo</button>
     <button id="redo" title="⌘+Shift+Z, or Ctrl+Y" disabled>Redo</button>
-    <button id="reload">Reload from Supabase</button>
     <button id="export" title="Download a CSV file (opens in Excel): what you see now, or everything">Export</button>
-    <button id="notionShown" title="Send the books shown in the grid (after your filters) to Notion at the next Notion sync">Send shown to Notion</button>
-    <button id="notionAll" title="Send every book to Notion at the next Notion sync">Send all to Notion</button>
+    <button id="notionShown" title="Sync the books shown in the grid (after your filters) to Notion">Send shown to Notion</button>
+    <button id="notionAll" title="Sync every book to Notion (about 10 seconds a book)">Send all to Notion</button>
     <button id="storelinks">Find store links</button>
+    <button id="payhipfooter" title="Make new Payhip footer code from the catalog">Payhip footer</button>
     <span class="who" id="nqueue"></span>
     <span class="who" id="who"></span>
     <button id="security">Sign-in options</button>
@@ -428,7 +459,7 @@ async function api(method, path, body, extra){
   let j = null; try{ j = txt ? JSON.parse(txt) : null; }catch(e){}
   if (!r.ok){
     const m = (j && (j.message || j.hint || j.details)) || txt || ("Error " + r.status);
-    const e = new Error(m); e.status = r.status; throw e;
+    const e = new Error(m); e.status = r.status; e.hint = (j && j.hint) || ""; throw e;
   }
   return j;
 }
@@ -447,7 +478,8 @@ async function getAll(table, order){
 /* ---------- column catalog ---------- */
 // kinds: ed (editions), st (stories, shared by all languages), one (one row per edition),
 // est (English text kept on a translation), ml (marketing link), fmt (format), sb (story bible, the companion book), sl (store link), ser (series), info (worked out, read-only)
-const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","badge"], edition_release_notes:["subscription_publication","collection_publication","payhip_publication","not_released_reason"]};
+const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","badge"], edition_release_notes:["subscription_publication","collection_publication","payhip_publication","not_released_reason"],
+  projects:["title","aplus","payhip_order","blank_on_site","seo_site","blurb_site","slideshow","plot"]};
 // Which fields each format uses. eBook and paperback share the book's Publication date (editions); hardcover and audiobook keep their own.
 // The story bible is a companion book with its own row in story_bibles (SB_FIELDS below), not a format.
 // Payhip prices are not here: they come from payhip_products (read-only "Payhip … price" columns).
@@ -455,14 +487,14 @@ const FMT_FIELDS = {
   "eBook":       ["not_offered","price_usd","library_price_usd","isbn","notes"],
   "Paperback":   ["not_offered","price_usd","isbn","amazon_isbn","bn_isbn","notes"],
   "Hardcover":   ["not_offered","price_usd","isbn","amazon_isbn","bn_isbn","publication_date","notes"],
-  "Audiobook":   ["not_offered","price_usd","library_price_usd","isbn","publication_date","narrator","narrator_bio","runtime","notes"]
+  "Audiobook":   ["not_offered","price_usd","library_price_usd","isbn","publication_date","narrator","narrator_bio","runtime_minutes","notes"]
 };
 const FMT_FIELDS_OTHER = ["not_offered","price_usd","isbn","publication_date","notes"];
 const SB_GROUP = "Story Bible (companion book)";
 const SB_FIELDS = ["price_usd","library_price_usd","isbn","publication_date","word_count","notes"];
 const SB_SELECT = "id,file_name," + SB_FIELDS.join(",");   // never the bible text itself (bible_md), which is large
 // Column ids that changed with the October 2026 data changes, so saved views and links still find them.
-const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:long_synopsis_series_intro"], "ed:long_synopsis_closing_line":["promo:line"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"]};
+const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:long_synopsis_series_intro"], "ed:long_synopsis_closing_line":["promo:line"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"]};
 function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
 const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id"]);
 let COLS = [], COLMAP = {};
@@ -477,6 +509,7 @@ function regOrder(table, col){ const r = REG[table+"."+col]; return r ? r.sort_o
 /* ---------- hover explanations for column names ---------- */
 // From field_registry.description plus the allowed values in reference_lists (e.g. Rating: E = Explicit…).
 let REF = {};   // reference_lists by list_name -> [{value, note}]
+let LISTCOL = {};   // "table.column" -> the reference_lists list its values come from (list_columns)
 function refListFor(c){
   const col = c.col || c.field; if (!col) return null;
   if (REF[col]) return REF[col];
@@ -589,7 +622,7 @@ function helpFor(c){
 
 /* ---------- sidebar groups (what a person looks for) ---------- */
 // Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
-const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Translations","Archive"];
+const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Projects","Translations","Archive"];
 const GROUP_ITEMS = {
   "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","st:english_title","info:english_title","ed:language","ed:series","ed:number_in_series","info:series_and_book_number",
     "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","ed:essential_description","promo:line","promo:text",
@@ -603,6 +636,7 @@ const GROUP_ITEMS = {
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
   "Story Bible (companion book)": ["sb:price_usd","sb:library_price_usd","sb:isbn","sb:publication_date","sb:word_count","sb:notes","php:Story Bible"],
   "Links": [],
+  "Projects": ["one:projects:title","one:projects:aplus","one:projects:payhip_order","one:projects:blank_on_site","one:projects:seo_site","one:projects:blurb_site","one:projects:slideshow","one:projects:plot"],
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"],
   "Archive": ["ed:archived_short_synopsis","ed:archived_long_synopsis"]
 };
@@ -617,9 +651,9 @@ function addCol(c){ placeCol(c); COLS.push(c); COLMAP[c.id] = c; }
 function buildCatalog(sample){
   COLS = []; COLMAP = {};
   const edCols = Object.keys(sample.editions[0]||{}).filter(c=>!SKIP_ED.has(c));
-  for (const c of edCols) addCol({id:"ed:"+c, kind:"ed", col:c, table:"editions", label:regLabel("editions",c), group:regGroup("editions",c,"Edition"), order:regOrder("editions",c), ro:false});
+  for (const c of edCols) addCol({id:"ed:"+c, kind:"ed", col:c, table:"editions", label:regLabel("editions",c), group:regGroup("editions",c,"Edition"), order:regOrder("editions",c), ro:c==="sheet_order"});
   for (const c of sample.storyCols) if (c!=="story_id") addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), ro:false});
-  for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
+  for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:(t==="projects" && c==="title") ? "Project title" : regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
   for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:"English "+f.replace(/_/g," "), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
   for (const l of sample.mlTypes){ addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:6000, ro:false});
     if (l==="Cover image") addCol({id:"ml:"+l+":alt_text", kind:"ml", lt:l, col:"alt_text", table:"marketing_links", label:"Cover alt text", group:"Marketing links", order:6001, ro:false}); }
@@ -683,7 +717,7 @@ async function ensureLoaded(cols){
           const mem = {}; for (const m of await getAll("relationship_members")) (mem[m.relationship_id] = mem[m.relationship_id] || []).push(m.character_id);
           for (const r of await getAll("relationships","relationship_id.asc")){
             const ids = mem[r.relationship_id]||[], txt = (r.type ? r.type + ": " : "") + (r.label||r.relationship_id) + (r.notes ? " – " + r.notes : ""), seen = new Set();
-            for (const fn of [r.established_in, r.central_romance_in]) if (fn) seen.add(fn);
+            for (const fn of [r.established_in, ...(r.central_romance_in||[])]) if (fn) seen.add(fn);
             for (const fn in inBook) if (ids.length > 1 && ids.every(id => inBook[fn].has(id))) seen.add(fn);
             for (const fn of seen) push(fn, txt);
           }
@@ -741,7 +775,7 @@ async function loadAll(){
   appReady = false;
   setStatus("Loading…");
   loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","php","promo"]) data[k]={}; data.one={};
-  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK] = await Promise.all([
+  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols] = await Promise.all([
     api("GET","field_registry?select=*").catch(()=>[]),
     api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000").catch(()=>[]),
     getAll("editions","sheet_order.asc.nullslast,file_name.asc"),
@@ -749,8 +783,10 @@ async function loadAll(){
     api("GET","english_source_text?select=field&limit=5000").catch(()=>[]),
     api("GET","marketing_links?select=link_type&limit=5000").catch(()=>[]),
     api("GET","formats?select=format&limit=5000").catch(()=>[]),
-    getAll("store_links").catch(()=>[])
+    getAll("store_links").catch(()=>[]),
+    api("GET","list_columns?select=list_name,table_name,column_name").catch(()=>[])
   ]);
+  LISTCOL = {}; for (const r of lcols) LISTCOL[r.table_name+"."+r.column_name] = r.list_name;
   REG = {}; for (const r of reg) REG[r.table_name+"."+r.column_name] = r;
   REF = {}; for (const r of refs) (REF[r.list_name] = REF[r.list_name] || []).push(r);
   data.editions = eds;
@@ -769,6 +805,7 @@ async function loadAll(){
   renderGrid();
   setStatus("Ready", "ok");
   queueCount();
+  startLive();
   appReady = true;
   await runPendingJump();   // a link that opened this tab jumps now, after sign-in and loading
 }
@@ -935,23 +972,11 @@ function presetRow(name, p){
   return {preset_name:name, purpose:"Catalog Editor view", columns:p.cols,
     editor_view:{lang:p.lang||"", series:p.series||"", find:p.find||"", blanks:!!p.blanks, blankAdd:p.blankAdd||[], blankOff:p.blankOff||[], sort:(p.sorts||[])[0]||{id:null,dir:1}, sorts:p.sorts||[], filters:p.filters||{}, conds:p.conds||{}, layout:p.layout||{order:[],widths:{},frozen:1}}};
 }
-// Excel-era column names (e.g. "formats(eBook).isbn", "store_links(Amazon, eBook, ASIN)") -> this page's column ids
-function mapLegacyCol(name){
-  let m;
-  if ((m = /^formats\((.+)\)\.(.+)$/.exec(name))) return m[2]==="payhip_price_usd" ? "php:"+m[1] : m[1]==="Story Bible" ? "sb:"+m[2] : `fmt:${m[1]}:${m[2]}`;
-  if ((m = /^store_links\((.+), (.+), (.+)\)$/.exec(name))) return `sl:${m[1]}|${m[2]}|${m[3]}`;
-  if ((m = /^[a-z_]+\.(.+)$/.exec(name))){
-    const col = m[1];
-    for (const id of ["ed:"+col, "st:"+col, "info:"+col]) if (COLMAP[id]) return id;
-    const one = COLS.find(c=>c.kind==="one" && c.col===col); if (one) return one.id;
-  }
-  return null;
-}
 function presetById(id){ return PRESETS.find(p=>String(p.id)===String(id)); }
 function presetToView(row){
   const v = row.editor_view;
   const fix = ids => [...new Set((ids||[]).flatMap(renamed))].filter(id => COLMAP[id]);
-  const cols = v ? fix(row.columns) : (row.columns||[]).map(mapLegacyCol).filter(id => id && COLMAP[id]);
+  const cols = fix(row.columns);
   if (!v) return {cols};
   // older views saved one sort ({id,dir}); newer ones save every level in "sorts"
   const sorts = (Array.isArray(v.sorts) && v.sorts.length ? v.sorts : (v.sort && v.sort.id ? [v.sort] : []))
@@ -1057,16 +1082,61 @@ function formatMissing(ed, c){
   const r = data.fmt[ed.file_name+"|"+f];
   return !r || (r.not_offered === true && c.col !== "not_offered");
 }
+// Columns kept as lists in Supabase (one item per line when editing; shown with ; between items)
+const ARRAY_COLS = new Set(["stories.tags","stories.display_tags","editions.keywords","editions.bisac","editions.thema","editions.bowker_genres","editions.bn_genres","editions.kobo_genres","editions.amazon_genres"]);
+const COMMA_LISTS = new Set(["stories.tags","stories.display_tags","editions.keywords"]);   // typed on one line, these also split at commas
+const isDateCol = c => /(^|_)(date|publication)$/.test(c.col||c.field||"");
 function typeOf(c){
+  if (c.col==="runtime_minutes") return "minutes";
+  if (ARRAY_COLS.has(c.table+"."+c.col)) return "list";
+  if (c.table && LISTCOL[c.table+"."+c.col]) return "pick";
+  if (isDateCol(c)) return "date";
   const vals = data.editions.map(ed=>valueOf(ed,c)).filter(v=>v!=null);
   if (vals.length && vals.every(v=>typeof v==="boolean")) return "bool";
   if (vals.length && vals.every(v=>typeof v==="number")) return "num";
   if (c.col==="not_offered") return "bool";
   return "text";
 }
-const show = v => v==null ? "" : (typeof v==="boolean" ? (v?"Yes":"No") : Array.isArray(v) ? v.join(", ") : String(v));
+const show = v => v==null ? "" : (typeof v==="boolean" ? (v?"Yes":"No") : Array.isArray(v) ? v.join("; ") : String(v));
+// Dates show as Oct 30, 2026 (month first, written out, so the whole team reads them the same way)
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtDate = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s)); return m ? `${MON[+m[2]-1]} ${+m[3]}, ${m[1]}` : String(s); };
+// Minutes show as hours and minutes: 549 -> 9 h 09 min
+const fmtMinutes = n => { n = Number(n); if (!isFinite(n)) return ""; const h = Math.floor(n/60), m = n%60; return h ? `${h} h ${String(m).padStart(2,"0")} min` : `${m} min`; };
+function parseDate(s){
+  s = s.trim().replace(/,/g," ").replace(/\s+/g," ");
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s), y, mo, d;
+  if (m){ y=+m[1]; mo=+m[2]; d=+m[3]; }
+  else if ((m = /^([a-z]{3,})\.? (\d{1,2}) (\d{4})$/i.exec(s))){ mo = MON.findIndex(x=>m[1].slice(0,3).toLowerCase()===x.toLowerCase())+1; d=+m[2]; y=+m[3]; }
+  else if ((m = /^(\d{1,2}) ([a-z]{3,})\.? (\d{4})$/i.exec(s))){ mo = MON.findIndex(x=>m[2].slice(0,3).toLowerCase()===x.toLowerCase())+1; d=+m[1]; y=+m[3]; }
+  else return null;
+  const dt = new Date(Date.UTC(y, mo-1, d));
+  if (!mo || dt.getUTCMonth()!==mo-1 || dt.getUTCDate()!==d) return null;
+  return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+}
+function parseMinutes(s){
+  s = s.trim().toLowerCase(); let m;
+  if ((m = /^(\d+):(\d{1,2})$/.exec(s))) return +m[1]*60 + +m[2];
+  if (/^\d+$/.test(s)) return +s;
+  const h = /(\d+)\s*h/.exec(s), mi = /(\d+)\s*m(?!s)/.exec(s), sec = /(\d+)\s*s/.exec(s);
+  if (!h && !mi) return null;
+  return (h ? +h[1]*60 : 0) + (mi ? +mi[1] : 0) + (sec && +sec[1] >= 30 ? 1 : 0);
+}
+function splitList(c, text){
+  let parts = text.split(/\r?\n/);
+  if (parts.filter(x=>x.trim()).length <= 1) parts = text.split(text.includes(";") || !COMMA_LISTS.has(c.table+"."+c.col) ? ";" : ",");
+  const out = [...new Set(parts.map(x=>x.trim()).filter(Boolean))];
+  return out.length ? out : null;
+}
 // Display only: word counts get thousands separators in the grid; the editor, saved values and comparisons still use show().
-const disp = (v,c) => (c && (c.col==="word_count" || c.field==="word_count") && v!=null && v!=="" && /^\d+$/.test(String(v).trim())) ? Number(v).toLocaleString("en-US") : show(v);
+const disp = (v,c) => {
+  if (c && v!=null && v!==""){
+    if ((c.col==="word_count" || c.field==="word_count") && /^\d+$/.test(String(v).trim())) return Number(v).toLocaleString("en-US");
+    if (c.col==="runtime_minutes") return fmtMinutes(v);
+    if (isDateCol(c)) return fmtDate(v);
+  }
+  return show(v);
+};
 
 /* ---------- grid ---------- */
 function fillFilters(){
@@ -1564,10 +1634,6 @@ fillBar.addEventListener("click", async e=>{
   const srcEd = viewRows[+a.dataset.r], srcCol = viewCols[+a.dataset.c];
   const text = show(valueOf(srcEd, srcCol));
   const jobs = fillTargets().filter(j=>{ const p = parseFor(j.c, text); return !p.ok || show(p.v) !== show(valueOf(j.ed, j.c)); }); if (!jobs.length){ setStatus("Those cells already have that value","ok"); return; }
-  const perTable = {};
-  for (const j of jobs){ if (!parseFor(j.c, text).ok || !rowExists(j.ed, j.c)) continue; const t = rowTable(j.ed, j.c); (perTable[t[0]] = perTable[t[0]] || new Set()).add(t[1]); }
-  const limit = await bulkLimit(), over = Object.entries(perTable).find(([,set])=>set.size > limit);
-  if (over){ alert(`This fill would change ${over[1].size} existing rows in ${over[0]} (new rows it would add are not counted), but Supabase allows at most ${limit} changed rows per table every 2 minutes (cells you changed in the last 2 minutes count too).\n\nNothing was changed. Select ${limit} rows or fewer, fill, wait 2 minutes, then fill the next batch.`); return; }
   if (!confirm(`Put ${text ? "“" + (text.length>50 ? text.slice(0,50)+"…" : text) + "”" : "a blank"} into ${jobs.length} cell${jobs.length>1?"s":""}?\n\nThis saves straight to Supabase. Undo reverses the whole fill.`)) return;
   b.disabled = true; undoGrp = Date.now(); let done = 0, skipped = 0, failed = 0;
   try{
@@ -1584,46 +1650,14 @@ fillBar.addEventListener("click", async e=>{
   if (failed){ setStatus(`Stopped after ${done} cell${done===1?"":"s"}: the next one was refused (${$("#status").textContent.replace(/^Not saved: /,"")}). ${failed} not filled. Undo reverses the ${done} that were filled.`, "bad"); return; }
   setStatus(`Filled ${done} cell${done===1?"":"s"}` + (skipped ? `, skipped ${skipped} that don't accept that value` : "") + ". Undo reverses the whole fill.", "ok");
 });
-// Which Supabase table and row a cell lives in (the database limits how many rows of one table change every 2 minutes).
-// True when saving this cell edits a row that already exists in Supabase (an UPDATE, which the 2-minute limit counts).
-// Cells whose row is missing get inserted instead (or can't be saved), and inserts are not limited.
-function rowExists(ed, c){
-  switch(c.kind){
-    case "one": return !!(data.one[c.t]||{})[ed.file_name];
-    case "est": return !!data.est[rowKey(ed,c)];
-    case "ml": return !!data.ml[rowKey(ed,c)];
-    case "sl": return !!data.sl[rowKey(ed,c)];
-    case "fmt": return !!data.fmt[rowKey(ed,c)];
-    case "sb": return !!data.sb[ed.file_name];
-    case "promo": return c.id==="promo:line" || !!ed.promo_line_id;
-  }
-  return true;   // ed, st, ser always edit an existing row
-}
-function rowTable(ed, c){
-  switch(c.kind){
-    case "ed": return ["editions", ed.file_name];
-    case "st": return ["stories", ed.story_id];
-    case "one": return [c.t, ed.file_name];
-    case "est": return ["english_source_text", rowKey(ed,c)];
-    case "ml": return ["marketing_links", rowKey(ed,c)];
-    case "fmt": return ["formats", rowKey(ed,c)];
-    case "sb": return ["story_bibles", ed.file_name];
-    case "sl": return ["store_links", rowKey(ed,c)];
-    case "ser": return ["series", rowKey(ed,c)];
-    case "promo": return c.id==="promo:line" ? ["editions", ed.file_name] : ["promo_lines", String(ed.promo_line_id)];
-  }
-  return [c.table||c.kind, ed.file_name];
-}
-let BULK_LIMIT = null;
-async function bulkLimit(){
-  if (BULK_LIMIT) return BULK_LIMIT;
-  try{ const r = await api("GET","settings?select=value&key=eq.bulk_edit_limit"); const n = parseInt(r && r[0] && r[0].value, 10); BULK_LIMIT = n > 0 ? n : 20; }catch(e){ BULK_LIMIT = 20; }
-  return BULK_LIMIT;
-}
 function parseFor(c, text){
   const t = typeOf(c), s = text.trim();
   if (t==="bool"){ const l = s.toLowerCase(); if (l==="") return {ok:true,v:null}; if (l==="yes"||l==="true") return {ok:true,v:true}; if (l==="no"||l==="false") return {ok:true,v:false}; return {ok:false}; }
   if (t==="num"){ if (s==="") return {ok:true,v:null}; const n = Number(text.replace(/[$,\s]/g,"")); return isNaN(n) ? {ok:false} : {ok:true,v:n}; }
+  if (t==="list") return {ok:true, v: splitList(c, text)};
+  if (t==="date"){ if (s==="") return {ok:true,v:null}; const d = parseDate(s); return d ? {ok:true,v:d} : {ok:false}; }
+  if (t==="minutes"){ if (s==="") return {ok:true,v:null}; const m = parseMinutes(s); return m==null ? {ok:false} : {ok:true,v:m}; }
+  if (t==="pick"){ if (s==="") return {ok:true,v:null}; const l = REF[LISTCOL[c.table+"."+c.col]]||[]; return l.some(x=>x.value===s) ? {ok:true,v:s} : {ok:false}; }
   return {ok:true, v: text==="" ? null : text};
 }
 
@@ -1658,6 +1692,26 @@ function openEditor(td){
       const ta = document.createElement("textarea"); ta.style.width="100%"; ta.style.minHeight="120px"; ta.placeholder = "Type the new promo line for " + ed.language + " books";
       input.replaceWith(ta); editing.input = ta; ta.addEventListener("keydown", onKey); ta.focus();
     });
+  } else if (t==="pick"){
+    const list = LISTCOL[c.table+"."+c.col];
+    input = document.createElement("select");
+    const fill = sel => { input.innerHTML = `<option value="">(blank)</option>` + (REF[list]||[]).map(x=>`<option value="${esc(x.value)}">${esc(x.value)}${x.note ? " – " + esc(x.note) : ""}</option>`).join("") + `<option value="__add__">Add new value…</option>`; input.value = sel==null ? "" : sel; };
+    fill(old); input.style.margin="8px";
+    input.addEventListener("change", async ()=>{
+      if (input.value!=="__add__") return;
+      const v = (prompt(`New value for the ${list} list:`)||"").trim();
+      if (!v){ input.value = old==null ? "" : old; return; }
+      try{ if (!(REF[list]||[]).some(x=>x.value===v)) (REF[list] = REF[list]||[]).push(await insertOne("reference_lists", {list_name:list, value:v, sort_order:900})); fill(v); }
+      catch(err){ setStatus("Not added: " + friendly(err), "bad"); input.value = old==null ? "" : old; }
+    });
+  } else if (t==="date"){
+    input = document.createElement("input"); input.type = "date"; input.value = old || ""; input.style.margin="8px";
+  } else if (t==="minutes"){
+    input = document.createElement("input"); input.value = old==null ? "" : `${Math.floor(old/60)}:${String(old%60).padStart(2,"0")}`; input.style.margin="8px";
+    input.placeholder = "9:09, 9h 9m or 549"; input.title = "Hours:minutes, like 9:09. Or 9h 9m, or the minutes alone (549).";
+  } else if (t==="list"){
+    input = document.createElement("textarea"); input.value = (old||[]).join("\n");
+    input.style.minHeight = Math.min(360, Math.max(120, 22*((old||[]).length+2))) + "px";
   } else if (t==="bool"){
     input = document.createElement("select");
     input.innerHTML = `<option value="">(blank)</option><option value="true">Yes</option><option value="false">No</option>`;
@@ -1669,7 +1723,7 @@ function openEditor(td){
   }
   box.appendChild(input);
   const bar = document.createElement("div"); bar.className="bar";
-  bar.innerHTML = `<span>${esc(ed.title||ed.file_name)} · ${esc(c.label)}${c.note?" — "+esc(c.note):""}</span><span class="grow"></span><span>Enter saves · Shift+Enter new line · Esc cancels</span><button data-a="cancel">Cancel</button><button class="primary" data-a="save">Save</button>`;
+  bar.innerHTML = `<span>${esc(ed.title||ed.file_name)} · ${esc(c.label)}${c.note?" — "+esc(c.note):""}</span><span class="grow"></span><span>${t==="list" ? "One per line · " : ""}Enter saves · Shift+Enter new line · Esc cancels</span><button data-a="cancel">Cancel</button><button class="primary" data-a="save">Save</button>`;
   box.appendChild(bar);
   document.body.appendChild(box);
   const rc = td.getBoundingClientRect(), W = Math.max(rc.width+40, LONG_HINT.test(c.col||c.field||c.label)?480:300);
@@ -1699,6 +1753,11 @@ function closeEditor(save){
   if (v==="__new__") return;
   if (t==="bool") v = v==="" ? null : v==="true";
   else if (t==="num") v = v.trim()==="" ? null : Number(v.replace(/[$,\s]/g,""));
+  else if (t==="list" || t==="date" || t==="minutes" || t==="pick"){
+    const p = parseFor(c, v);
+    if (!p.ok){ flash(td,"err"); setStatus(t==="minutes" ? "Type the runtime as 9:09, 9h 9m or 549 (minutes)." : t==="date" ? "That isn't a date." : "Pick a value from the list.", "bad"); return; }
+    v = p.v;
+  }
   else v = v === "" ? null : v;
   if (t==="num" && v!=null && isNaN(v)) { flash(td,"err"); setStatus("That needs to be a number.","bad"); return; }
   if (show(v) === show(old)) return;
@@ -1720,10 +1779,30 @@ async function saveCell(ed, c, v, old, td, record){
     updateCell(ed, c);
     return true;
   }catch(err){
+    if (await offerAdd(err)) return saveCell(ed, c, v, old, td, record);
     td && (td.classList.remove("saving"), td.classList.add("err"));
     setStatus("Not saved: " + friendly(err), "bad");
     return false;
   }
+}
+// A tag that isn't in Tag Vocab, or a value that isn't in its list: ask, add it, then the save is tried again.
+async function offerAdd(err){
+  const h = (err && err.hint) || "";
+  try{
+    if (h.startsWith("new_tags:")){
+      const tags = h.slice(9).split(", ").filter(Boolean), many = tags.length > 1;
+      if (!confirm(`${tags.join(", ")} ${many?"are":"is"} not in Tag Vocab yet.\n\nAdd ${many?"them":"it"} as new tag${many?"s":""}? Its group and translations can be filled in later in tag_vocab.`)) return false;
+      for (const tg of tags) await insertOne("tag_vocab", {english:tg, tag_group:"New (sort me)"});
+      return true;
+    }
+    if (h.startsWith("add_to_list:")){
+      const list = h.slice(12), m = /^"(.*)" is not in/.exec(err.message||"");
+      if (!m || !confirm(`"${m[1]}" is not in the ${list} list yet. Add it?`)) return false;
+      (REF[list] = REF[list]||[]).push(await insertOne("reference_lists", {list_name:list, value:m[1], sort_order:900}));
+      return true;
+    }
+  }catch(e){ setStatus("Not added: " + friendly(e), "bad"); }
+  return false;
 }
 function friendly(err){
   const m = err.message||String(err);
@@ -1996,25 +2075,157 @@ $("#pklist").addEventListener("click", async e=>{
 function confirmTwice(btn){ if (btn.dataset.sure) return true; btn.dataset.sure = "1"; const t = btn.textContent; btn.textContent = "Click again to remove"; setTimeout(()=>{ delete btn.dataset.sure; btn.textContent = t; }, 4000); return false; }
 
 $("#signout").onclick = async()=>{ try{ client() && await client().auth.signOut(); }catch(e){} showSignin("Signed out."); };
-$("#reload").onclick = ()=>afterSignIn();
-/* ---------- send to Notion (adds books to notion_sync_queue; the Notion sync script does the rest) ---------- */
+/* ---------- live updates: other people's changes show up without reloading ---------- */
+let live = null, liveTimer = null, liveFull = false;
+function liveMap(map, ev, n, o, keyOf){
+  if (!map) return;
+  for (const k in map) if (map[k] && o && o.id != null && map[k].id === o.id) delete map[k];   // drop the old copy (its key may have changed)
+  if (ev !== "DELETE" && n) map[keyOf(n)] = n;
+}
+function liveRefresh(pred){
+  if (liveFull){ return; }
+  viewRows.forEach((r,ri)=>{
+    if (!pred(r)) return;
+    viewCols.forEach((cc,ci)=>{
+      const td = cellAt(ri,ci); if (!td || (editing && editing.td === td)) return;
+      const v = valueOf(r,cc), sp = td.querySelector(".v"); if (!sp) return;
+      sp.textContent = disp(v,cc); td.title = disp(v,cc).slice(0,600);
+      td.classList.toggle("blank", v==null || v==="" || (Array.isArray(v) && !v.length));
+    });
+  });
+}
+function liveRender(){
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(()=>{
+    if (editing || document.querySelector("dialog[open]")){ liveRender(); return; }   // wait until you finish editing
+    liveFull = false; renderGrid();
+  }, 400);
+}
+function liveApply(p){
+  const t = p.table, ev = p.eventType, n = ev === "DELETE" ? null : p.new, o = p.old || {};
+  switch(t){
+    case "editions": {
+      const key = o.file_name || (n && n.file_name);
+      const ed = data.editions.find(e=>e.file_name===key) || (n && data.editions.find(e=>e.file_name===n.file_name));
+      if (ev === "DELETE"){ if (ed){ data.editions.splice(data.editions.indexOf(ed), 1); liveFull = true; liveRender(); } return; }
+      if (ed){
+        const moved = ed.sheet_order !== n.sheet_order || ed.file_name !== n.file_name;
+        Object.assign(ed, n);
+        if (moved){ data.editions.sort((a,b)=>(a.sheet_order ?? 1e9) - (b.sheet_order ?? 1e9) || String(a.file_name).localeCompare(b.file_name)); liveFull = true; liveRender(); }
+        else liveRefresh(r=>r===ed);
+      } else { data.editions.push(n); data.editions.sort((a,b)=>(a.sheet_order ?? 1e9) - (b.sheet_order ?? 1e9)); liveFull = true; liveRender(); }
+      refreshInfo(n.file_name).then(()=>liveRefresh(r=>r.file_name===n.file_name));
+      return;
+    }
+    case "stories":
+      if (!loaded.has("stories")) return;
+      if (ev === "DELETE") delete data.stories[o.story_id]; else data.stories[n.story_id] = n;
+      liveRefresh(r=>r.story_id === (n ? n.story_id : o.story_id)); return;
+    case "edition_subtitles": case "edition_awards": case "edition_release_notes": case "projects":
+      if (data.one[t]) liveMap(data.one[t], ev, n, o, r=>r.file_name); break;
+    case "notion_sync_queue": queueCountSoon(); return;
+    case "english_source_text": if (loaded.has("est")) liveMap(data.est, ev, n, o, r=>r.file_name+"|"+r.field); break;
+    case "marketing_links": if (loaded.has("ml")) liveMap(data.ml, ev, n, o, r=>r.file_name+"|"+r.link_type); break;
+    case "formats": if (loaded.has("fmt")) liveMap(data.fmt, ev, n, o, r=>r.file_name+"|"+r.format); break;
+    case "story_bibles":
+      if (n){ const keep = {}; for (const k of ["id","file_name",...SB_FIELDS]) keep[k] = n[k]; liveMap(data.sb, ev, keep, o, r=>r.file_name); }
+      else liveMap(data.sb, ev, null, o, r=>r.file_name);
+      break;
+    case "store_links":
+      liveMap(data.sl, ev, n, o, r=>`${r.file_name}|${r.store}|${r.format}|${r.link_type}`);
+      if (n && !COLMAP[`sl:${n.store}|${n.format}|${n.link_type}`]) setStatus(`A new kind of store link (${n.store} ${n.format} ${n.link_type}) was added. Reload the page to get its column.`, "warn");
+      break;
+    case "series":
+      if (!loaded.has("ser")) return;
+      liveMap(data.ser, ev, n, o, r=>r.series+"|"+r.language);
+      liveRefresh(r=>!!n && r.series === n.series && r.language === n.language); return;
+    case "promo_lines":
+      if (!loaded.has("promo")) return;
+      liveMap(data.promo, ev, n, o, r=>r.id);
+      refreshInfo(null).then(()=>liveRefresh(r=>!!n && r.promo_line_id === n.id)); return;
+    case "reference_lists":
+      api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000")
+        .then(refs=>{ REF = {}; for (const r of refs) (REF[r.list_name] = REF[r.list_name] || []).push(r); }).catch(()=>{});
+      return;
+    case "column_presets":
+      api("GET","column_presets?select=*&order=sort_order.asc.nullslast,preset_name.asc")
+        .then(rows=>{ PRESETS = rows || []; renderPresetMenu($("#presetsel").value); }).catch(()=>{});
+      return;
+    case "store_link_suggestions": if ($("#sldlg").open) slLoad(); return;
+    default: return;
+  }
+  // a row of a per-book table changed: redraw that book's cells
+  const fn = (n && n.file_name) || o.file_name;
+  if (fn) liveRefresh(r=>r.file_name===fn); else { liveFull = true; liveRender(); }
+}
+function startLive(){
+  if (live || !client()) return;
+  live = client().channel("catalog-editor")
+    .on("postgres_changes", {event:"*", schema:"public"}, p=>{ try{ liveApply(p); }catch(e){ console.warn("live update", e); } })
+    .subscribe(st=>{ if (st === "CHANNEL_ERROR" || st === "TIMED_OUT") setStatus("Live updates paused. Reload the page to see other people's changes.", "warn"); });
+}
+
+/* ---------- send to Notion (adds books to notion_sync_queue and starts the notion-sync Edge Function) ---------- */
+// The function works one book at a time (about 10 seconds each) and keeps going by itself every minute
+// until nothing is waiting, even after this page is closed.
+let nqFailed = [];
 async function queueCount(){
-  try{ const r = await api("GET","notion_sync_queue?select=id&status=eq.Waiting&limit=1000"); $("#nqueue").textContent = r.length ? r.length + " waiting for Notion" : ""; }catch(e){ $("#nqueue").textContent = ""; }
+  const el = $("#nqueue");
+  try{
+    const rows = await api("GET","notion_sync_queue?select=id,file_name,status,message,done_at&status=in.(Waiting,Working,Failed)&order=done_at.desc.nullslast&limit=5000") || [];
+    const waiting = rows.filter(r=>r.status !== "Failed").length;
+    const seen = new Set(rows.filter(r=>r.status !== "Failed").map(r=>r.file_name));
+    nqFailed = rows.filter(r=>r.status === "Failed" && !seen.has(r.file_name));
+    const parts = [];
+    if (waiting) parts.push(`${waiting} waiting for Notion`);
+    if (nqFailed.length) parts.push(`${nqFailed.length} failed`);
+    el.textContent = parts.join(" · ");
+    el.classList.toggle("fail", nqFailed.length > 0);
+    el.title = nqFailed.length ? "Click to see why and try again" : "";
+  }catch(e){ el.textContent = ""; el.classList.remove("fail"); }
+}
+let nqTimer = null;
+function queueCountSoon(){ clearTimeout(nqTimer); nqTimer = setTimeout(queueCount, 1500); }
+async function startNotionSync(){
+  const r = await fetch(cfg.url + "/functions/v1/notion-sync", {method:"POST", headers: await headers(), body:"{}"});
+  if (r.ok) return;
+  const j = await r.json().catch(()=>({}));
+  throw new Error(j.error || j.message || ("Error " + r.status));
 }
 async function sendToNotion(files, btn){
   if (!files.length){ setStatus("No books to send", "bad"); return; }
   if (!btn.dataset.sure){ btn.dataset.sure = "1"; const t = btn.textContent; btn.textContent = `Click again to send ${files.length}`; setTimeout(()=>{ delete btn.dataset.sure; btn.textContent = t; }, 4000); return; }
   delete btn.dataset.sure; btn.textContent = btn.id === "notionAll" ? "Send all to Notion" : "Send shown to Notion";
   try{
-    const waiting = new Set((await api("GET","notion_sync_queue?select=file_name&status=eq.Waiting&limit=5000")).map(r=>r.file_name));
+    const waiting = new Set((await api("GET","notion_sync_queue?select=file_name&status=in.(Waiting,Working)&limit=5000")).map(r=>r.file_name));
     const add = files.filter(f=>!waiting.has(f));
     for (let i=0; i<add.length; i+=500) await api("POST","notion_sync_queue", add.slice(i,i+500).map(f=>({file_name:f})), {Prefer:"return=minimal"});
-    setStatus(`${add.length} book(s) will go to Notion at the next Notion sync` + (files.length-add.length ? ` (${files.length-add.length} were already waiting)` : ""), "ok");
+    let started = "";
+    try{ await startNotionSync(); }catch(err){ started = ` The sync didn't start now (${friendly(err)}); the schedule starts it within a minute.`; }
+    const mins = Math.ceil((add.length + waiting.size) * 10 / 60);
+    setStatus(`${add.length} book(s) sent to Notion` + (files.length-add.length ? ` (${files.length-add.length} were already waiting)` : "") + `. About ${mins} minute${mins===1?"":"s"} for everything waiting; you can close this page.` + started, started ? "warn" : "ok");
     queueCount();
   }catch(err){ setStatus(friendly(err), "bad"); }
 }
 $("#notionShown").onclick = e=>sendToNotion(visibleRows().map(ed=>ed.file_name), e.currentTarget);
 $("#notionAll").onclick = e=>sendToNotion(data.editions.map(ed=>ed.file_name), e.currentTarget);
+$("#nqueue").onclick = ()=>{
+  if (!nqFailed.length) return;
+  const titles = {}; (data.editions||[]).forEach(e=>{ titles[e.file_name] = e.title; });
+  $("#nflist").innerHTML = "<ul>" + nqFailed.map(r=>`<li><b>${esc(titles[r.file_name]||r.file_name)}</b> <span class="hint">${esc(r.file_name)}</span><br>${esc(r.message||"No reason given.")}</li>`).join("") + "</ul>";
+  $("#nfmsg").textContent = ""; $("#nfretry").disabled = false;
+  $("#nfdlg").showModal();
+};
+$("#nfretry").onclick = async e=>{
+  const b = e.currentTarget; b.disabled = true; $("#nfmsg").textContent = "Sending again…";
+  try{
+    const ids = nqFailed.map(r=>r.id);
+    for (let i=0; i<ids.length; i+=200) await api("PATCH", `notion_sync_queue?id=in.(${ids.slice(i,i+200).join(",")})`, {status:"Waiting", message:null, done_at:null}, {Prefer:"return=minimal"});
+    try{ await startNotionSync(); }catch(_){ /* the schedule starts it within a minute */ }
+    $("#nfdlg").close(); setStatus(`${ids.length} book(s) sent to Notion again.`, "ok"); queueCount();
+  }catch(err){ $("#nfmsg").textContent = friendly(err); b.disabled = false; }
+};
+$("#nfclose").onclick = ()=>$("#nfdlg").close();
 
 /* ---------- Find store links (Edge Function find-store-links fills store_link_suggestions; Approve adds to store_links) ---------- */
 let slRows = [], slChanged = 0;
@@ -2082,7 +2293,7 @@ $("#storelinks").onclick = ()=>{ slChanged = 0; slMsg(""); $("#sldlg").showModal
 $("#slone").onclick = e=>{ const f = $("#slbook").value; if (f) slRun(e.currentTarget, f); };
 $("#slclose").onclick = ()=>{
   $("#sldlg").close();
-  if (slChanged) setStatus(`${slChanged} store link(s) added. Press Reload from Supabase to see them in the grid.`, "ok");
+  if (slChanged) setStatus(`${slChanged} store link(s) added.`, "ok");
 };
 $("#slfind").onclick = e=>slRun(e.currentTarget, "");
 $("#slsure").onclick = async e=>{
@@ -2105,6 +2316,423 @@ $("#sllist").addEventListener("click", async ev=>{
     slRows = slRows.filter(r=>r.id !== id); slRender();
   }catch(err){ slMsg(friendly(err)); tr.querySelectorAll("button").forEach(x=>x.disabled = false); }
 });
+
+/* ---------- Payhip footer code (was payhip_footer_update.py) ----------
+   Makes the Payhip footer code from the catalog. Start from the footer code pasted from Payhip
+   (Settings → Custom code → Footer code), else the last one saved in Supabase (payhip_footer).
+   Brings up to date: the A Connected World picks, the series lists and release days, and each book's
+   paperback pages and size, audiobook runtime and narrator, badges, and (for books with none yet) tags.
+   French, German, Italian and Spanish entries are left as they were. The result is saved in payhip_footer
+   (the last 10 are kept) and shown with a Copy button. */
+const PF = (()=>{
+const CONNECTED_PICKS = 4, QUICK_ESCAPE_WORDS = 40000, STEAMY_FROM_SPICE = 3;
+const MARK = "You Might Also Like, rebuilt";
+const fail = m => { const e = new Error(m); e.payhip = true; throw e; };
+const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Same as Python's json.dumps(..., ensure_ascii=False): items joined with sep[0], keys with sep[1]
+function dumps(v, sep){
+  sep = sep || [",", ":"];
+  if (Array.isArray(v)) return "[" + v.map(x=>dumps(x, sep)).join(sep[0]) + "]";
+  if (v && typeof v === "object") return "{" + Object.entries(v).map(([k,x])=>JSON.stringify(k) + sep[1] + dumps(x, sep)).join(sep[0]) + "}";
+  return JSON.stringify(v === undefined ? null : v);
+}
+const pyCmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+/** The footer's own book key, made exactly as its SE.bookKey makes it. */
+function key(title){
+  let t = String(title||"").normalize("NFKD").replace(/[̀-ͯ᪰-᫿᷀-᷿⃐-⃿︠-︯]/g, "");
+  t = t.replace(/ß/g,"ss").replace(/ø/g,"o").replace(/ł/g,"l").replace(/æ/g,"ae").replace(/œ/g,"oe").toLowerCase();
+  t = t.replace(/[‘’ʼ'"]/g, "");
+  return t.replace(/[^a-z0-9]+/g, " ").trim();
+}
+function block(text, name, opener, closer){
+  const m = new RegExp("const " + name + " = " + reEsc(opener)).exec(text);
+  if (!m) fail(`Could not find "const ${name} = ${opener}" in the footer code. Is this the right code?`);
+  const mEnd = m.index + m[0].length;
+  const end = text.indexOf("\n  " + closer, mEnd);
+  if (end < 0) fail(`Could not find the end of ${name}.`);
+  return [mEnd - 1, end + 3 + closer.length - 1];
+}
+function parse(literal, numericKeys){
+  let body = literal.trim();
+  if (numericKeys) body = body.replace(/^(\s*)(\d+):/gm, '$1"$2":');
+  body = body.replace(/,(\s*[\]}])/g, "$1");
+  return JSON.parse(body);
+}
+function dumpObj(entries, numericKeys, sep){   // entries: [[key, value], …] in order
+  const lines = entries.map(([k,v])=>`    ${numericKeys ? k : JSON.stringify(k)}: ${dumps(v, sep || [",",":"])}`);
+  return "{\n" + lines.join(",\n") + "\n  }";
+}
+const dumpList = items => "[\n" + items.map(x=>"    " + JSON.stringify(x)).join(",\n") + "\n  ]";
+function number(n){ if (n === null || n === undefined || n === "") return null; const f = Number(n); return isFinite(f) ? Math.floor(f) : null; }
+const ENTRY = /^    ("(?:[^"\\]|\\.)*"): (.*?)(,?)$/;
+function objectLines(text, name){
+  const m = new RegExp("const " + name + " = \\{\\n").exec(text);
+  if (!m) return null;
+  const start = m.index + m[0].length, end = text.indexOf("\n  };", start);
+  if (end < 0) return null;
+  return [start, end, text.slice(start, end).split("\n")];
+}
+function payhipStory(name){
+  let n = String(name||"").trim();
+  const cut = n.endsWith("...") || n.endsWith("…");
+  n = n.replace(/\s*(\.\.\.|…)$/, "");
+  if (n.includes(":")) return n.split(":")[0].trim();
+  if (cut) return "";
+  return n.replace(/\s*\([^()]*\)\s*$/, "").trim();
+}
+function seriesVocab(text){
+  const names = [];
+  for (const nm of ["SERIES_LINKS","FRENCH_SERIES_LINKS"]){
+    const m = new RegExp("const " + nm + " = \\{\\n([\\s\\S]*?)\\n  \\};").exec(text);
+    if (m) for (const x of m[1].matchAll(/^\s+("(?:[^"\\]|\\.)*"):/gm)) names.push(JSON.parse(x[1]));
+  }
+  return [...new Set(names.map(key).filter(Boolean))].sort((a,b)=>b.length - a.length);
+}
+function clean(v){ v = String(v ?? "").replace(/\s+/g, " ").trim(); return ["","none","n/a","na","-"].includes(v.toLowerCase()) ? "" : v; }
+const listOf = v => Array.isArray(v) ? v.map(String) : String(v ?? "").split(",");
+
+function readProducts(md){
+  const rows = [];
+  for (const it of md.split(/\n(?=- \[(?!Edit)[^\]]*\]\(https:\/\/payhip\.com\/b\/)/)){
+    const m = /^- \[([^\]]*)\]\(https:\/\/payhip\.com\/b\/([A-Za-z0-9]+)\)/.exec(it.trim());
+    if (!m) continue;
+    const line = /\n\s*((?:(?:Hidden|Unlisted|Draft|Archived)\s*)+)\n/.exec(it);
+    const words = line ? line[1].trim().split(/\s+/) : [];
+    const st = ["Archived","Draft","Hidden","Unlisted"].find(w=>words.includes(w));
+    const v = /\*\*\$([\d,.]+)\*\* price/.exec(it);
+    rows.push({code:m[2], name:m[1], status:st || "Live", price_usd: v ? parseFloat(v[1].replace(/,/g,"")) : null});
+  }
+  return rows;
+}
+
+async function bookDetails(text, get, notes, details){
+  const vocab = seriesVocab(text);
+  const eds = (await get("editions_full?select=file_name,language,title,series,paperback_pages,paperback_page_size,spice,explicit_content,word_count,simplified_award,display_tags,not_released_reason&order=sheet_order")).filter(e=>!e.not_released_reason);
+  const fmt = new Map();
+  for (const f of await get("formats?select=file_name,format,runtime,narrator,not_offered,isbn&format=in.(Audiobook,Paperback)")){ const k = f.file_name + "|" + f.format; if (!fmt.has(k)) fmt.set(k, f); }
+  const names = Object.create(null); for (const p of await get("payhip_products?select=code,name")) names[p.code] = p.name;
+  const linked = new Set(), stories = Object.create(null);
+  for (const l of await get("store_links?select=file_name,format,link_or_id&store=eq.Payhip")){
+    const m = /\/b\/([A-Za-z0-9]+)/.exec(l.link_or_id || ""); if (!m) continue;
+    linked.add(l.file_name + "|" + l.format);
+    const s = key(payhipStory(names[m[1]]));
+    if (s) ((stories[l.file_name] ??= {})[l.format] ??= new Set()).add(s);
+  }
+  const title = Object.create(null), lang = Object.create(null), vs = Object.create(null);
+  for (const e of eds){ title[e.file_name] = e.title; lang[e.file_name] = e.language; }
+  for (const e of eds){ const flat = key(e.series); vs[e.file_name] = vocab.find(v=>flat && flat.includes(v)) || ""; }
+
+  const pages = e=>{
+    const fn = e.file_name, pb = fmt.get(fn + "|Paperback");
+    if (pb && pb.not_offered) return null;
+    if (!(/^\s*97[89]/.test((pb||{}).isbn || "") || linked.has(fn + "|Paperback"))) return null;
+    const n = number(e.paperback_pages), size = clean(e.paperback_page_size);
+    return n && size ? `${n} (${size}) pages` : null;
+  };
+  const audio = e=>{
+    const a = fmt.get(e.file_name + "|Audiobook");
+    if (!a || a.not_offered) return null;
+    const rt = clean(a.runtime), nr = clean(a.narrator);
+    return rt && nr ? [rt, nr] : null;
+  };
+  const badges = e=>{
+    const out = String(e.simplified_award || "").split("!").map(a=>a.trim()).filter(Boolean);
+    const wc = /\d+/.exec(String(e.word_count ?? "").replace(/,/g, ""));
+    if (wc && Number(wc[0]) < QUICK_ESCAPE_WORDS) out.push("Quick Escape");
+    const sp = e.spice, ex = clean(e.explicit_content === true ? "yes" : e.explicit_content === false ? "no" : e.explicit_content).toLowerCase();
+    if (sp !== null && sp !== undefined && String(sp).trim() !== "") out.push(Number(sp) >= STEAMY_FROM_SPICE ? "Steamy" : "Family Friendly");
+    else if (ex === "yes" || ex === "no") out.push(ex === "yes" ? "Steamy" : "Family Friendly");
+    return out.length ? out : null;
+  };
+  const found = objectLines(text, "BOOK_TAGS"), usedTags = new Set();
+  for (const l of (found ? found[2] : [])){ const m = ENTRY.exec(l); if (m){ try{ for (const t of JSON.parse(m[2])) usedTags.add(t); }catch(_){} } }
+  const tags = e=>{   // only tags already used somewhere on the site, so a new book never brings one that narrows nothing
+    const out = [];
+    for (let t of listOf(e.display_tags)){ t = t.trim(); if (usedTags.has(t) && !out.includes(t)) out.push(t); }
+    return out.length ? out : null;
+  };
+  const show = v => typeof v === "string" ? v : v.join(", ");
+
+  function refresh(text, name, label, valueOf, formats, update = true){
+    const f = objectLines(text, name);
+    if (!f){ notes.push(`${label}: could not find ${name} in the footer code; nothing changed there.`); return text; }
+    const [start, end, lines] = f;
+    const vals = new Map(); for (const e of eds){ const v = valueOf(e); if (v !== null) vals.set(e.file_name, v); }
+    // every name a book goes by — the catalog title and the title part of each of its Payhip products
+    const cands = Object.create(null), claim = Object.create(null);
+    for (const fn of vals.keys()){
+      const c = new Set([key(title[fn])]);
+      for (const ks of Object.values(stories[fn] || {})) for (const k of ks) c.add(k);
+      c.delete(""); cands[fn] = c;
+    }
+    for (const [fn, c] of Object.entries(cands)) for (const k of c) (claim[k] ??= []).push(fn);
+    const plainOwner = p=>{
+      const c = claim[p] || [];
+      if (c.length === 1) return c[0];
+      const loose = c.filter(fn=>!vs[fn]);   // editions the footer cannot qualify by series
+      if (!loose.length) return null;
+      return (loose.filter(fn=>lang[fn] === "English").length ? loose.filter(fn=>lang[fn] === "English") : loose)[0];
+    };
+    const owned = new Map(), keysHere = new Set();
+    lines.forEach((line, i)=>{
+      const m = ENTRY.exec(line); if (!m) return;
+      const k = JSON.parse(m[1]); keysHere.add(k);
+      const at = k.indexOf(" | "), p = at < 0 ? k : k.slice(0, at), sfx = at < 0 ? "" : k.slice(at + 3);
+      let fn;
+      if (sfx){ const c = (claim[p] || []).filter(fn=>vs[fn] && sfx.includes(vs[fn])); fn = c.length === 1 ? c[0] : null; }
+      else fn = plainOwner(p);
+      if (fn){ if (!owned.has(fn)) owned.set(fn, []); owned.get(fn).push([i, m]); }
+    });
+    let changed = 0; const added = [], skipped = [];
+    for (const [fn, hits] of owned){
+      if (!update) continue;
+      const nw = dumps(vals.get(fn), [", ", ": "]);
+      for (const [i, m] of hits){
+        if (m[2] === nw) continue;
+        let was; try{ was = show(JSON.parse(m[2])); }catch(_){ was = m[2]; }
+        lines[i] = `    ${m[1]}: ${nw}${m[3]}`;
+        changed++;
+        details.push(`${label}, ${title[fn]} (${lang[fn]}): ${was} → ${show(vals.get(fn))}`);
+      }
+    }
+    for (const [fn, v] of vals){
+      if (owned.has(fn)) continue;
+      // keyed the way the footer will look the product up, with the series added where another edition has the same title
+      const bs = new Set(); for (const f of formats) for (const k of ((stories[fn] || {})[f] || [])) bs.add(k);
+      let bases = [...bs].sort(pyCmp); if (!bases.length) bases = [key(title[fn])];
+      let want = bases.map(b=>plainOwner(b) === fn ? b : (vs[fn] ? `${b} | ${vs[fn]}` : ""));
+      want = [...new Set(want)].filter(k=>k && !keysHere.has(k));
+      if (!want.length){ skipped.push(`${title[fn]} (${lang[fn]})`); continue; }
+      for (const k of want){
+        const entryRows = []; lines.forEach((l, j)=>{ if (ENTRY.test(l)) entryRows.push(j); });
+        const after = entryRows.filter(j=>JSON.parse(ENTRY.exec(lines[j])[1]) > k);
+        let at;
+        if (after.length) at = after[0];
+        else {
+          at = entryRows.length ? entryRows[entryRows.length - 1] + 1 : lines.length;
+          if (entryRows.length && !lines[entryRows[entryRows.length - 1]].endsWith(",")) lines[entryRows[entryRows.length - 1]] += ",";
+        }
+        lines.splice(at, 0, `    ${JSON.stringify(k)}: ${dumps(v, [", ", ": "])},`);
+        keysHere.add(k);
+      }
+      added.push(title[fn]);
+      details.push(`${label}, ${title[fn]} (${lang[fn]}) added: ${show(v)}`);
+    }
+    let msg = `${label}: ${changed} changed, ${added.length} added`;
+    if (skipped.length) msg += `; not added, because another edition already uses the same title and the series cannot tell them apart: ${skipped.join(", ")}`;
+    notes.push(msg + ".");
+    return text.slice(0, start) + lines.join("\n") + text.slice(end);
+  }
+  text = refresh(text, "BOOK_PAGES", "Paperback pages", pages, ["Paperback"]);
+  text = refresh(text, "AUDIO_DETAILS", "Audiobook runtime and narrator", audio, ["Audiobook"]);
+  text = refresh(text, "BOOK_BADGES", "Badges", badges, ["eBook","Paperback","Audiobook"]);
+  text = refresh(text, "BOOK_TAGS", "Tags (books with none yet)", tags, ["eBook","Paperback","Audiobook"], false);
+  return text;
+}
+
+const FIXES = [
+  ['A Connected World: the catalog\'s picks first, a "Connected:" line in the description last',
+`    const names = [
+      ...((window.seProductDetails || {}).connectedList || []),
+      ...recommendedFor(currentName)
+    ];`,
+`    const names = [
+      /* The catalog's picks first (payhip_also_like.py); a "Connected:" line in the
+         description is the last resort. */
+      ...recommendedFor(currentName),
+      ...((window.seProductDetails || {}).connectedList || [])
+    ];`],
+  ["Format picker: a printable or other extra never gets a paperback's page count",
+    String.raw`const isPaper = /paper\s*back|print|broch/i.test(label);`,
+    String.raw`const isPaper = !item.seIsOtherThing && /paper\s*back|\bprint\b|broch/i.test(label);`],
+  ["Format picker: artwork, games and the like belong to their own book, not to every book in the series",
+`      if (isBundleName(item.name)) continue;
+      found.push({ ...item, seIsExtra: true, seIsOtherThing: true });`,
+`      if (isBundleName(item.name)) continue;
+      /* Made for another book of the series ("The Dragon's Treasure … Original
+         Artwork Printable" on The Sea King's Lady): leave it to that book. */
+      const itsStory = storyTitle(item.name);
+      if (itsStory && itsStory !== storyTitle(document.title)
+          && window.se.lookUp(BOOK_PAGES, window.se.bookKeysFor(item.name))) continue;
+      found.push({ ...item, seIsExtra: true, seIsOtherThing: true });`]];
+
+/** get(path) -> rows (all pages); send(method, path, body, prefer). Returns {text, notes, details, where}. */
+async function make({pasted, productsMd, get, send, today}){
+  today = today || new Date().toISOString().slice(0,10);
+  let text = null, where = "";
+  if (pasted && pasted.includes(MARK)) { text = pasted; where = "the footer code you pasted from Payhip"; }
+  else if (pasted && pasted.trim()) fail(`What you pasted has no "${MARK}" block, so it is not the footer code. Copy it again from Payhip (Settings → Custom code → Footer code), or leave the box empty to use the last one saved.`);
+  if (text === null){
+    const last = await get("payhip_footer?select=code,created_at&order=created_at.desc&limit=1", true);
+    if (!last.length) fail("No footer code yet: paste it from Payhip (Settings → Custom code → Footer code).");
+    text = last[0].code; where = `the last footer code saved in Supabase (${String(last[0].created_at).slice(0,16).replace("T"," ")})`;
+    if (!text.includes(MARK)) fail(`The last saved code has no "${MARK}" block, so it is not the footer code. Paste it from Payhip instead.`);
+  }
+  const notes = [], details = [];
+  if (productsMd){
+    const rows = readProducts(productsMd);
+    if (!rows.length) fail("No products found in that product list.");
+    await send("POST", "payhip_products?on_conflict=code", rows, "resolution=merge-duplicates,return=minimal");
+    const have = new Set(rows.map(r=>r.code));
+    const gone = (await get("payhip_products?select=code")).map(r=>r.code).filter(c=>!have.has(c));
+    if (gone.length) await send("PATCH", "payhip_products?code=in.(" + gone.join(",") + ")", {status:"Archived"});
+    const live = rows.filter(r=>r.status === "Live").length;
+    notes.push(`Payhip products: ${rows.length} read (${live} live, ${rows.length - live} hidden/unlisted/draft)` + (gone.length ? `, ${gone.length} no longer listed` : "") + ".");
+  } else notes.push("Payhip products: not refreshed (add the Payhip product list to refresh which are live).");
+
+  const books = await get("edition_info?select=file_name,title,series,number_in_series,publication_date,subscription_publication,payhip_publication,sheet_order,anthology_only&language=eq.English&order=sheet_order");
+  const sugg = await get("also_like?select=file_name,rank,suggested_file_name,suggested_series&order=file_name,rank");
+  const titleOf = Object.create(null), fkey = Object.create(null), seriesOf = Object.create(null);
+  for (const b of books){ titleOf[b.file_name] = b.title; fkey[b.file_name] = key(b.title); seriesOf[b.file_name] = b.series; }
+
+  const [s2, e2] = block(text, "SERIES_NAMES", "[", "];"); const names = parse(text.slice(s2, e2));
+  const [s4, e4] = block(text, "BOOK_INFO", "{", "};"); const info = parse(text.slice(s4, e4));
+  // A title written a little differently in the footer is the same book when its series and number match
+  for (const b of books){
+    const k = fkey[b.file_name];
+    if (Object.hasOwn(info, k) || !b.series || !names.includes(b.series)) continue;
+    const idx = names.indexOf(b.series), n = number(b.number_in_series);
+    const same = Object.entries(info).filter(([fk, v])=>v[0] === idx && v[1] === n && n !== null && fk.split(/\s+/).slice(0,2).join(" ") === k.split(/\s+/).slice(0,2).join(" ")).map(([fk])=>fk);
+    if (same.length === 1) fkey[b.file_name] = same[0];
+  }
+  const englishKeys = new Set(Object.values(fkey));
+
+  // ---------- RECOMMENDED: the Connected World picks
+  const [s0, e0] = block(text, "RECOMMENDED_TITLES", "[", "];"); const titles = parse(text.slice(s0, e0));
+  const [s1, e1] = block(text, "RECOMMENDED", "{", "};"); const rec = parse(text.slice(s1, e1));
+  const picks = new Map();
+  for (const r of sugg){
+    const f = r.file_name, s = r.suggested_file_name;
+    if (r.suggested_series === seriesOf[f]) continue;      // the same series is the Next in the Series slot
+    if (!picks.has(f)) picks.set(f, []);
+    const lst = picks.get(f);
+    if (lst.length < CONNECTED_PICKS) lst.push(titleOf[s]);
+  }
+  const newRec = new Map();
+  for (const [k, v] of Object.entries(rec)) if (!englishKeys.has(k)) newRec.set(k, v.filter(i=>i < titles.length).map(i=>titles[i]));
+  let changed = 0;
+  for (const [f, lst] of picks){
+    const k = fkey[f];
+    const old = (Object.hasOwn(rec, k) ? rec[k] : []).filter(i=>i < titles.length).map(i=>titles[i]);
+    if (JSON.stringify(old) !== JSON.stringify(lst)) changed++;
+    newRec.set(k, lst);
+  }
+  for (const k of Object.keys(rec)) if (englishKeys.has(k) && !newRec.has(k)) newRec.set(k, rec[k].filter(i=>i < titles.length).map(i=>titles[i]));   // no catalog picks: keep hers
+  const newTitles = [];
+  for (const v of newRec.values()) for (const t of v) if (!newTitles.includes(t)) newTitles.push(t);
+  const recOut = [...newRec.keys()].sort(pyCmp).map(k=>[k, newRec.get(k).map(t=>newTitles.indexOf(t))]);
+  notes.push(`A Connected World: ${changed} English books have new picks; ${picks.size} English books have catalog picks.`);
+
+  // ---------- SERIES_NAMES / BOOK_INFO / SERIES_BOOKS
+  const [s3, e3] = block(text, "SERIES_BOOKS", "{", "};"); const seriesBooks = parse(text.slice(s3, e3), true);
+  const addedNames = [];
+  for (const b of books) if (b.series && !names.includes(b.series)){ names.push(b.series); addedNames.push(b.series); }
+  const dated = [], added = [], newBooks = new Set();
+  for (const b of books){
+    if (!b.series) continue;
+    const k = fkey[b.file_name], idx = names.indexOf(b.series);
+    const day = b.payhip_publication || b.subscription_publication || b.publication_date || "";
+    const old = Object.hasOwn(info, k) ? info[k] : undefined;
+    if (old === undefined){
+      info[k] = [idx, /boxset/i.test(b.title) ? null : number(b.number_in_series), day];   // a boxset keeps no number
+      added.push(b.title); newBooks.add(k);
+    } else if (old[2] !== day){
+      // subscription day first, so updating an older book on Payhip never makes it look new
+      dated.push(`${b.title}: ${old[2] || "(blank)"} → ${day || "(blank)"}`); old[2] = day;
+    }
+    const lst = (seriesBooks[String(idx)] ??= []);
+    // only books new to the footer join a series list; her lists are otherwise left as they are
+    if (newBooks.has(k) && !lst.some(t=>key(t) === k) && !b.anthology_only && !/boxset/i.test(b.title)){
+      const n = number(b.number_in_series);
+      let at = lst.length;
+      if (n !== null) for (let i = 0; i < lst.length; i++){ const tn = (Object.hasOwn(info, key(lst[i])) ? info[key(lst[i])] : [null, null])[1]; if (tn !== null && tn !== undefined && tn > n){ at = i; break; } }
+      lst.splice(at, 0, b.title);
+    }
+  }
+  if (added.length) notes.push("Added to the catalog list: " + added.join(", "));
+  if (addedNames.length) notes.push("New series: " + addedNames.join(", ") + " (add it to CONNECTED_SERIES by hand if it needs neighbours)");
+  if (dated.length) notes.push("Payhip release day changed: " + dated.join("; "));
+
+  // ---------- put it back (from the end of the file backwards, so the positions stay right)
+  const sbEntries = Object.entries(seriesBooks).sort((a,b)=>Number(a[0]) - Number(b[0]));
+  const parts = [[s0, e0, dumpList(newTitles)], [s1, e1, dumpObj(recOut)], [s2, e2, dumpList(names)],
+    [s3, e3, dumpObj(sbEntries, true, [", ", ":"])], [s4, e4, dumpObj(Object.keys(info).sort(pyCmp).map(k=>[k, info[k]]))]].sort((a,b)=>b[0] - a[0]);
+  for (const [s, e, nw] of parts) text = text.slice(0, s) + nw + text.slice(e);
+
+  // ---------- pages, runtime and narrator, badges, tags
+  text = await bookDetails(text, get, notes, details);
+
+  // ---------- eBook first
+  const sameFormat = /\n    const here = formatOf\(currentName\)\.trim\(\);\n    if \(here\) \{[\s\S]*?\n    \}\n(?=    for \(const format of FORMAT_ORDER\))/;
+  if (sameFormat.test(text)){
+    text = text.replace(sameFormat, "\n    /* Always the eBook first, whatever format this page is (Laurelle, Oct 2026). */\n");
+    text = text.replace("/* Which edition of a book to show. The format of the page being read comes\n     first, so an audiobook recommends audiobooks; then these, in order. */",
+                        "/* Which edition of a book to show: the eBook, then the audiobook, then the paperback. */");
+    notes.push("Cards now link to the eBook first on every page.");
+  } else if (text.includes("Always the eBook first")) notes.push("eBook first: already in place.");
+  else notes.push("eBook first: could not find pickEdition's same-format lines; nothing changed there.");
+
+  // ---------- fixes to the footer's own code (each applied once; skipped if already there or not found)
+  for (const [label, old, nw] of FIXES){
+    if (text.includes(nw)) notes.push(label + ": already in place.");
+    else if (text.split(old).length === 2){ text = text.replace(old, ()=>nw); notes.push(label + "."); }
+    else notes.push(label + ": could not find the lines to change; nothing changed there.");
+  }
+
+  // ---------- cache stamp
+  const stamp = "b" + today;
+  let bumped = false;
+  text = text.replace(/cacheVersion: "([^"]*)"/, (m, was)=>{
+    bumped = true;
+    const letter = was.startsWith(stamp) && /[A-Za-z]$/.test(was) ? String.fromCharCode(was.charCodeAt(was.length - 1) + 1) : "a";
+    return `cacheVersion: "${stamp}${letter}"`;
+  });
+  notes.push(bumped ? "Cache stamp moved on, so readers see the changes straight away." : "Cache stamp not found; readers may see old details for up to a week.");
+
+  // kept in Supabase too, so the next run can start from it; the last 10 are kept
+  await send("POST", "payhip_footer", {code:text, note:notes.join("; ").slice(0, 2000)});
+  const old = (await get("payhip_footer?select=id&order=created_at.desc")).slice(10).map(r=>r.id);
+  if (old.length) await send("DELETE", "payhip_footer?id=in.(" + old.join(",") + ")", null);
+  return {text, notes, details, where};
+}
+return {make, key, readProducts};
+})();
+
+async function pfGet(path){   // every row, 1000 at a time (a path with its own limit is read once)
+  if (/[?&]limit=/.test(path)) return await api("GET", path) || [];
+  let out = [];
+  for (let off = 0; ; off += 1000){ const rows = await api("GET", `${path}${path.includes("?")?"&":"?"}limit=1000&offset=${off}`) || []; out = out.concat(rows); if (rows.length < 1000) return out; }
+}
+async function pfSend(method, path, body, prefer){ return api(method, path, body, {Prefer: prefer || "return=minimal"}); }
+let pfText = "";
+$("#payhipfooter").onclick = ()=>{
+  $("#pfin").value = ""; $("#pfprod").value = ""; $("#pfout").innerHTML = ""; $("#pfmsg").textContent = ""; pfText = "";
+  $("#pfcopy").classList.add("hidden"); $("#pfdown").classList.add("hidden");
+  $("#pfdlg").showModal();
+};
+$("#pfgo").onclick = async e=>{
+  const b = e.currentTarget; b.disabled = true; $("#pfmsg").textContent = "Making the footer code…"; $("#pfout").innerHTML = "";
+  try{
+    const f = $("#pfprod").files[0];
+    const r = await PF.make({pasted: $("#pfin").value, productsMd: f ? await f.text() : "", get: pfGet, send: pfSend});
+    pfText = r.text;
+    $("#pfmsg").textContent = `Started from ${r.where}. Saved in Supabase (payhip_footer).`;
+    $("#pfout").innerHTML = "<ul>" + r.notes.map(n=>`<li>${esc(n)}</li>`).join("") + "</ul>" +
+      (r.details.length ? `<details><summary>Book by book (${r.details.length})</summary><ul>${r.details.map(d=>`<li>${esc(d)}</li>`).join("")}</ul></details>` : "") +
+      `<p class="hint">Next: press Copy new code, then in Payhip → Settings → Custom code → Footer code: select all, paste, Save.</p>`;
+    $("#pfcopy").classList.remove("hidden"); $("#pfdown").classList.remove("hidden");
+  }catch(err){ $("#pfmsg").textContent = err.payhip ? err.message : friendly(err); }
+  finally{ b.disabled = false; }
+};
+$("#pfcopy").onclick = async ()=>{
+  try{ await navigator.clipboard.writeText(pfText); $("#pfmsg").textContent = "Copied. Paste it into Payhip → Settings → Custom code → Footer code, then Save."; }
+  catch(_){ $("#pfmsg").textContent = "The browser didn't allow copying. Press Download and open the file instead."; }
+};
+$("#pfdown").onclick = ()=>{
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([pfText], {type:"text/plain;charset=utf-8"}));
+  a.download = `Payhip footer code ${new Date().toISOString().slice(0,10)}.txt`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+};
+$("#pfclose").onclick = ()=>$("#pfdlg").close();
 
 /* ---------- export to CSV (shown = the grid as it looks now; all = every column and every book) ---------- */
 function csvCell(v){ const t = show(v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g,'""') + '"' : t; }
