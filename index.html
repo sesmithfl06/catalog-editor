@@ -296,9 +296,9 @@ dialog#sldlg::backdrop{background:#0006}
       <summary>Columns <span class="n" id="colcount"></span></summary>
       <div id="coltools">
         <div id="presetrow">
-          <select id="presetsel" aria-label="View presets" title="Ticked columns, filters and sort, saved under a name on this device"></select>
-          <button id="presetsave" type="button" title="Save the current columns, filters and sort as a preset">Save preset</button>
-          <button id="presetdel" type="button" title="Delete the selected preset" disabled>Delete preset</button>
+          <select id="presetsel" aria-label="View presets" title="Ticked columns, filters and sort, saved under a name in Supabase (works on any device)"></select>
+          <button id="presetsave" type="button" title="Save the current columns, filters and sort as a view in Supabase">Save view</button>
+          <button id="presetdel" type="button" title="Delete the selected view" disabled>Delete view</button>
         </div>
         <label class="chk" title="Shows the title plus every column that has a blank for at least one book shown. Tick or untick a column on the left to add it to or remove it from this view."><input type="checkbox" id="fcolblank"> Blanks</label>
         <input id="colsearch" type="search" placeholder="Find a column…">
@@ -333,7 +333,7 @@ const DEFAULT_URL = "https://qurcnkeqxfqqfnygkpmd.supabase.co";
 const DEFAULT_KEY = "sb_publishable_SCKdsKDMAWp8htqoVF7VPA_TN9A5KOU";
 
 // The columns ticked when the page opens (and by the Favorites button).
-const FAVORITES = ["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name","ed:long_synopsis","st:rating","ed:word_count"];
+const FAVORITES = ["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name","info:long_synopsis","st:rating","ed:word_count"];
 // Always shown first, never counted for "blanks".
 const KEY_COLS = new Set(["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name"]);
 const LONG_HINT = /synopsis|description|loglines|reasons|excerpt|review|plot|bio|keywords|promo|tags|notes|tagline|seo|text|characters|species|technology|language|rare|bookclub|scene/i;
@@ -348,7 +348,6 @@ const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 
 /* ---------- connection & auth ---------- */
 const cfg = { url: (store.get("ce_url")||DEFAULT_URL).replace(/\/+$/,""), key: store.get("ce_key")||DEFAULT_KEY };
-const testToken = new URLSearchParams(location.hash.slice(1)).get("token"); // for automated testing only
 // Sign-ins are kept only until the browser closes.
 const mem = {};
 const sessionStore = {
@@ -364,7 +363,6 @@ function client(){
   return sb;
 }
 async function accessToken(){
-  if (testToken) return testToken;
   const c = client(); if (!c) return null;
   const {data} = await c.auth.getSession();
   return data && data.session ? data.session.access_token : null;
@@ -403,12 +401,28 @@ async function getAll(table, order){
 
 /* ---------- column catalog ---------- */
 // kinds: ed (editions), st (stories, shared by all languages), one (one row per edition),
-// est (English text kept on a translation), ml (marketing link), fmt (format), sl (store link), ser (series), info (worked out, read-only)
-const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","badge"], edition_release_notes:["subscription_publication","collection_publication","not_released_reason"], long_synopsis_inserts:["insert_line","insert_place","closing_place"]};
+// est (English text kept on a translation), ml (marketing link), fmt (format), sb (story bible, the companion book), sl (store link), ser (series), info (worked out, read-only)
+const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","badge"], edition_release_notes:["subscription_publication","collection_publication","payhip_publication","not_released_reason"], long_synopsis_inserts:["insert_line","insert_place","closing_place"]};
+// Which fields each format uses. eBook and paperback share the book's Publication date (editions); hardcover and audiobook keep their own.
+// The story bible is a companion book with its own row in story_bibles (SB_FIELDS below), not a format.
+// Payhip prices are not here: they come from payhip_products (read-only "Payhip … price" columns).
+const FMT_FIELDS = {
+  "eBook":       ["not_offered","price_usd","library_price_usd","isbn","notes"],
+  "Paperback":   ["not_offered","price_usd","isbn","amazon_isbn","bn_isbn","notes"],
+  "Hardcover":   ["not_offered","price_usd","isbn","amazon_isbn","bn_isbn","publication_date","notes"],
+  "Audiobook":   ["not_offered","price_usd","library_price_usd","isbn","publication_date","narrator","narrator_bio","runtime","notes"]
+};
+const FMT_FIELDS_OTHER = ["not_offered","price_usd","isbn","publication_date","notes"];
+const SB_GROUP = "Story Bible (companion book)";
+const SB_FIELDS = ["price_usd","library_price_usd","isbn","publication_date","word_count","notes"];
+const SB_SELECT = "id,file_name," + SB_FIELDS.join(",");   // never the bible text itself (bible_md), which is large
+// Column ids that changed with the October 2026 data changes, so saved views and links still find them.
+const RENAMED = {"ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"]};
+function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
 const SKIP_ED = new Set(["id","created_at","updated_at"]);
 let COLS = [], COLMAP = {};
 let REG = {};   // field_registry by "table.column"
-const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sl:{}, ser:{}, info:{}, lists:{}};
+const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sb:{}, sl:{}, ser:{}, info:{}, lists:{}, php:{}};
 const loaded = new Set();
 
 function regLabel(table, col){ const r = REG[table+"."+col]; return r ? (r.label||col) : col.replace(/_/g," ").replace(/^./,c=>c.toUpperCase()); }
@@ -450,7 +464,19 @@ const HELP = {
   "stories.display_tags":"The tags shown to readers (a trimmed set of Tags).",
   "formats.not_offered":"Tick when this format is not offered for this book.",
   "formats.library_price_usd":"Price libraries pay, in US dollars.",
-  "formats.word_count":"Word count of the story bible.",
+  "formats.narrator_bio":"Short bio of the audiobook narrator.",
+  "formats.publication_date":"Publication date of this format (hardcover or audiobook). The eBook and paperback go on sale together, so their date is the book's Publication date.",
+  "editions.publication_date":"Publication date of the eBook and paperback (they go on sale together). Hardcover and audiobook dates are in their own columns, and the story bible's is with the story bible.",
+  "editions.audio_files":"Number of audio files in the audiobook: one per chapter, plus the prologue, epilogue and author's note, plus 2 for the opening and closing credits, plus 1 'coming soon' file for subscription books. Blank where the chapter notes didn't say it plainly.",
+  "editions.chapter_notes":"How the book is split, e.g. pro-23+epi = prologue, chapters 1-23 and epilogue. Things that aren't audio files, like a glossary, are noted here too.",
+  "editions.word_count":"Word count of the story only (no pre-story or post-story pages), as a number.",
+  "editions.character_sheet_included":"Whether the book includes a character sheet. A glossary doesn't count; it's noted in Chapter notes.",
+  "story_bibles.word_count":"Word count of the story bible (the companion book). The novel's own word count is the book's Word count.",
+  "story_bibles.publication_date":"Publication date of the story bible.",
+  "story_bibles.notes":"Notes about the story bible (the companion book).",
+  "info.long_synopsis":"Worked out: Long synopsis lead-in + Essential description + the inserted line + Long synopsis closing line. To change it, edit those.",
+  "info.series_and_book_number":"Worked out: the series, the word for 'Book' in the book's language (Book, Tome, Buch, Volume, Libro) and the book number. For a different label on one book, add it in edition_differences (field series_and_book_number).",
+  "edition_release_notes.payhip_publication":"Date the book was published on Payhip.",
   "series.reading_note":"Note to readers about the reading order of the series.",
   "edition_awards.badge":"Badge for that award, shown on the book.",
   "edition_release_notes.subscription_publication":"Notes on when the book was published in a subscription service.",
@@ -478,7 +504,8 @@ function ownHelp(c){
   if (c.kind==="sl") return LINK_TYPE_HELP[c.lt] || "";
   if (c.kind==="ml") return ML_HELP[c.lt] || "";
   if (c.kind==="est") return "The English text kept next to the translation, so you can compare them.";
-  let h = HELP[({ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", info:"info", list:"list"}[c.kind]) + "." + col] || "";
+  if (c.kind==="php") return "Price on Payhip, read from Payhip products (payhip_products) by matching the book's Payhip link. Change it there, not here.";
+  let h = HELP[({ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", sb:"story_bibles", info:"info", list:"list"}[c.kind]) + "." + col] || "";
   return h;
 }
 // Meaning of one coded value (shown when hovering a cell), or "" for ordinary values.
@@ -492,8 +519,8 @@ function valueHelp(c, v){
 function qm(text){ return `<span class="qm" title="${esc(text)}" aria-label="Explanation">?</span>`; }
 function helpFor(c){
   const parts = [];
-  const regTable = {ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", ml:"marketing_links", info:"editions"}[c.kind];
-  const r = regTable && REG[regTable+"."+(c.col||"")];
+  const regTable = {ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", sb:"story_bibles", ml:"marketing_links", info:"editions"}[c.kind];
+  const r = regTable && (REG[regTable+"."+(c.col||"")] || (c.kind==="info" && REG["edition_info."+(c.col||"")]));
   const own = (r && r.description) || ownHelp(c);
   if (own) parts.push(own);
   const list = refListFor(c);
@@ -507,28 +534,29 @@ function helpFor(c){
 
 /* ---------- sidebar groups (what a person looks for) ---------- */
 // Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
-const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Links","Translations"];
+const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Translations"];
 const GROUP_ITEMS = {
-  "Book Basics": ["ed:file_name","ed:language","ed:title","one:edition_subtitles:subtitle","st:english_title","info:english_title","ed:series","ed:number_in_series","ed:series_and_book_number",
-    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","ed:long_synopsis","ed:essential_description","ed:long_synopsis_lead_in","ed:long_synopsis_closing_line",
+  "Book Basics": ["ed:file_name","ed:language","ed:title","one:edition_subtitles:subtitle","st:english_title","info:english_title","ed:series","ed:number_in_series","info:series_and_book_number",
+    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:essential_description","ed:long_synopsis_lead_in","ed:long_synopsis_closing_line",
     "one:long_synopsis_inserts:insert_line","one:long_synopsis_inserts:insert_place","one:long_synopsis_inserts:closing_place","ed:archived_short_synopsis","ed:archived_long_synopsis",
     "st:rating","st:explicit_content","st:spice","st:age_max","st:audience","st:main_genre_differentiated",
-    "ed:word_count","fmt:Story Bible:word_count","ed:chapters","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
-    "one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","one:edition_release_notes:not_released_reason",
+    "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
+    "one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","one:edition_release_notes:payhip_publication","one:edition_release_notes:not_released_reason",
     "list:authors_note","info:author","info:publisher","info:author_bio","ed:sheet_order","ed:story_id","st:story_id"],
   "Story": ["st:main_plot","st:subplots","st:tags","st:display_tags","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
   "Series": ["ser:series_synopsis","ser:series_url","ser:reads_in_order_from","ser:reads_in_order_to","ser:reading_note"],
   "Marketing": ["ed:tagline","ed:reasons_to_love","ed:excerpts","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy","list:bookclub"],
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
+  "Story Bible (companion book)": ["sb:price_usd","sb:library_price_usd","sb:isbn","sb:publication_date","sb:word_count","sb:notes","php:Story Bible"],
   "Links": [],
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"]
 };
-const KIND_GROUP = {ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", fmt:"Distribution", sl:"Links", ml:"Links", est:"Translations"};
+const KIND_GROUP = {ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", est:"Translations"};
 const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
 function placeCol(c){
   for (const g of GROUP_ORDER){ const i = GROUP_ITEMS[g].indexOf(c.id); if (i>=0){ c.group = g; c.so = i; return; } }
-  c.group = KIND_GROUP[c.kind] || "Book Basics";                       // any column not listed above lands with its kind
-  c.so = 1000 + (c.kind==="fmt" ? (FORMAT_RANK[c.f]??9)*1000 + c.order : c.kind==="ml" ? 5000 + c.order : c.order);
+  c.group = (c.f==="Story Bible" && c.kind==="php") ? SB_GROUP : (KIND_GROUP[c.kind] || "Book Basics");   // any column not listed above lands with its kind
+  c.so = 1000 + ((c.kind==="fmt" || c.kind==="php") ? (FORMAT_RANK[c.f]??9)*1000 + c.order : c.kind==="ml" ? 5000 + c.order : c.order);
 }
 function addCol(c){ placeCol(c); COLS.push(c); COLMAP[c.id] = c; }
 function buildCatalog(sample){
@@ -540,8 +568,9 @@ function buildCatalog(sample){
   for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:"English "+f.replace(/_/g," "), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
   for (const l of sample.mlTypes){ addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:6000, ro:false});
     if (l==="Cover image") addCol({id:"ml:"+l+":alt_text", kind:"ml", lt:l, col:"alt_text", table:"marketing_links", label:"Cover alt text", group:"Marketing links", order:6001, ro:false}); }
-  const fmtFields = ["not_offered","price_usd","library_price_usd","payhip_price_usd","isbn","amazon_isbn","bn_isbn","publication_date","word_count","narrator","runtime","notes"];
-  for (const f of sample.formats) for (const c of fmtFields) if (c!=="word_count" || f==="Story Bible") addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
+  for (const f of sample.formats) for (const c of (FMT_FIELDS[f] || FMT_FIELDS_OTHER)) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
+  SB_FIELDS.forEach((c,i)=>addCol({id:"sb:"+c, kind:"sb", col:c, table:"story_bibles", label:`Story Bible · ${regLabel("story_bibles",c)}`, group:SB_GROUP, order:7800+i, ro:false}));
+  for (const f of sample.payhipFormats) addCol({id:`php:${f}`, kind:"php", f, col:"price_usd", table:"payhip_products", label:`${f} · Payhip price`, group:"Format: "+f, order:7000+regOrder("formats","payhip_price_usd"), ro:true});
   for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
   for (const c of ["series_synopsis","series_url","reading_note"]) addCol({id:"ser:"+c, kind:"ser", col:c, table:"series", label:regLabel("series",c), group:"Series (shared by the whole series)", order:9000+regOrder("series",c), ro:false});
   // Story details kept as lists per book (read-only here)
@@ -550,11 +579,17 @@ function buildCatalog(sample){
     ["technology","Technology"],["language","Pet names & invented words"],["rare","Rare details"],["bookclub","Book club questions"],
     ["reviews","Reviews (edit in Notion)"],["copy","Marketing copy (edit in Notion)"],["pron","Pronunciations"],["scenes","Scene image prompts"],["authors_note","Author's Note"]];
   LISTS.forEach(([k,l],i)=>addCol({id:"list:"+k, kind:"list", col:k, table:"story details", label:l, group:"Story", order:9800+i, ro:true}));
-  for (const c of ["english_title","whole_book_number","author","publisher","author_bio"]) addCol({id:"info:"+c, kind:"info", col:c, table:"edition_info", label:{whole_book_number:"Book # with no decimals (B&N)", english_title:"English title"}[c]||regLabel("editions",c), group:"Worked out (read-only)", order:9900, ro:true});
+  // worked out in edition_info (read-only); long synopsis and series + book number keep their usual place in the grid
+  for (const c of ["english_title","whole_book_number","author","publisher","author_bio","long_synopsis","series_and_book_number"]){
+    const inInfo = !!REG["edition_info."+c];
+    addCol({id:"info:"+c, kind:"info", col:c, table:"edition_info", label:{whole_book_number:"Book # with no decimals (B&N)", english_title:"English title", long_synopsis:"Long Synopsis (built)"}[c]||regLabel(inInfo?"edition_info":"editions",c), group:"Worked out (read-only)", order:inInfo ? regOrder("edition_info",c) : 9900, ro:true});
+  }
 }
 
 /* ---------- loading ---------- */
-function needTable(c){ return {st:"stories", one:"one:"+c.t, est:"est", ml:"ml", fmt:"fmt", sl:"sl", ser:"ser", info:"info", list:"list:"+c.col}[c.kind]; }
+function needTable(c){ return {st:"stories", one:"one:"+c.t, est:"est", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", ser:"ser", info:"info", php:"php", list:"list:"+c.col}[c.kind]; }
+// The Payhip product code is the last part of the book's Payhip link (payhip.com/b/<code>).
+const payhipCode = l => { const m = /\/b\/([^\/?#]+)/.exec((l && (l.link_or_id || l.reader_link)) || ""); return m ? m[1] : null; };
 async function ensureLoaded(cols){
   const need = [...new Set(cols.map(needTable).filter(Boolean))].filter(x=>!loaded.has(x));
   for (const n of need){
@@ -564,8 +599,13 @@ async function ensureLoaded(cols){
     else if (n==="est"){ for (const r of await getAll("english_source_text")) data.est[r.file_name+"|"+r.field]=r; }
     else if (n==="ml"){ for (const r of await getAll("marketing_links")) data.ml[r.file_name+"|"+r.link_type]=r; }
     else if (n==="fmt"){ for (const r of await getAll("formats")) data.fmt[r.file_name+"|"+r.format]=r; }
+    else if (n==="sb"){ data.sb = {}; for (const r of await api("GET","story_bibles?select="+SB_SELECT+"&limit=5000")) data.sb[r.file_name]=r; }
     else if (n==="sl"){ for (const r of await getAll("store_links")) data.sl[`${r.file_name}|${r.store}|${r.format}|${r.link_type}`]=r; }
     else if (n==="ser"){ for (const r of await getAll("series")) data.ser[r.series+"|"+r.language]=r; }
+    else if (n==="php"){
+      const price = {}; for (const r of await getAll("payhip_products")) price[r.code] = r.price_usd;
+      for (const l of Object.values(data.sl)){ if (l.store!=="Payhip") continue; const code = payhipCode(l); if (code && price[code]!=null) data.php[l.file_name+"|"+l.format] = price[code]; }
+    }
     else if (n.startsWith("list:")){
       const k = n.slice(5), out = {}, push = (fn, t)=>{ (out[fn] = out[fn] || []).push(t); };
       if (k==="main_characters" || k==="all_characters"){
@@ -625,14 +665,14 @@ async function ensureLoaded(cols){
       }
       data.lists[k] = out;
     }
-    else if (n==="info"){ for (const r of await api("GET","edition_info?select=file_name,english_title,whole_book_number,author,publisher,author_bio")) data.info[r.file_name]=r; }
+    else if (n==="info"){ for (const r of await api("GET","edition_info?select=file_name,english_title,whole_book_number,author,publisher,author_bio,long_synopsis,series_and_book_number")) data.info[r.file_name]=r; }
     loaded.add(n);
   }
 }
 async function loadAll(){
   appReady = false;
   setStatus("Loading…");
-  loaded.clear(); for (const k of ["stories","est","ml","fmt","sl","ser","info","lists"]) data[k]={}; data.one={};
+  loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","php"]) data[k]={}; data.one={};
   const [reg, refs, eds, storyOne, estF, mlT, fmts, slK] = await Promise.all([
     api("GET","field_registry?select=*").catch(()=>[]),
     api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000").catch(()=>[]),
@@ -651,8 +691,11 @@ async function loadAll(){
   const fmtOrder = ["eBook","Paperback","Hardcover","Audiobook","Story Bible"];
   buildCatalog({editions:eds, storyCols:Object.keys((storyOne||[])[0]||{}), estFields:uniq(estF,"field"), mlTypes:uniq(mlT,"link_type"),
     formats:uniq(fmts,"format").sort((a,b)=>fmtOrder.indexOf(a)-fmtOrder.indexOf(b)),
-    slKeys:[...new Set(slK.map(r=>`${r.store}|${r.format}|${r.link_type}`))].sort()});
+    slKeys:[...new Set(slK.map(r=>`${r.store}|${r.format}|${r.link_type}`))].sort(),
+    payhipFormats:[...new Set(slK.filter(r=>r.store==="Payhip" && payhipCode(r)).map(r=>r.format))].sort((a,b)=>(fmtOrder.indexOf(a)+1||99)-(fmtOrder.indexOf(b)+1||99))});
+  await ensureLoaded([{kind:"sb"}]);
   fillFilters();
+  await loadPresetsDb();
   renderColumnList();
   await ensureLoaded(ticked());
   renderGrid();
@@ -766,11 +809,13 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     const ed = viewRows[+td.dataset.r]; if(!ed) return;
     e.preventDefault(); closeCtx();
     if (!msel.has(keyOf(td))){ clearSel(); manchor = keyOf(td); msel.add(manchor); paintSel(); }   // right-click on an unselected cell selects it first
-    const canEd = td.classList.contains("edit");
+    const canEd = td.classList.contains("edit"), cc = viewCols[+td.dataset.c];
+    const addF = cc && cc.kind==="fmt" && !data.fmt[rowKey(ed,cc)] ? cc.f : null;
+    const addSB = !!(cc && cc.kind==="sb" && !data.sb[ed.file_name]);
     const m = document.createElement("div"); m.className = "ctx";
-    m.innerHTML = `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
+    m.innerHTML = (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
     m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
-    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
+    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
     document.body.appendChild(m); ctxMenu = m;
     return;
   }
@@ -784,16 +829,60 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); b.dataset.a==="end" ? hideColumnsFrom(id) : hideColumn(id); });
   document.body.appendChild(m); ctxMenu = m;
 });
-/* ---------- view presets (saved on this device only) ---------- */
-const PRESET_KEY = "ce_presets";
-function loadPresets(){ try{ const p = JSON.parse(store.get(PRESET_KEY)||"{}"); return p && typeof p==="object" ? p : {}; }catch(e){ return {}; } }
-function savePresets(p){ store.set(PRESET_KEY, JSON.stringify(p)); }
+/* ---------- view presets (saved in Supabase: column_presets, so they follow you to any device) ----------
+   Views saved here keep their filters and sort in column_presets.editor_view.
+   The older Excel views in that table (editor_view empty) are listed too, columns only, and can't be changed here. */
+let PRESETS = [];   // column_presets rows
+const LOCAL_PRESET_KEY = "ce_presets";   // views saved on this device by the old version; moved to Supabase once
+async function loadPresetsDb(){
+  try{ PRESETS = await api("GET","column_presets?select=*&order=sort_order.asc.nullslast,preset_name.asc") || []; }
+  catch(e){ PRESETS = []; setStatus("Couldn't load saved views: " + friendly(e), "bad"); }
+  await moveLocalPresets();
+  renderPresetMenu("");
+}
+async function moveLocalPresets(){
+  let local = {}; try{ local = JSON.parse(store.get(LOCAL_PRESET_KEY)||"{}") || {}; }catch(e){ return; }
+  const names = Object.keys(local); if (!names.length) return;
+  try{
+    for (const n of names){ if (!PRESETS.some(p=>p.editor_view && p.preset_name===n)) PRESETS.push(await insertOne("column_presets", presetRow(n, local[n]))); }
+    store.set(LOCAL_PRESET_KEY, null);
+    setStatus(`Moved ${names.length} saved view${names.length>1?"s":""} from this device to Supabase`, "ok");
+  }catch(e){ setStatus("Views saved on this device couldn't be moved to Supabase yet: " + friendly(e), "warn"); }
+}
+function presetRow(name, p){
+  return {preset_name:name, purpose:"Catalog Editor view", columns:p.cols,
+    editor_view:{lang:p.lang||"", series:p.series||"", find:p.find||"", blanks:!!p.blanks, blankAdd:p.blankAdd||[], blankOff:p.blankOff||[], sort:p.sort||{id:null,dir:1}}};
+}
+// Excel-era column names (e.g. "formats(eBook).isbn", "store_links(Amazon, eBook, ASIN)") -> this page's column ids
+function mapLegacyCol(name){
+  let m;
+  if ((m = /^formats\((.+)\)\.(.+)$/.exec(name))) return m[2]==="payhip_price_usd" ? "php:"+m[1] : m[1]==="Story Bible" ? "sb:"+m[2] : `fmt:${m[1]}:${m[2]}`;
+  if ((m = /^store_links\((.+), (.+), (.+)\)$/.exec(name))) return `sl:${m[1]}|${m[2]}|${m[3]}`;
+  if ((m = /^[a-z_]+\.(.+)$/.exec(name))){
+    const col = m[1];
+    for (const id of ["ed:"+col, "st:"+col, "info:"+col]) if (COLMAP[id]) return id;
+    const one = COLS.find(c=>c.kind==="one" && c.col===col); if (one) return one.id;
+  }
+  return null;
+}
+function presetById(id){ return PRESETS.find(p=>String(p.id)===String(id)); }
+function presetToView(row){
+  const v = row.editor_view;
+  const fix = ids => [...new Set((ids||[]).flatMap(renamed))].filter(id => COLMAP[id]);
+  const cols = v ? fix(row.columns) : (row.columns||[]).map(mapLegacyCol).filter(id => id && COLMAP[id]);
+  if (!v) return {cols};
+  const sort = v.sort && v.sort.id ? {id: renamed(v.sort.id)[0], dir: v.sort.dir} : v.sort;
+  return Object.assign({}, v, {cols, blankAdd: fix(v.blankAdd), blankOff: fix(v.blankOff), sort});
+}
 function renderPresetMenu(sel){
-  const names = Object.keys(loadPresets()).sort((a,b)=>a.localeCompare(b));
+  const mine = PRESETS.filter(p=>p.editor_view), excel = PRESETS.filter(p=>!p.editor_view);
+  const opt = p => `<option value="id:${esc(p.id)}"${p.purpose && !p.editor_view ? ` title="${esc(p.purpose)}"` : ""}>${esc(p.preset_name)}</option>`;
   $("#presetsel").innerHTML = `<option value="">Views…</option><option value="@fav">Favorites</option>` +
-    (names.length ? `<optgroup label="My presets">` + names.map(n=>`<option value="p:${esc(n)}">${esc(n)}</option>`).join("") + `</optgroup>` : "");
+    (mine.length ? `<optgroup label="Saved views">` + mine.map(opt).join("") + `</optgroup>` : "") +
+    (excel.length ? `<optgroup label="Excel views (columns only)">` + excel.map(opt).join("") + `</optgroup>` : "");
   $("#presetsel").value = sel && [...$("#presetsel").options].some(o=>o.value===sel) ? sel : "";
-  $("#presetdel").disabled = !$("#presetsel").value.startsWith("p:");
+  const cur = presetById($("#presetsel").value.slice(3));
+  $("#presetdel").disabled = !(cur && cur.editor_view);
 }
 async function applyPreset(p){
   checked = new Set(p.cols);
@@ -805,25 +894,29 @@ async function applyPreset(p){
   try{ await ensureLoaded(p.blanks ? allCols() : ticked()); renderGrid(); setStatus("Ready","ok"); }catch(err){ setStatus(err.message,"bad"); }
 }
 $("#presetsel").onchange = async()=>{
-  const v = $("#presetsel").value;
-  $("#presetdel").disabled = !v.startsWith("p:");
+  const v = $("#presetsel").value, row = v.startsWith("id:") ? presetById(v.slice(3)) : null;
+  $("#presetdel").disabled = !(row && row.editor_view);
   if (v==="@fav") await applyPreset({cols:FAVORITES});
-  else if (v.startsWith("p:")){ const p = loadPresets()[v.slice(2)]; if (p) await applyPreset(p); }
+  else if (row) await applyPreset(presetToView(row));
 };
-$("#presetsave").onclick = ()=>{
-  const cur = $("#presetsel").value, def = cur.startsWith("p:") ? cur.slice(2) : "";
-  const name = (prompt("Name this view preset:", def)||"").trim(); if (!name) return;
-  const all = loadPresets();
-  if (all[name] && name!==def && !confirm(`A preset named "${name}" already exists. Replace it?`)) return;
-  all[name] = {cols:[...checked], lang:$("#flang").value, series:$("#fseries").value, find:$("#frow").value, blanks:$("#fcolblank").checked, blankAdd:[...blankAdd], blankOff:[...blankOff], sort:sortBy};
-  savePresets(all); renderPresetMenu("p:"+name); setStatus(`Saved preset "${name}"`,"ok");
+$("#presetsave").onclick = async()=>{
+  const cur = presetById($("#presetsel").value.slice(3)), def = cur && cur.editor_view ? cur.preset_name : "";
+  const name = (prompt("Name this view:", def)||"").trim(); if (!name) return;
+  const same = PRESETS.find(p=>p.editor_view && p.preset_name===name);
+  if (same && name!==def && !confirm(`A view named "${name}" already exists. Replace it?`)) return;
+  const body = presetRow(name, {cols:[...checked], lang:$("#flang").value, series:$("#fseries").value, find:$("#frow").value, blanks:$("#fcolblank").checked, blankAdd:[...blankAdd], blankOff:[...blankOff], sort:sortBy});
+  try{
+    const row = same ? await patchOne("column_presets", "id=eq."+q(same.id), body) : await insertOne("column_presets", body);
+    PRESETS = PRESETS.filter(p=>p.id!==row.id).concat(row);
+    renderPresetMenu("id:"+row.id); setStatus(`Saved view "${name}" in Supabase`,"ok");
+  }catch(err){ setStatus("View not saved: " + friendly(err), "bad"); }
 };
-$("#presetdel").onclick = ()=>{
-  const v = $("#presetsel").value; if (!v.startsWith("p:")) return;
-  const name = v.slice(2); if (!confirm(`Delete the preset "${name}"?`)) return;
-  const all = loadPresets(); delete all[name]; savePresets(all); renderPresetMenu(""); setStatus(`Deleted preset "${name}"`,"ok");
+$("#presetdel").onclick = async()=>{
+  const row = presetById($("#presetsel").value.slice(3)); if (!row || !row.editor_view) return;
+  if (!confirm(`Delete the view "${row.preset_name}"?`)) return;
+  try{ await delWhere("column_presets", "id=eq."+q(row.id)); PRESETS = PRESETS.filter(p=>p!==row); renderPresetMenu(""); setStatus(`Deleted view "${row.preset_name}"`,"ok"); }
+  catch(err){ setStatus("View not deleted: " + friendly(err), "bad"); }
 };
-renderPresetMenu("");
 $("#none").onclick = async()=>{ if (blanksOn()){ viewCols.forEach(c=>setColOn(c.id,false)); renderColumnList(); renderGrid(); return; } checked = new Set([...KEY_COLS].filter(k=>k!=="ed:file_name")); renderColumnList(); await refresh(); };
 $("#expand").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=true);
 $("#collapse").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=false);
@@ -834,7 +927,8 @@ function rowKey(ed, c){
   switch(c.kind){
     case "est": return ed.file_name+"|"+c.field;
     case "ml": return ed.file_name+"|"+c.lt;
-    case "fmt": return ed.file_name+"|"+c.f;
+    case "fmt": case "php": return ed.file_name+"|"+c.f;
+    case "sb": return ed.file_name;
     case "sl": return `${ed.file_name}|${c.s}|${c.f}|${c.lt}`;
     case "ser": return ed.series+"|"+ed.language;
   }
@@ -848,6 +942,8 @@ function valueOf(ed, c){
     case "est": r = data.est[rowKey(ed,c)]; return r ? r.english_text : null;
     case "ml": r = data.ml[rowKey(ed,c)]; return r ? r[c.col] : null;
     case "fmt": r = data.fmt[rowKey(ed,c)]; return r ? r[c.col] : null;
+    case "sb": r = data.sb[ed.file_name]; return r ? r[c.col] : null;
+    case "php": return data.php[rowKey(ed,c)] ?? null;
     case "sl": r = data.sl[rowKey(ed,c)]; return r ? r.link_or_id : null;
     case "ser": r = data.ser[rowKey(ed,c)]; return r ? r[c.col] : null;
     case "info": r = data.info[ed.file_name]; return r ? r[c.col] : null;
@@ -859,7 +955,18 @@ function canEdit(ed, c){
   if (c.kind==="st") return !!ed.story_id;
   if (c.kind==="est") return ed.language !== "English";
   if (c.kind==="ser") return !!ed.series && !!data.ser[rowKey(ed,c)];
+  if (c.kind==="fmt") return !!data.fmt[rowKey(ed,c)];   // only formats the book has; add one with right-click → Add format
+  if (c.kind==="sb") return !!data.sb[ed.file_name];      // only books that have a story bible; add one with right-click
   return true;
+}
+// A format cell (or that format's store link / Payhip price) for a format the book doesn't have, or doesn't offer.
+// The same for story bible cells (and story bible store links / Payhip price) on a book without a story bible.
+function formatMissing(ed, c){
+  if (c.kind==="sb" || ((c.kind==="php" || c.kind==="sl") && c.f==="Story Bible")) return loaded.has("sb") && !data.sb[ed.file_name];
+  const f = (c.kind==="fmt" || c.kind==="php" || c.kind==="sl") ? c.f : null;
+  if (!f || !FMT_FIELDS[f] || !loaded.has("fmt")) return false;
+  const r = data.fmt[ed.file_name+"|"+f];
+  return !r || (r.not_offered === true && c.col !== "not_offered");
 }
 function typeOf(c){
   const vals = data.editions.map(ed=>valueOf(ed,c)).filter(v=>v!=null);
@@ -909,7 +1016,8 @@ function searchRows(L, S, q){
   });
 }
 // A real blank: empty, and the cell applies to this book (e.g. "English text" doesn't apply to English editions).
-function isBlank(ed, c){ const v = valueOf(ed,c); return (v==null || v==="" || (Array.isArray(v) && !v.length)) && (c.ro || canEdit(ed,c)); }
+// Formats a book doesn't have or doesn't offer are not blanks.
+function isBlank(ed, c){ if (formatMissing(ed,c)) return false; const v = valueOf(ed,c); return (v==null || v==="" || (Array.isArray(v) && !v.length)) && (c.ro || canEdit(ed,c)); }
 
 /* ---------- sorting (click a column heading: A→Z, Z→A, then back to the usual order) ---------- */
 let sortBy = {id:null, dir:1};
@@ -963,7 +1071,9 @@ function renderGrid(){
     viewCols.forEach((c,ci)=>{
       const v = valueOf(ed,c), ok = canEdit(ed,c);
       const cls = [ci===0?"first":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (LONG_HINT.test(c.col||c.field||c.label)?"long":""), (c.id==="ed:title"?"title":"")].join(" ");
-      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
+      const noFmt = c.kind==="fmt" && !data.fmt[rowKey(ed,c)] ? `This book has no ${c.f}. Right-click → Add ${c.f} to add it.`
+        : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it." : "";
+      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt, valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
     });
     h += "</tr>";
   });
@@ -1089,7 +1199,11 @@ fillBar.addEventListener("click", async e=>{
   const a = manchor && cellByKey(manchor); if (!a) return;
   const srcEd = viewRows[+a.dataset.r], srcCol = viewCols[+a.dataset.c];
   const text = show(valueOf(srcEd, srcCol));
-  const jobs = fillTargets(); if (!jobs.length) return;
+  const jobs = fillTargets().filter(j=>{ const p = parseFor(j.c, text); return !p.ok || show(p.v) !== show(valueOf(j.ed, j.c)); }); if (!jobs.length){ setStatus("Those cells already have that value","ok"); return; }
+  const perTable = {};
+  for (const j of jobs){ if (!parseFor(j.c, text).ok || !rowExists(j.ed, j.c)) continue; const t = rowTable(j.ed, j.c); (perTable[t[0]] = perTable[t[0]] || new Set()).add(t[1]); }
+  const limit = await bulkLimit(), over = Object.entries(perTable).find(([,set])=>set.size > limit);
+  if (over){ alert(`This fill would change ${over[1].size} existing rows in ${over[0]} (new rows it would add are not counted), but Supabase allows at most ${limit} changed rows per table every 2 minutes (cells you changed in the last 2 minutes count too).\n\nNothing was changed. Select ${limit} rows or fewer, fill, wait 2 minutes, then fill the next batch.`); return; }
   if (!confirm(`Put ${text ? "“" + (text.length>50 ? text.slice(0,50)+"…" : text) + "”" : "a blank"} into ${jobs.length} cell${jobs.length>1?"s":""}?\n\nThis saves straight to Supabase. Undo reverses the whole fill.`)) return;
   b.disabled = true; undoGrp = Date.now(); let done = 0, skipped = 0, failed = 0;
   try{
@@ -1099,12 +1213,47 @@ fillBar.addEventListener("click", async e=>{
       const old = valueOf(j.ed, j.c);
       if (show(p.v) === show(old)) continue;                           // already the same
       setStatus(`Filling ${done+failed+1} of ${jobs.length}…`);
-      (await saveCell(j.ed, j.c, p.v, old, j.td, true)) ? done++ : failed++;
+      if (await saveCell(j.ed, j.c, p.v, old, j.td, true)) done++; else { failed = jobs.length - done - skipped; break; }   // stop at the first refusal so nothing is half-done silently
     }
   } finally { undoGrp = null; }
   clearSel();
-  setStatus(`Filled ${done} cell${done===1?"":"s"}` + (skipped ? `, skipped ${skipped} that don't accept that value` : "") + (failed ? `, ${failed} not saved` : "") + ". Undo reverses the whole fill.", failed ? "bad" : "ok");
+  if (failed){ setStatus(`Stopped after ${done} cell${done===1?"":"s"}: the next one was refused (${$("#status").textContent.replace(/^Not saved: /,"")}). ${failed} not filled. Undo reverses the ${done} that were filled.`, "bad"); return; }
+  setStatus(`Filled ${done} cell${done===1?"":"s"}` + (skipped ? `, skipped ${skipped} that don't accept that value` : "") + ". Undo reverses the whole fill.", "ok");
 });
+// Which Supabase table and row a cell lives in (the database limits how many rows of one table change every 2 minutes).
+// True when saving this cell edits a row that already exists in Supabase (an UPDATE, which the 2-minute limit counts).
+// Cells whose row is missing get inserted instead (or can't be saved), and inserts are not limited.
+function rowExists(ed, c){
+  switch(c.kind){
+    case "one": return !!(data.one[c.t]||{})[ed.file_name];
+    case "est": return !!data.est[rowKey(ed,c)];
+    case "ml": return !!data.ml[rowKey(ed,c)];
+    case "sl": return !!data.sl[rowKey(ed,c)];
+    case "fmt": return !!data.fmt[rowKey(ed,c)];
+    case "sb": return !!data.sb[ed.file_name];
+  }
+  return true;   // ed, st, ser always edit an existing row
+}
+function rowTable(ed, c){
+  switch(c.kind){
+    case "ed": return ["editions", ed.file_name];
+    case "st": return ["stories", ed.story_id];
+    case "one": return [c.t, ed.file_name];
+    case "est": return ["english_source_text", rowKey(ed,c)];
+    case "ml": return ["marketing_links", rowKey(ed,c)];
+    case "fmt": return ["formats", rowKey(ed,c)];
+    case "sb": return ["story_bibles", ed.file_name];
+    case "sl": return ["store_links", rowKey(ed,c)];
+    case "ser": return ["series", rowKey(ed,c)];
+  }
+  return [c.table||c.kind, ed.file_name];
+}
+let BULK_LIMIT = null;
+async function bulkLimit(){
+  if (BULK_LIMIT) return BULK_LIMIT;
+  try{ const r = await api("GET","settings?select=value&key=eq.bulk_edit_limit"); const n = parseInt(r && r[0] && r[0].value, 10); BULK_LIMIT = n > 0 ? n : 20; }catch(e){ BULK_LIMIT = 20; }
+  return BULK_LIMIT;
+}
 function parseFor(c, text){
   const t = typeOf(c), s = text.trim();
   if (t==="bool"){ const l = s.toLowerCase(); if (l==="") return {ok:true,v:null}; if (l==="yes"||l==="true") return {ok:true,v:true}; if (l==="no"||l==="false") return {ok:true,v:false}; return {ok:false}; }
@@ -1213,6 +1362,16 @@ async function insertOne(table, body){
   return rows[0];
 }
 async function delWhere(table, filter){ await api("DELETE", `${table}?${filter}`, null, PATCH); }
+async function addFormat(ed, f){
+  if (!confirm(`Add ${f} for "${ed.title||ed.file_name}"?\n\nThis creates an empty ${f} row in Supabase so you can fill in its price, ISBN and so on. Undo does not remove it.`)) return;
+  try{ data.fmt[ed.file_name+"|"+f] = await insertOne("formats", {file_name:ed.file_name, format:f}); renderGrid(); setStatus(`Added ${f} for ${ed.title||ed.file_name}`,"ok"); }
+  catch(err){ setStatus("Not added: " + friendly(err), "bad"); }
+}
+async function addStoryBible(ed){
+  if (!confirm(`Add a story bible for "${ed.title||ed.file_name}"?\n\nThis creates an empty story bible row in Supabase so you can fill in its price, ISBN and so on. Undo does not remove it.`)) return;
+  try{ data.sb[ed.file_name] = await insertOne("story_bibles?select="+SB_SELECT, {file_name:ed.file_name}); renderGrid(); setStatus(`Added a story bible for ${ed.title||ed.file_name}`,"ok"); }
+  catch(err){ setStatus("Not added: " + friendly(err), "bad"); }
+}
 async function write(ed, c, v){
   const fn = "file_name=eq."+q(ed.file_name);
   switch(c.kind){
@@ -1226,7 +1385,7 @@ async function write(ed, c, v){
     }
     case "est": {
       const k = rowKey(ed,c), cur = data.est[k], f = fn+"&field=eq."+q(c.field);
-      if (v==null){ if (cur){ await delWhere("english_source_text", f); delete data.est[k]; } return; }
+      if (v==null){ if (cur) data.est[k] = await patchOne("english_source_text", f, {english_text:null}); return; }   // clearing blanks the text and keeps the row
       data.est[k] = cur ? await patchOne("english_source_text", f, {english_text:v}) : await insertOne("english_source_text", {file_name:ed.file_name, field:c.field, english_text:v});
       return;
     }
@@ -1238,13 +1397,18 @@ async function write(ed, c, v){
     }
     case "fmt": {
       const k = rowKey(ed,c), cur = data.fmt[k], f = fn+"&format=eq."+q(c.f);
-      if (cur){ data.fmt[k] = await patchOne("formats", f, {[c.col]:v}); }
-      else if (v!=null){ data.fmt[k] = await insertOne("formats", {file_name:ed.file_name, format:c.f, [c.col]:v}); }
+      if (!cur) throw new Error(`This book has no ${c.f}. Right-click → Add ${c.f} first.`);
+      data.fmt[k] = await patchOne("formats", f, {[c.col]:v});
+      return;
+    }
+    case "sb": {
+      if (!data.sb[ed.file_name]) throw new Error("This book has no story bible. Right-click → Add a story bible first.");
+      data.sb[ed.file_name] = await patchOne("story_bibles", fn+"&select="+SB_SELECT, {[c.col]:v});
       return;
     }
     case "sl": {
       const k = rowKey(ed,c), cur = data.sl[k], f = `${fn}&store=eq.${q(c.s)}&format=eq.${q(c.f)}&link_type=eq.${q(c.lt)}`;
-      if (v==null){ if (cur){ await delWhere("store_links", f); delete data.sl[k]; } return; }
+      if (v==null){ if (cur) data.sl[k] = await patchOne("store_links", f, {link_or_id:null}); return; }   // clearing blanks the link and keeps the row (notes, store count)
       data.sl[k] = cur ? await patchOne("store_links", f, {link_or_id:v}) : await insertOne("store_links", {file_name:ed.file_name, store:c.s, format:c.f, link_type:c.lt, link_or_id:v});
       return;
     }
@@ -1391,7 +1555,7 @@ async function loadSecurity(){
     $("#deltotp").classList.toggle("hidden", !f); $("#addtotp").classList.toggle("hidden", !!f); $("#deltotp").dataset.id = f ? f.id : "";
   }catch(e){ $("#totpstate").textContent = "Couldn't check: " + plain(e); }
 }
-$("#security").onclick = ()=>{ if (testToken) return; $("#secmsg").textContent = ""; $("#totpbox2").innerHTML = ""; $("#secdlg").showModal(); loadSecurity(); };
+$("#security").onclick = ()=>{ $("#secmsg").textContent = ""; $("#totpbox2").innerHTML = ""; $("#secdlg").showModal(); loadSecurity(); };
 $("#secclose").onclick = ()=>$("#secdlg").close();
 $("#addpk").onclick = async()=>{ if (await addPasskey($("#secmsg"))) loadSecurity(); };
 $("#addtotp").onclick = ()=>startTotp($("#totpbox2"), $("#secmsg"));
@@ -1606,7 +1770,7 @@ async function jumpTo(book, colId){
   const low = book.toLowerCase();
   const ed = data.editions.find(e=>e.file_name===book) || data.editions.find(e=>(e.file_name||"").toLowerCase()===low);
   if (!ed){ setStatus(`Link: no book with the file name “${book}”.`, "bad"); return; }
-  const c = colId ? COLMAP[colId] || null : null;
+  const c = colId ? COLMAP[colId] || COLMAP[renamed(colId)[0]] || null : null;
   linkView = {file: ed.file_name, col: c ? c.id : null};
   // show the column's box in the sidebar (not ticked: the link view shows it without changing your columns)
   if (c){
@@ -1636,7 +1800,6 @@ async function jumpTo(book, colId){
 }
 
 (async function init(){
-  if (testToken){ startApp(claims(testToken).email); return; }
   if (!client()){ showSignin(); return; }
   const tok = await accessToken().catch(()=>null);
   if (tok) { afterSignIn(); return; }
