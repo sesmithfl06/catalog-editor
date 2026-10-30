@@ -313,8 +313,7 @@ dialog#sldlg::backdrop{background:#0006}
     <span class="grow"></span>
     <button id="undo" title="Ctrl/⌘+Z" disabled>Undo</button>
     <button id="redo" title="⌘+Shift+Z, or Ctrl+Y" disabled>Redo</button>
-    <button id="reload">Reload</button>
-    <span class="helptip" tabindex="0" role="note" aria-label="About Reload" data-tip="Reload pulls the latest data from Supabase. It does not reload the Catalog Editor webpage itself.">?</span>
+    <button id="reload">Reload from Supabase</button>
     <button id="export" title="Download a CSV file (opens in Excel): what you see now, or everything">Export</button>
     <button id="notionShown" title="Send the books shown in the grid (after your filters) to Notion at the next Notion sync">Send shown to Notion</button>
     <button id="notionAll" title="Send every book to Notion at the next Notion sync">Send all to Notion</button>
@@ -378,7 +377,7 @@ dialog#sldlg::backdrop{background:#0006}
 const DEFAULT_URL = "https://qurcnkeqxfqqfnygkpmd.supabase.co";
 const DEFAULT_KEY = "sb_publishable_SCKdsKDMAWp8htqoVF7VPA_TN9A5KOU";
 
-// The columns ticked when the page opens (and by the Favorites button).
+// Column order for the key columns (not a view; the page opens with Title only).
 const FAVORITES = ["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name","info:long_synopsis","st:rating","ed:word_count"];
 // Always shown first, never counted for "blanks".
 const KEY_COLS = new Set(["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name"]);
@@ -775,7 +774,7 @@ async function loadAll(){
 }
 
 /* ---------- column picker ---------- */
-let checked = new Set(FAVORITES);
+let checked = new Set(["ed:title"]);   // opens with Title only; add other columns through the column picker
 // Blanks view: columns you added (even with no blanks) or removed (even with blanks), and the ids now shown.
 let blankAdd = new Set(), blankOff = new Set(), blankIds = new Set();
 const BLANK_KEEP = "ed:title";
@@ -964,7 +963,7 @@ function presetToView(row){
 function renderPresetMenu(sel){
   const mine = PRESETS.filter(p=>p.editor_view);
   const opt = p => `<option value="id:${esc(p.id)}"${p.purpose && !p.editor_view ? ` title="${esc(p.purpose)}"` : ""}>${esc(p.preset_name)}</option>`;
-  $("#presetsel").innerHTML = `<option value="">Views…</option><option value="@fav">Favorites</option>` +
+  $("#presetsel").innerHTML = `<option value="">Views…</option>` +
     (mine.length ? `<optgroup label="Saved views">` + mine.map(opt).join("") + `</optgroup>` : "");
   $("#presetsel").value = sel && [...$("#presetsel").options].some(o=>o.value===sel) ? sel : "";
   const cur = presetById($("#presetsel").value.slice(3));
@@ -985,8 +984,7 @@ async function applyPreset(p){
 $("#presetsel").onchange = async()=>{
   const v = $("#presetsel").value, row = v.startsWith("id:") ? presetById(v.slice(3)) : null;
   $("#presetdel").disabled = !(row && row.editor_view);
-  if (v==="@fav") await applyPreset({cols:FAVORITES});
-  else if (row) await applyPreset(presetToView(row));
+  if (row) await applyPreset(presetToView(row));
 };
 $("#presetsave").onclick = async()=>{
   const cur = presetById($("#presetsel").value.slice(3)), def = cur && cur.editor_view ? cur.preset_name : "";
@@ -2084,7 +2082,7 @@ $("#storelinks").onclick = ()=>{ slChanged = 0; slMsg(""); $("#sldlg").showModal
 $("#slone").onclick = e=>{ const f = $("#slbook").value; if (f) slRun(e.currentTarget, f); };
 $("#slclose").onclick = ()=>{
   $("#sldlg").close();
-  if (slChanged) setStatus(`${slChanged} store link(s) added. Press Reload to see them in the grid.`, "ok");
+  if (slChanged) setStatus(`${slChanged} store link(s) added. Press Reload from Supabase to see them in the grid.`, "ok");
 };
 $("#slfind").onclick = e=>slRun(e.currentTarget, "");
 $("#slsure").onclick = async e=>{
