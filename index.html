@@ -301,17 +301,10 @@ dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
 
 <!-- ============ Find store links ============ -->
 <dialog id="sldlg">
-  <h2>Find store links</h2>
-  <p class="hint">Nothing goes into the catalog until you press Approve. A rejected link is never suggested again.</p>
-  <div class="row">
-    <select id="slbook" aria-label="Book to look up" title="Books with blank store links, newest publication date first"><option value="">Loading books…</option></select>
-    <button id="slone" class="primary" type="button">Look up this book</button>
-    <button id="slfind" type="button">Look up all books</button>
-    <button id="slsure" type="button">Approve all “Sure”</button>
-    <span class="grow"></span>
-    <span class="hint" id="slmsg"></span>
-  </div>
-  <div id="sllist"><div class="empty">Loading…</div></div>
+  <h2>Find store links for shown books</h2>
+  <p class="hint">“Sure” links are saved on their own. The rest wait here for Approve or Reject; a rejected link is never suggested again.</p>
+  <div class="row"><span class="hint" id="slmsg"></span></div>
+  <div id="sllist"><div class="empty">Looking up…</div></div>
   <div class="row"><span class="grow"></span><button id="slclose" type="button">Done</button></div>
 </dialog>
 
@@ -348,7 +341,7 @@ dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
     <button id="notionShown" title="Sync the books shown in the grid (after your filters) to Notion">Send shown to Notion</button>
     <span class="helptip" tabindex="0" role="note" aria-label="Help: Send shown to Notion" data-tip="Sends all the prearranged columns for each visible row, not just the visible ones.">?</span>
     <button id="notionAll" title="Sync every book to Notion (about 10 seconds a book)">Send all to Notion</button>
-    <button id="storelinks">Find store links</button>
+    <button id="storelinks" title="Look up the blank store links of the books shown in the grid (after your filters)">Find store links for shown books</button>
     <button id="payhipfooter" title="Make new Payhip footer code from the catalog">Payhip footer</button>
     <span class="who" id="nqueue"></span>
     <span class="who" id="who"></span>
@@ -634,7 +627,7 @@ const GROUP_ITEMS = {
   "Story": ["st:main_plot","st:subplots","st:tags","st:display_tags","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
   "Series": ["ser:series_synopsis","ser:series_url","ser:reads_in_order_from","ser:reads_in_order_to","ser:reading_note"],
   "Marketing": ["ed:tagline","ed:reasons_to_love","ed:excerpts","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy","list:bookclub"],
-  "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
+  "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
   "Story Bible (companion book)": ["sb:price_usd","sb:library_price_usd","sb:isbn","sb:publication_date","sb:word_count","sb:notes","php:Story Bible"],
   "Links": [],
   "Projects": ["one:projects:title","one:projects:aplus","one:projects:payhip_order","one:projects:blank_on_site","one:projects:seo_site","one:projects:blurb_site","one:projects:slideshow","one:projects:plot"],
@@ -1084,7 +1077,7 @@ function formatMissing(ed, c){
   return !r || (r.not_offered === true && c.col !== "not_offered");
 }
 // Columns kept as lists in Supabase (one item per line when editing; shown with ; between items)
-const ARRAY_COLS = new Set(["stories.tags","stories.display_tags","editions.keywords","editions.bisac","editions.thema","editions.bowker_genres","editions.bn_genres","editions.kobo_genres","editions.amazon_genres"]);
+const ARRAY_COLS = new Set(["stories.tags","stories.display_tags","editions.keywords","editions.bisac","editions.thema","editions.bowker_genres","editions.bn_genres","editions.kobo_genres","editions.apple_genres","editions.amazon_genres"]);
 const COMMA_LISTS = new Set(["stories.tags","stories.display_tags","editions.keywords"]);   // typed on one line, these also split at commas
 const isDateCol = c => /(^|_)(date|publication)$/.test(c.col||c.field||"");
 function typeOf(c){
@@ -2152,7 +2145,7 @@ function liveApply(p){
       api("GET","column_presets?select=*&order=sort_order.asc.nullslast,preset_name.asc")
         .then(rows=>{ PRESETS = rows || []; renderPresetMenu($("#presetsel").value); }).catch(()=>{});
       return;
-    case "store_link_suggestions": if ($("#sldlg").open) slLoad(); return;
+    case "store_link_suggestions": if ($("#sldlg").open && !slBusy) slLoad(); return;
     default: return;
   }
   // a row of a per-book table changed: redraw that book's cells
@@ -2228,19 +2221,30 @@ $("#nfretry").onclick = async e=>{
 };
 $("#nfclose").onclick = ()=>$("#nfdlg").close();
 
-/* ---------- Find store links (Edge Function find-store-links fills store_link_suggestions; Approve adds to store_links) ---------- */
-let slRows = [], slChanged = 0;
+/* ---------- Find store links for shown books ----------
+   Only the books shown in the grid (after filters). For each one with blank store cells, the Edge Function
+   find-store-links fills store_link_suggestions; "Sure" ones are then saved with approve_store_link;
+   the rest wait in the list for Approve / Reject. */
+let slRows = [], slChanged = 0, slShown = [], slBusy = false;
 function slMsg(t){ $("#slmsg").textContent = t||""; }
+// file_name=in.(...) in chunks, so a long list of books still fits in the address
+async function slIn(path, files){
+  const out = [];
+  for (let i=0; i<files.length; i+=80){
+    const list = files.slice(i,i+80).map(f=>'"' + String(f).replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '"').join(",");
+    out.push(...(await api("GET", path + "&file_name=in.(" + encodeURIComponent(list) + ")") || []));
+  }
+  return out;
+}
 async function slLoad(){
   try{
-    slRows = await api("GET","store_link_suggestions?select=*&status=eq.waiting&order=file_name,store,format&limit=2000") || [];
+    slRows = slShown.length ? await slIn("store_link_suggestions?select=*&status=eq.waiting&order=file_name,store,format&limit=2000", slShown) : [];
     slRender();
   }catch(err){ $("#sllist").innerHTML = `<div class="empty">${esc(friendly(err))}</div>`; }
 }
 function slRender(){
   const titles = {}; (data.editions||[]).forEach(e=>{ titles[e.file_name] = e.title; });
-  $("#slsure").disabled = !slRows.some(r=>r.confidence==="sure");
-  if (!slRows.length){ $("#sllist").innerHTML = `<div class="empty">Nothing waiting. Pick a book and press “Look up this book”, or “Look up all books”.</div>`; return; }
+  if (!slRows.length){ $("#sllist").innerHTML = `<div class="empty">${slBusy ? "Looking up…" : "Nothing waiting for the books shown."}</div>`; return; }
   const cls = c => c==="sure" ? "sure" : c==="check" ? "check" : "hand";
   const lbl = c => c==="sure" ? "Sure" : c==="check" ? "Check" : "Add by hand";
   $("#sllist").innerHTML = `<table><thead><tr><th>Book</th><th>Store</th><th>Link or ID</th><th>How sure</th><th>Why</th><th></th></tr></thead><tbody>` +
@@ -2265,47 +2269,53 @@ async function slApprove(id, value){
 async function slReject(id){
   await api("PATCH", `store_link_suggestions?id=eq.${id}`, {status:"rejected", decided_at:new Date().toISOString()}, {Prefer:"return=minimal"});
 }
-// Books that still have blank store cells, newest publication date first (the first one is picked).
-async function slBooks(){
-  const sel = $("#slbook");
-  try{
-    const rows = await api("GET","store_link_blanks?select=file_name&limit=5000") || [];
-    const count = {}; rows.forEach(r=>{ count[r.file_name] = (count[r.file_name]||0) + 1; });
-    const eds = {}; (data.editions||[]).forEach(e=>{ eds[e.file_name] = e; });
-    const files = Object.keys(count).sort((a,b)=>String((eds[b]||{}).publication_date||"").localeCompare(String((eds[a]||{}).publication_date||"")) || a.localeCompare(b));
-    sel.innerHTML = files.length
-      ? files.map(f=>{ const e = eds[f]||{}; return `<option value="${esc(f)}">${esc(e.title||f)}${e.language && e.language!=="English" ? " ("+esc(e.language)+")" : ""}${e.publication_date ? " · "+esc(e.publication_date) : ""} · ${count[f]} blank</option>`; }).join("")
-      : `<option value="">No published book has blank store links</option>`;
-    $("#slone").disabled = !files.length;
-  }catch(err){ sel.innerHTML = `<option value="">${esc(friendly(err))}</option>`; $("#slone").disabled = true; }
+async function slLookUp(file){
+  const r = await fetch(cfg.url + "/functions/v1/find-store-links", {method:"POST", headers: await headers(), body: JSON.stringify({file_name:file})});
+  const j = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(j.error || j.message || ("Error " + r.status));
+  return j;
 }
-async function slRun(btn, file){
-  btn.disabled = true; slMsg(file ? "Looking up this book…" : "Looking up… this can take a minute.");
+async function slRun(){
+  if (slBusy) return;
+  const btn = $("#storelinks");
+  slShown = visibleRows().map(ed=>ed.file_name);
+  slChanged = 0; slRows = []; slBusy = true; btn.disabled = true;
+  slMsg(""); slRender(); $("#sldlg").showModal();
+  const failed = [];
+  let todo = [];
   try{
-    const r = await fetch(cfg.url + "/functions/v1/find-store-links", {method:"POST", headers: await headers(), body: JSON.stringify(file ? {file_name:file} : {})});
-    const j = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(j.error || j.message || ("Error " + r.status));
-    slMsg(`${j.blanks} blank cells · ${j.checked} looked up: ${j.sure} sure, ${j.check} to check, ${j.by_hand} to add by hand.`);
+    if (!slShown.length){ slMsg("No books are shown in the grid."); return; }
+    slMsg("Checking which shown books have blank store links…");
+    const has = new Set((await slIn("store_link_blanks?select=file_name&limit=5000", slShown)).map(r=>r.file_name));
+    todo = slShown.filter(f=>has.has(f));
+    let n = 0;
+    const queue = todo.slice();
+    const worker = async ()=>{
+      for (let f = queue.shift(); f; f = queue.shift()){
+        slMsg(`Looking up book ${++n} of ${todo.length}…`);
+        try{ await slLookUp(f); }catch(err){ failed.push(f); }
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
     await slLoad();
-  }catch(err){ slMsg(friendly(err)); }
-  finally{ btn.disabled = false; }
+    const sure = slRows.filter(r=>r.confidence==="sure");
+    for (let i=0; i<sure.length; i++){
+      slMsg(`Saving “Sure” link ${i+1} of ${sure.length}…`);
+      try{ await slApprove(sure[i].id, sure[i].suggested_value); }catch(err){ /* stays in the list to approve by hand */ }
+    }
+  }catch(err){ slMsg(friendly(err)); return; }
+  finally{
+    slBusy = false; btn.disabled = false;
+    await slLoad();
+  }
+  const titles = {}; (data.editions||[]).forEach(e=>{ titles[e.file_name] = e.title; });
+  slMsg(`${slShown.length} book(s) shown, ${todo.length} with blank store links. ${slChanged} “Sure” link(s) saved. ${slRows.length} waiting below.` +
+    (failed.length ? ` Could not look up: ${failed.map(f=>titles[f]||f).join(", ")}.` : ""));
 }
-$("#storelinks").onclick = ()=>{ slChanged = 0; slMsg(""); $("#sldlg").showModal(); slLoad(); slBooks(); };
-$("#slone").onclick = e=>{ const f = $("#slbook").value; if (f) slRun(e.currentTarget, f); };
+$("#storelinks").onclick = ()=>slRun();
 $("#slclose").onclick = ()=>{
   $("#sldlg").close();
   if (slChanged) setStatus(`${slChanged} store link(s) added.`, "ok");
-};
-$("#slfind").onclick = e=>slRun(e.currentTarget, "");
-$("#slsure").onclick = async e=>{
-  const b = e.currentTarget, sure = slRows.filter(r=>r.confidence==="sure");
-  if (!sure.length) return;
-  if (!b.dataset.sure){ b.dataset.sure = "1"; const t = b.textContent; b.textContent = `Click again to approve ${sure.length}`; setTimeout(()=>{ delete b.dataset.sure; b.textContent = t; }, 4000); return; }
-  delete b.dataset.sure; b.textContent = "Approve all “Sure”"; b.disabled = true;
-  let done = 0;
-  try{ for (const r of sure){ await slApprove(r.id, r.suggested_value); done++; } slMsg(`Approved ${done}.`); }
-  catch(err){ slMsg(`Approved ${done}, then: ${friendly(err)}`); }
-  await slLoad();
 };
 $("#sllist").addEventListener("click", async ev=>{
   const btn = ev.target.closest("button[data-a]"); if (!btn) return;
