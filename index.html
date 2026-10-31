@@ -221,6 +221,14 @@ dialog#sldlg::backdrop{background:#0006}
 dialog#pfdlg,dialog#nfdlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:820px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
 dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
 #pfdlg label{display:block;margin:10px 0 0;font-size:13px}
+/* New column */
+dialog#ncdlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:520px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
+dialog#ncdlg::backdrop{background:#0006}
+#ncdlg label{display:block;margin:10px 0 0;font-size:13px}
+#ncdlg input[type=text],#ncdlg select,#ncdlg textarea{display:block;width:100%;box-sizing:border-box;margin-top:4px}
+#ncdlg textarea{min-height:70px}
+#ncdlg .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
+#ncdlg .row .grow{flex:1}
 #pfdlg textarea{display:block;width:100%;box-sizing:border-box;min-height:110px;margin-top:4px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 #pfdlg input[type=file]{display:block;margin-top:4px}
 #pfdlg .row,#nfdlg .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
@@ -340,6 +348,40 @@ dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
   <div class="row"><button id="pfcopy" type="button" class="hidden">Copy new code</button><button id="pfdown" type="button" class="hidden">Download</button><span class="grow"></span><button id="pfclose" type="button">Done</button></div>
 </dialog>
 
+<!-- ============ New column ============ -->
+<dialog id="ncdlg">
+  <h2>New column</h2>
+  <p class="hint">Adds the column to Supabase and to the editor. It starts blank for every book.</p>
+  <label>Name <input id="ncname" type="text" placeholder="e.g. Audio Release Notes" autocomplete="off"></label>
+  <label>Kind of value
+    <select id="nctype">
+      <option value="text">Short text</option>
+      <option value="long_text">Long text</option>
+      <option value="number">Number (prices, decimals)</option>
+      <option value="whole_number">Whole number</option>
+      <option value="date">Date</option>
+      <option value="yes_no">Yes / No</option>
+      <option value="list">List (several values, one per line)</option>
+      <option value="pick">Pick one from a list</option>
+    </select></label>
+  <div id="ncpick" class="hidden">
+    <label>List to pick from <select id="nclist"></select></label>
+    <div id="ncnewbox" class="hidden">
+      <label>New list's name <input id="ncnewlist" type="text" autocomplete="off"></label>
+      <label>Its values, one per line <textarea id="ncvalues"></textarea></label>
+    </div>
+  </div>
+  <label>Belongs to
+    <select id="nctable">
+      <option value="editions">Each edition (every language has its own value)</option>
+      <option value="stories">The story (shared by all languages)</option>
+    </select></label>
+  <label>Section in the column list <select id="ncsec"></select></label>
+  <label>Sits after <select id="ncafter"></select></label>
+  <label>Hover help for the column name (optional) <textarea id="ncdesc"></textarea></label>
+  <div class="row"><button id="ncgo" class="primary" type="button">Add column</button><span class="hint" id="ncmsg"></span><span class="grow"></span><button id="ncclose" type="button">Cancel</button></div>
+</dialog>
+
 <!-- ============ Notion sync problems ============ -->
 <dialog id="nfdlg">
   <h2>Books Notion could not sync</h2>
@@ -359,7 +401,6 @@ dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
     <button id="export" title="Download a CSV file (opens in Excel): what you see now, or everything">Export</button>
     <button id="notionShown" title="Sync the books shown in the grid (after your filters) to Notion">Send shown to Notion</button>
     <span class="helptip" tabindex="0" role="note" aria-label="Help: Send shown to Notion" data-tip="Sends all the prearranged columns for each visible row, not just the visible ones.">?</span>
-    <button id="notionAll" title="Sync every book to Notion (about 10 seconds a book)">Send all to Notion</button>
     <button id="storelinks" title="Look up the blank store links of the books shown in the grid (after your filters)">Find store links for shown books</button>
     <button id="payhipfooter" title="Make new Payhip footer code from the catalog">Payhip footer</button>
     <span class="who" id="nqueue"></span>
@@ -394,6 +435,7 @@ dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
           <button id="none" title="Untick everything">Clear</button>
           <button id="expand">Open all</button>
           <button id="collapse">Close all</button>
+          <button id="newcol" title="Add a new column to Supabase and the editor">New column</button>
         </div>
       </div>
       <div id="collist"></div>
@@ -691,6 +733,13 @@ function buildCatalog(sample){
   for (const c of ["whole_book_number","author","publisher","author_bio","long_synopsis","series_and_book_number"]){
     const inInfo = !!REG["edition_info."+c];
     addCol({id:"info:"+c, kind:"info", col:c, table:"edition_info", label:{whole_book_number:"Book # with no decimals (B&N)", long_synopsis:"Long Synopsis (built)"}[c]||regLabel(inInfo?"edition_info":"editions",c), group:"Worked out (read-only)", order:inInfo ? regOrder("edition_info",c) : 9900, ro:true});
+  }
+  // Columns made with New column: in the section chosen then, right after the column chosen then (oldest first, so one can follow another)
+  const made = COLS.filter(c=>regType(c)).map(c=>[c, REG[c.table+"."+c.col]]).sort((a,b)=>a[1].id-b[1].id);
+  for (const [c, r] of made){
+    const a = r.editor_after && COLMAP[r.editor_after];
+    if (a){ c.group = a.group; c.so = a.so + 0.5 + r.id/1e9; c.order = orderOf(a) + 0.5 + r.id/1e9; }
+    else if (GROUP_ORDER.includes(r.group_name)){ c.group = r.group_name; c.so = 99000 + r.id/1e9; }
   }
 }
 
@@ -1129,10 +1178,15 @@ function formatMissing(ed, c){
 const ARRAY_COLS = new Set(["stories.tags","stories.display_tags","editions.keywords","editions.bisac","editions.thema","editions.bowker_genres","editions.bn_genres","editions.kobo_genres","editions.apple_genres","editions.amazon_genres"]);
 const COMMA_LISTS = new Set(["stories.tags","stories.display_tags","editions.keywords"]);   // typed on one line, these also split at commas
 const isDateCol = c => /(^|_)(date|publication)$/.test(c.col||c.field||"");
+// Columns made with New column keep their kind of value in field_registry.editor_type.
+const regType = c => ((c.kind==="ed" || c.kind==="st") && REG[c.table+"."+c.col] && REG[c.table+"."+c.col].editor_type) || "";
+const REG_TYPE = {list:"list", date:"date", yes_no:"bool", number:"num", whole_number:"num"};
+const isLong = c => LONG_HINT.test(c.col||c.field||c.label) || regType(c)==="long_text";
 function typeOf(c){
   if (c.col==="runtime_minutes") return "minutes";
   if (ARRAY_COLS.has(c.table+"."+c.col)) return "list";
   if (c.table && LISTCOL[c.table+"."+c.col]) return "pick";
+  if (REG_TYPE[regType(c)]) return REG_TYPE[regType(c)];
   if (isDateCol(c)) return "date";
   const vals = data.editions.map(ed=>valueOf(ed,c)).filter(v=>v!=null);
   if (vals.length && vals.every(v=>typeof v==="boolean")) return "bool";
@@ -1452,7 +1506,7 @@ function renderGrid(){
     h += "<tr>";
     viewCols.forEach((c,ci)=>{
       const v = valueOf(ed,c), ok = canEdit(ed,c);
-      const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (LONG_HINT.test(c.col||c.field||c.label)?"long":""), (c.id==="ed:title"?"title":""), (isGenreCol(c)?"genres":"")].join(" ");
+      const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (isLong(c)?"long":""), (c.id==="ed:title"?"title":""), (isGenreCol(c)?"genres":"")].join(" ");
       const noFmt = c.kind==="fmt" && !data.fmt[rowKey(ed,c)] ? `This book has no ${c.f}. Right-click → Add ${c.f} to add it.`
         : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it." : "";
       h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt, valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
@@ -1707,7 +1761,7 @@ fillBar.addEventListener("click", async e=>{
 function parseFor(c, text){
   const t = typeOf(c), s = text.trim();
   if (t==="bool"){ const l = s.toLowerCase(); if (l==="") return {ok:true,v:null}; if (l==="yes"||l==="true") return {ok:true,v:true}; if (l==="no"||l==="false") return {ok:true,v:false}; return {ok:false}; }
-  if (t==="num"){ if (s==="") return {ok:true,v:null}; const n = Number(text.replace(/[$,\s]/g,"")); return isNaN(n) ? {ok:false} : {ok:true,v:n}; }
+  if (t==="num"){ if (s==="") return {ok:true,v:null}; const n = Number(text.replace(/[$,\s]/g,"")); return isNaN(n) || (regType(c)==="whole_number" && !Number.isInteger(n)) ? {ok:false} : {ok:true,v:n}; }
   if (t==="list") return {ok:true, v: splitList(c, text)};
   if (t==="date"){ if (s==="") return {ok:true,v:null}; const d = parseDate(s); return d ? {ok:true,v:d} : {ok:false}; }
   if (t==="minutes"){ if (s==="") return {ok:true,v:null}; const m = parseMinutes(s); return m==null ? {ok:false} : {ok:true,v:m}; }
@@ -1788,7 +1842,7 @@ function openEditor(td){
     input.value = old==null ? "" : String(old); input.style.margin="8px";
   } else {
     input = document.createElement("textarea"); input.value = show(old);
-    if (!LONG_HINT.test(c.col||c.field||c.label)) { input.style.minHeight="40px"; input.rows = 2; }
+    if (!isLong(c)) { input.style.minHeight="40px"; input.rows = 2; }
     else input.style.minHeight = Math.min(360, Math.max(160, Math.round(input.value.length/2.2))) + "px";
   }
   box.appendChild(input);
@@ -1796,7 +1850,7 @@ function openEditor(td){
   bar.innerHTML = `<span>${esc(ed.title||ed.file_name)} · ${esc(c.label)}${c.note?" — "+esc(c.note):""}</span><span class="grow"></span><span>${t==="list" ? "One per line · " : ""}Enter saves · Shift+Enter new line · Esc cancels</span><button data-a="cancel">Cancel</button><button class="primary" data-a="save">Save</button>`;
   box.appendChild(bar);
   document.body.appendChild(box);
-  const rc = td.getBoundingClientRect(), W = Math.min(innerWidth-24, Math.max(rc.width+40, c.id==="promo:line" ? 620 : LONG_HINT.test(c.col||c.field||c.label)?480:300));
+  const rc = td.getBoundingClientRect(), W = Math.min(innerWidth-24, Math.max(rc.width+40, c.id==="promo:line" ? 620 : isLong(c)?480:300));
   box.style.left = Math.max(8, Math.min(rc.left, innerWidth - W - 16)) + "px";
   box.style.top = Math.max(8, Math.min(rc.top, innerHeight - 260)) + "px";
   box.style.width = W + "px";
@@ -2290,7 +2344,7 @@ async function startNotionSync(){
 async function sendToNotion(files, btn){
   if (!files.length){ setStatus("No books to send", "bad"); return; }
   if (!btn.dataset.sure){ btn.dataset.sure = "1"; const t = btn.textContent; btn.textContent = `Click again to send ${files.length}`; setTimeout(()=>{ delete btn.dataset.sure; btn.textContent = t; }, 4000); return; }
-  delete btn.dataset.sure; btn.textContent = btn.id === "notionAll" ? "Send all to Notion" : "Send shown to Notion";
+  delete btn.dataset.sure; btn.textContent = "Send shown to Notion";
   try{
     const waiting = new Set((await api("GET","notion_sync_queue?select=file_name&status=in.(Waiting,Working)&limit=5000")).map(r=>r.file_name));
     const add = files.filter(f=>!waiting.has(f));
@@ -2303,7 +2357,6 @@ async function sendToNotion(files, btn){
   }catch(err){ setStatus(friendly(err), "bad"); }
 }
 $("#notionShown").onclick = e=>sendToNotion(visibleRows().map(ed=>ed.file_name), e.currentTarget);
-$("#notionAll").onclick = e=>sendToNotion(data.editions.map(ed=>ed.file_name), e.currentTarget);
 $("#nqueue").onclick = ()=>{
   if (!nqFailed.length) return;
   const titles = {}; (data.editions||[]).forEach(e=>{ titles[e.file_name] = e.title; });
@@ -2321,6 +2374,60 @@ $("#nfretry").onclick = async e=>{
   }catch(err){ $("#nfmsg").textContent = friendly(err); b.disabled = false; }
 };
 $("#nfclose").onclick = ()=>$("#nfdlg").close();
+
+/* ---------- New column: adds a column to Supabase (add_catalog_column) and shows it in the editor ---------- */
+function ncFillAfter(){
+  const g = $("#ncsec").value, cs = COLS.filter(c=>c.group===g).sort((a,b)=>a.so-b.so || a.label.localeCompare(b.label));
+  $("#ncafter").innerHTML = cs.map(c=>`<option value="${esc(c.id)}">${esc(c.label)}</option>`).join("") + `<option value="">(at the end of ${esc(g)})</option>`;
+  $("#ncafter").value = cs.length ? cs[cs.length-1].id : "";
+}
+function ncType(){
+  const pick = $("#nctype").value==="pick";
+  $("#ncpick").classList.toggle("hidden", !pick);
+  $("#ncnewbox").classList.toggle("hidden", !(pick && $("#nclist").value==="__new__"));
+}
+$("#newcol").onclick = ()=>{
+  $("#ncname").value = ""; $("#ncdesc").value = ""; $("#ncnewlist").value = ""; $("#ncvalues").value = ""; $("#ncmsg").textContent = "";
+  $("#nctype").value = "text"; $("#nctable").value = "editions";
+  $("#ncsec").innerHTML = GROUP_ORDER.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("");
+  $("#nclist").innerHTML = Object.keys(REF).sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("") + `<option value="__new__">New list…</option>`;
+  ncType(); ncFillAfter(); $("#ncgo").disabled = false;
+  $("#ncdlg").showModal(); $("#ncname").focus();
+};
+$("#nctype").onchange = ncType;
+$("#nclist").onchange = ncType;
+$("#ncsec").onchange = ncFillAfter;
+$("#ncclose").onclick = ()=>$("#ncdlg").close();
+$("#ncgo").onclick = async ()=>{
+  const msg = t=>{ $("#ncmsg").textContent = t; };
+  const name = $("#ncname").value.trim(), type = $("#nctype").value, table = $("#nctable").value;
+  if (!name) return msg("Give the column a name.");
+  if (!/^[a-z]/i.test(name)) return msg("The name must start with a letter.");
+  if (COLS.some(c=>String(c.label||"").trim().toLowerCase()===name.toLowerCase())) return msg(`A column named "${name}" already exists.`);
+  let list = null, values = null;
+  if (type==="pick"){
+    list = $("#nclist").value;
+    if (list==="__new__"){
+      list = $("#ncnewlist").value.trim();
+      values = $("#ncvalues").value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+      if (!list) return msg("Name the new list.");
+      if (REF[list]) return msg(`There is already a list called "${list}". Choose it above instead.`);
+      if (!values.length) return msg("Type the new list's values, one per line.");
+    }
+  }
+  const b = $("#ncgo"); b.disabled = true; msg("Adding…");
+  try{
+    const col = await api("POST","rpc/add_catalog_column", {p_table:table, p_label:name, p_type:type, p_section:$("#ncsec").value,
+      p_after:$("#ncafter").value||null, p_description:$("#ncdesc").value.trim()||null, p_list:list, p_values:values});
+    const id = (table==="stories" ? "st:" : "ed:") + col;
+    $("#ncdlg").close();
+    setStatus(`Adding "${name}"…`);
+    await new Promise(r=>setTimeout(r, 1500));   // Supabase needs a moment to see the new column
+    await loadAll();
+    if (COLMAP[id]){ await showColumn(id); setStatus(`Added the column "${name}". It's ticked in the grid and blank for every book.`, "ok"); }
+    else setStatus(`"${name}" was added in Supabase. Reload the page if it isn't in the column list yet.`, "warn");
+  }catch(err){ msg("Not added: " + friendly(err)); b.disabled = false; }
+};
 
 /* ---------- Find store links for shown books ----------
    Only the books shown in the grid (after filters). For each one with blank store cells, the Edge Function
