@@ -152,8 +152,8 @@ td.title .v{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellip
 #gridwrap.full td .v{display:block;-webkit-line-clamp:unset;overflow:visible}
 #gridwrap.full td.long{--w:460px}
 td.edit{cursor:default}
-/* header = dark blue (all columns, title too); title column cells = dark purple with slight row banding */
-:root{--hdr:#1f3a66; --hdr-ink:#ffffff; --ttl:#3b2160; --ttl-band:#4a2a73; --ttl-ink:#ffffff}
+/* header = dark blue (all columns, title too); title column cells = very subtle dark purple with slight row banding */
+:root{--hdr:#1f3a66; --hdr-ink:#ffffff; --ttl:#1c1429; --ttl-band:#231a33; --ttl-ink:#ffffff}
 th{background:var(--hdr);color:var(--hdr-ink)}
 th .tbl{color:#c5d3ea}
 th .tbl.blk{color:#ffcf8a}
@@ -161,8 +161,8 @@ th .sic{color:#c5d3ea}
 th.sorted .sic{color:#fff}
 td.title{background:var(--ttl);color:var(--ttl-ink)}
 :where(tbody tr:nth-child(even)) td.title{background:var(--ttl-band)}
-td.title.edit:hover{background:#5a3891}
-td.title.msel{background:#6b45a8}
+td.title.edit:hover{background:#30244a}
+td.title.msel{background:#43326b}
 .cpy{position:absolute;top:2px;right:2px;z-index:4;display:flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 4px;font-size:12px;line-height:1;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:5px;box-shadow:0 1px 3px #0002;cursor:pointer}
 .cpy:hover{color:var(--accent);border-color:var(--accent)}
 .cpy.done{color:var(--ok);border-color:var(--ok);font-weight:600}
