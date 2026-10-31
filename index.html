@@ -1376,7 +1376,7 @@ function renderGrid(){
   const hidden = blanksOnly ? picked.filter(c=>c.id!==BLANK_KEEP && !blankN[c.id] && !blankAdd.has(c.id)).length : 0;
   $("#rowcount").textContent = `${viewRows.length} of ${data.editions.length} books · ${viewCols.length} columns` + (hidden ? ` (${hidden} column${hidden>1?"s":""} hidden: no blanks)` : "") + (hiddenRows.size ? ` · ${hiddenRows.size} row${hiddenRows.size>1?"s":""} hidden` : "") + (nf && !linkView ? ` · ${nf} column filter${nf>1?"s":""}` : "") + (linkView ? " · opened from a link" : "");
   $("#clearfilters").classList.toggle("hidden", !nf || !!linkView);
-  $("#clearfilters").textContent = nf > 1 ? `Clear all filters (${nf})` : "Clear filter";
+  $("#clearfilters").textContent = "Clear all filters";
   $("#linkexit").classList.toggle("hidden", !linkView);
   const ss = linkView ? "" : sortSummary();
   $("#sortinfo").textContent = ss ? "Sorted by " + ss : "";
