@@ -616,8 +616,10 @@ window.addEventListener("scroll", qmClose, true);
 async function showColumn(id){
   leaveLinkView();
   const c = COLMAP[id]; if (!c) return;
+  const vb = viewSnap();
   if (blanksOn()) $("#fcolblank").checked = false;   // the Blanks view would hide a column that has no blanks
   setColOn(id, true);
+  recordView(vb);
   const g = [...document.querySelectorAll("#collist .grp")].find(d=>d.dataset.g===c.group);
   if (g){ g.open = true; const box = [...g.querySelectorAll("input[data-id]")].find(i=>i.dataset.id===id); if (box) box.closest("label").scrollIntoView({block:"nearest"}); }
   syncColList();
@@ -881,7 +883,7 @@ function updateColCount(){ const n = onSet().size; $("#colcount").textContent = 
 $("#collist").addEventListener("click", e=>{ if (e.target.closest(".qm")) e.preventDefault(); });   // the underlined name only explains, it must not tick the column
 $("#collist").addEventListener("change", async e=>{
   const id = e.target.dataset.id; if(!id) return;
-  setColOn(id, e.target.checked);
+  const vb = viewSnap(); setColOn(id, e.target.checked); recordView(vb);
   await refresh();
 });
 $("#colsearch").addEventListener("input", renderColumnList);
@@ -890,11 +892,13 @@ let ctxMenu = null;
 function closeCtx(){ if(ctxMenu){ ctxMenu.remove(); ctxMenu = null; } }
 async function setSection(grp, on){
   const keep = id => blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
+  const vb = viewSnap();
   grp.querySelectorAll("input[data-id]").forEach(i=>{
     const id = i.dataset.id;
     if (on) setColOn(id, true);
     else if (!keep(id)) setColOn(id, false);
   });
+  recordView(vb);
   await refresh();
 }
 $("#collist").addEventListener("contextmenu", e=>{
@@ -913,23 +917,27 @@ document.addEventListener("scroll", e=>{ if (ctxMenu && e.target instanceof Node
 window.addEventListener("resize", closeCtx);
 /* right-click a column header: Hide column (unticks its box in the sidebar; re-tick the box to show it again) */
 async function hideColumn(id){
+  const vb = viewSnap();
   setColOn(id, false);
+  recordView(vb);
   await refresh();
 }
 /* right-click a column header: Hide from here to end (unticks this column and every column to its right in the grid; the locked ones always stay) */
 async function hideColumnsFrom(id){
   const i = viewCols.findIndex(c=>c.id===id); if(i<0) return;
+  const vb = viewSnap();
   for (const c of viewCols.slice(i)){
     if (blanksOn() ? c.id===BLANK_KEEP : KEY_COLS.has(c.id) && c.id !== "ed:file_name") continue;
     setColOn(c.id, false);
   }
+  recordView(vb);
   renderColumnList();
   await refresh();
 }
 /* right-click a row: Hide row (the book disappears from the grid until you use "Show hidden rows" in the Books section or in this menu) */
-function hideRow(fn){ hiddenRows.add(fn); renderGrid(); }
-function hideRowsFrom(ri){ viewRows.slice(ri).forEach(ed=>hiddenRows.add(ed.file_name)); renderGrid(); }
-function showAllRows(){ hiddenRows.clear(); renderGrid(); }
+function hideRow(fn){ const vb = viewSnap(); hiddenRows.add(fn); recordView(vb); renderGrid(); }
+function hideRowsFrom(ri){ const vb = viewSnap(); viewRows.slice(ri).forEach(ed=>hiddenRows.add(ed.file_name)); recordView(vb); renderGrid(); }
+function showAllRows(){ const vb = viewSnap(); hiddenRows.clear(); recordView(vb); renderGrid(); }
 $("#showrows").onclick = showAllRows;
 $("#gridwrap").addEventListener("contextmenu", e=>{
   const td = e.target.closest("td[data-r]");
@@ -1064,7 +1072,7 @@ $("#presetdel").onclick = async()=>{
   try{ await delWhere("column_presets", "id=eq."+q(row.id)); PRESETS = PRESETS.filter(p=>p!==row); renderPresetMenu(""); setStatus(`Deleted view "${row.preset_name}"`,"ok"); }
   catch(err){ setStatus("View not deleted: " + friendly(err), "bad"); }
 };
-$("#none").onclick = async()=>{ if (blanksOn()){ viewCols.forEach(c=>setColOn(c.id,false)); renderColumnList(); renderGrid(); return; } checked = new Set([...KEY_COLS].filter(k=>k!=="ed:file_name")); renderColumnList(); await refresh(); };
+$("#none").onclick = async()=>{ const vb = viewSnap(); if (blanksOn()){ viewCols.forEach(c=>setColOn(c.id,false)); recordView(vb); renderColumnList(); renderGrid(); return; } checked = new Set([...KEY_COLS].filter(k=>k!=="ed:file_name")); recordView(vb); renderColumnList(); await refresh(); };
 $("#expand").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=true);
 $("#collapse").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=false);
 async function refresh(){ try{ await ensureLoaded(ticked()); renderGrid(); setStatus("Ready","ok"); }catch(err){ setStatus(err.message,"bad"); } }
@@ -1830,6 +1838,28 @@ function closeEditor(save){
 /* ---------- saving ---------- */
 const undoStack = [], redoStack = [];   // redoStack holds groups of edits you undid (a whole fill is one group)
 function syncUndoBtns(){ $("#undo").disabled = !undoStack.length; $("#redo").disabled = !redoStack.length; }
+/* Hiding and showing columns/rows goes into the same undo history as edits: each change is one {kind:"view"} step holding the ticked columns, Blanks-view choices and hidden rows before and after. Undo/Redo put that back; nothing is saved to Supabase. */
+function viewSnap(){ return {checked:new Set(checked), add:new Set(blankAdd), off:new Set(blankOff), rows:new Set(hiddenRows), blank:$("#fcolblank").checked}; }
+function setDiff(a,b){ return [...a].filter(x=>!b.has(x)).length; }
+function viewWhat(a,b){
+  const shownC = setDiff(b.checked,a.checked) + setDiff(b.add,a.add) + setDiff(a.off,b.off), hidC = setDiff(a.checked,b.checked) + setDiff(a.add,b.add) + setDiff(b.off,a.off);
+  const hidR = setDiff(b.rows,a.rows), shownR = setDiff(a.rows,b.rows), p = [];
+  const n = (k,w)=>k+" "+w+(k>1?"s":"");
+  if (hidC) p.push("hiding "+n(hidC,"column")); if (shownC) p.push("showing "+n(shownC,"column"));
+  if (hidR) p.push("hiding "+n(hidR,"row")); if (shownR) p.push("showing "+n(shownR,"row"));
+  return p.join(" and ") || "a view change";
+}
+function recordView(before){
+  const after = viewSnap();
+  if (setDiff(after.checked,before.checked)+setDiff(before.checked,after.checked)+setDiff(after.add,before.add)+setDiff(before.add,after.add)+setDiff(after.off,before.off)+setDiff(before.off,after.off)+setDiff(after.rows,before.rows)+setDiff(before.rows,after.rows)+(after.blank!==before.blank?1:0) === 0) return;
+  undoStack.push({kind:"view", before, after, what:viewWhat(before,after)}); redoStack.length = 0; syncUndoBtns();
+}
+async function applyView(s){
+  checked = new Set(s.checked); blankAdd = new Set(s.add); blankOff = new Set(s.off);
+  hiddenRows.clear(); s.rows.forEach(r=>hiddenRows.add(r));
+  $("#fcolblank").checked = s.blank;
+  renderColumnList(); await refresh();
+}
 function q(v){ return encodeURIComponent(v); }
 async function saveCell(ed, c, v, old, td, record){
   td && (td.classList.remove("saved","err"), td.classList.add("saving"));
@@ -1971,6 +2001,7 @@ function updateCell(ed, c){
 function flash(td, cls){ td.classList.add(cls); setTimeout(()=>td.classList.remove(cls), 1500); }
 async function undo(){
   const u = undoStack.pop(); if (!u) return;
+  if (u.kind==="view"){ redoStack.push([u]); syncUndoBtns(); await applyView(u.before); setStatus("Undid "+u.what, "ok"); return; }
   const batch = [u];
   if (u.grp) while (undoStack.length && undoStack[undoStack.length-1].grp === u.grp) batch.push(undoStack.pop());
   const done = [];
@@ -1987,6 +2018,7 @@ let redoing = false;
 async function redo(){
   if (redoing) return;
   const grp = redoStack.pop(); if (!grp) return;
+  if (grp[0].kind==="view"){ undoStack.push(grp[0]); syncUndoBtns(); await applyView(grp[0].after); setStatus("Redid "+grp[0].what, "ok"); return; }
   redoing = true; syncUndoBtns();
   let n = 0;
   try{
