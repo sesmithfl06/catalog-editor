@@ -103,13 +103,12 @@ th{position:sticky;top:0;z-index:2;background:var(--soft);font-weight:600;white-
 th .tbl{display:block;font-weight:400;color:var(--muted);font-size:11px}
 th .tbl.blk{color:var(--warn)}
 th.sortable{user-select:none}
-th .sic{display:inline-block;cursor:pointer;padding:0 4px;border-radius:4px;margin-left:6px;color:var(--muted);font-size:11px;opacity:.6}
-th .sic:hover{background:var(--sel)}
+th .sic{display:inline-block;padding:0 4px;margin-left:6px;color:var(--muted);font-size:11px}
 th.sorted .sic{color:var(--accent);opacity:1;font-weight:700}
 th.sorted{box-shadow:inset 0 -2px 0 var(--accent)}
-th .fic{display:inline-block;margin-left:4px;padding:0 4px;border-radius:4px;color:var(--muted);font-size:11px;opacity:.7;cursor:pointer}
-th .fic:hover{background:var(--panel);color:var(--accent);opacity:1}
-th.filtered .fic{color:var(--accent-ink);background:var(--accent);opacity:1;font-weight:700}
+th .fic{display:inline-block;margin-left:4px;padding:0 4px;border-radius:4px;font-size:11px;color:var(--accent-ink);background:var(--accent);font-weight:700}
+#gridwrap.picking th{cursor:pointer}
+.filters button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .fpop{width:290px;padding:8px;display:flex;flex-direction:column;gap:6px;font-size:13px}
 .fpop .fhead{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fpop .fsort{display:flex;gap:6px}
@@ -389,6 +388,9 @@ dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
   <main>
     <div class="filters">
       <label class="chk" title="Long cells show only their first line."><input type="checkbox" id="ffull"> Show full text</label>
+      <button type="button" id="modesort" title="Then click column headings to sort. Click several to stack the sort (heat, then title).">Sort</button>
+      <button type="button" id="modefilter" title="Then click a column heading to filter it.">Filter</button>
+      <span class="sortinfo hidden" id="pickmsg">Select a column</span>
       <button id="clearfilters" type="button" class="hidden">Clear all filters</button>
       <span class="sortinfo" id="sortinfo"></span>
       <button id="clearsort" type="button" class="hidden">Clear sort</button>
@@ -498,7 +500,7 @@ const SB_SELECT = "id,file_name," + SB_FIELDS.join(",");   // never the bible te
 const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:long_synopsis_series_intro"], "ed:long_synopsis_closing_line":["promo:line"], "promo:text":["promo:line"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"], "info:english_title":["st:english_title"]};
 function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
 const PROMO_EDIT = {id:"promo:text", kind:"promo", col:"promo_line", table:"promo_lines", label:"Promo Line wording"};
-const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id"]);
+const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id","audio_files"]);   // audio_files stays in Supabase for the script; the editor does not show it
 let COLS = [], COLMAP = {};
 let REG = {};   // field_registry by "table.column"
 const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sb:{}, sl:{}, ser:{}, info:{}, lists:{}, php:{}, promo:{}};
@@ -618,10 +620,10 @@ function helpFor(c){
 
 /* ---------- sidebar groups (what a person looks for) ---------- */
 // Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
-const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Projects","Translations","Archive"];
+const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Projects","Translations"];
 const GROUP_ITEMS = {
   "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","st:english_title","ed:language","ed:series","ed:number_in_series","info:series_and_book_number",
-    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","ed:essential_description","promo:line",
+    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","ed:essential_description","promo:line","ed:archived_short_synopsis","ed:archived_long_synopsis",
     "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience","st:main_genre_differentiated",
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
     "one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","one:edition_release_notes:payhip_publication","one:edition_release_notes:not_released_reason",
@@ -633,8 +635,7 @@ const GROUP_ITEMS = {
   "Story Bible (companion book)": ["sb:price_usd","sb:library_price_usd","sb:isbn","sb:publication_date","sb:word_count","sb:notes","php:Story Bible"],
   "Links": [],
   "Projects": ["one:projects:title","one:projects:aplus","one:projects:payhip_order","one:projects:blank_on_site","one:projects:seo_site","one:projects:blurb_site","one:projects:slideshow","one:projects:plot"],
-  "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"],
-  "Archive": ["ed:archived_short_synopsis","ed:archived_long_synopsis"]
+  "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"]
 };
 const KIND_GROUP = {calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", est:"Translations"};
 const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
@@ -1339,8 +1340,8 @@ function openFilter(id, th){
 $("#clearfilters").onclick = clearAllFilters;
 
 /* ---------- sorting ----------
-   Click a column heading's sort icon: A→Z, Z→A, then back to the usual order.
-   Shift+click another heading (or ▾ → Then A→Z) to add it as the next level, e.g. heat, then title. */
+   Press Sort in the bar above the grid, then click column headings: first click A→Z, second Z→A, third removes it.
+   Each heading you click is added as the next level (stacks), e.g. heat, then title. */
 let sortKeys = [];   // [{id, dir}] first = main sort, then the tie-breakers
 const collator = new Intl.Collator(undefined, {numeric:true, sensitivity:"base"});
 function cmpSortVals(av, bv){
@@ -1401,11 +1402,11 @@ function renderGrid(){
   let h = "<table><thead><tr>";
   viewCols.forEach((c,i)=>{
     const si = sortKeys.findIndex(k=>k.id===c.id), sk = sortKeys[si], on = !!sk;
-    const icon = on ? (sk.dir>0 ? "▲" : "▼") + (sortKeys.length>1 ? si+1 : "") : "⇅";
-    const hp = helpFor(c), tip = "Click to sort. Shift+click to add it as the next sort level (for example heat, then title)." + (on ? (sortKeys.length>1 ? `\nSort level ${si+1} of ${sortKeys.length}.` : "") + (sk.dir>0 ? "\nNow sorted A→Z / low→high. Click again for Z→A." : "\nNow sorted Z→A / high→low. Click again to remove this sort.") : "");
+    const icon = on ? (sk.dir>0 ? "▲" : "▼") + (sortKeys.length>1 ? si+1 : "") : "";
+    const hp = helpFor(c), tip = (sortKeys.length>1 ? `Sort level ${si+1} of ${sortKeys.length}. ` : "") + (on ? (sk.dir>0 ? "A→Z / low→high" : "Z→A / high→low") : "");
     const fk = colFilters[c.id], fc = colConds[c.id];
-    const ftip = fk || fc ? "Filtered: " + [fc ? condLabel(fc, condType(c)) : "", fk ? `showing ${fk.size} value${fk.size>1?"s":""}` : ""].filter(Boolean).join("; ") + ". Click to change." : "Filter: pick values or a condition";
-    h += `<th class="sortable ${i===0?"first":""} ${i<nFrz?"frz":""} ${i===nFrz-1?"frzlast":""} ${colWidths[c.id]?"sized":""} ${on?"sorted":""} ${fk||fc?"filtered":""}" data-sort="${esc(c.id)}" data-c="${i}" draggable="true" aria-sort="${on?(sk.dir>0?"ascending":"descending"):"none"}"><span>${hp?qm(hp,c.label):esc(c.label)}</span><span class="sic" role="button" title="${esc(tip)}">${icon}</span><span class="fic" role="button" title="${esc(ftip)}" aria-label="${esc(ftip)}">▾</span><span class="rsz" draggable="false" title="Double-click to reset width"></span></th>`;
+    const ftip = fk || fc ? "Filtered: " + [fc ? condLabel(fc, condType(c)) : "", fk ? `showing ${fk.size} value${fk.size>1?"s":""}` : ""].filter(Boolean).join("; ") : "";
+        h += `<th class="sortable ${i===0?"first":""} ${i<nFrz?"frz":""} ${i===nFrz-1?"frzlast":""} ${colWidths[c.id]?"sized":""} ${on?"sorted":""} ${fk||fc?"filtered":""}" data-sort="${esc(c.id)}" data-c="${i}" draggable="true" aria-sort="${on?(sk.dir>0?"ascending":"descending"):"none"}"><span>${hp?qm(hp,c.label):esc(c.label)}</span>${on ? `<span class="sic" title="${esc(tip)}">${icon}</span>` : ""}${fk||fc ? `<span class="fic" title="${esc(ftip)}">▾</span>` : ""}<span class="rsz" draggable="false" title="Double-click to reset width"></span></th>`;
   });
   h += "</tr></thead><tbody>";
   viewRows.forEach((ed,ri)=>{
@@ -1519,20 +1520,27 @@ $("#fcolblank").addEventListener("change", async()=>{
 $("#gridwrap").addEventListener("click", e=>{
   if (e.target.closest(".qm")) return;   // the underlined name only explains
   if (swallowClick || e.target.closest(".rsz")) return;   // finishing a resize does not sort
-  const fic = e.target.closest(".fic");
-  if (fic){ e.stopPropagation(); const fth = fic.closest("th[data-sort]"); const had = ctxMenu && ctxMenu.classList.contains("fpop") && ctxMenu.dataset.col === fth.dataset.sort; if (had){ closeCtx(); return; } openFilter(fth.dataset.sort, fth); if (ctxMenu) ctxMenu.dataset.col = fth.dataset.sort; return; }
-  if (!e.target.closest(".sic")) return;   // only the sort icon sorts
-  const th = e.target.closest("th[data-sort]"); if (!th) return;
-  const id = th.dataset.sort, i = sortKeys.findIndex(k=>k.id===id);
-  if (e.shiftKey && sortKeys.length && !(sortKeys.length===1 && i===0)){   // Shift+click: add / flip / remove this level, keep the others
-    if (i < 0) sortKeys.push({id, dir:1});
-    else if (sortKeys[i].dir > 0) sortKeys[i].dir = -1;
-    else sortKeys.splice(i, 1);
+  const th = e.target.closest("th[data-sort]"); if (!th || !pickMode) return;
+  const id = th.dataset.sort;
+  if (pickMode==="filter"){
+    e.stopPropagation(); setPickMode("");
+    openFilter(id, th); if (ctxMenu) ctxMenu.dataset.col = id; return;
   }
-  else if (sortKeys.length===1 && i===0){ if (sortKeys[0].dir > 0) sortKeys[0].dir = -1; else sortKeys = []; }
-  else sortKeys = [{id, dir:1}];
+  const i = sortKeys.findIndex(k=>k.id===id);   // Sort: each column you click stacks as the next level
+  if (i < 0) sortKeys.push({id, dir:1});
+  else if (sortKeys[i].dir > 0) sortKeys[i].dir = -1;
+  else sortKeys.splice(i, 1);
   renderGrid();
 });
+let pickMode = "";   // "" | "sort" | "filter": what a click on a column heading does
+function setPickMode(m){
+  pickMode = m;
+  $("#modesort").classList.toggle("on", m==="sort"); $("#modefilter").classList.toggle("on", m==="filter");
+  $("#pickmsg").classList.toggle("hidden", !m); $("#gridwrap").classList.toggle("picking", !!m);
+}
+$("#modesort").onclick = ()=>{ closeCtx(); setPickMode(pickMode==="sort" ? "" : "sort"); };
+$("#modefilter").onclick = ()=>{ closeCtx(); setPickMode(pickMode==="filter" ? "" : "filter"); };
+document.addEventListener("keydown", e=>{ if (e.key==="Escape" && pickMode) setPickMode(""); });
 $("#clearsort").onclick = ()=>{ sortKeys = []; renderGrid(); };
 $("#ffull").addEventListener("change", ()=>$("#gridwrap").classList.toggle("full", $("#ffull").checked));
 let ft; $("#frow").addEventListener("input", ()=>{ clearTimeout(ft); ft=setTimeout(renderGrid,150); });
