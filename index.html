@@ -174,6 +174,12 @@ td.jump{animation:jumpflash 1.6s ease-out 1}
 @keyframes jumpflash{0%,36%,72%{background:var(--sel);box-shadow:inset 0 0 0 3px var(--accent)}18%,54%{background:var(--panel);box-shadow:inset 0 0 0 3px var(--accent)}}
 .editor{position:fixed;z-index:20;background:var(--panel);border:2px solid var(--accent);border-radius:6px;box-shadow:0 6px 24px #0003;display:flex;flex-direction:column}
 .editor textarea{border:0;resize:both;padding:8px;min-width:260px;min-height:90px;background:transparent;outline:none}
+.editor .pplist{margin:8px;max-height:60vh;overflow-y:auto;border:1px solid var(--line);border-radius:6px;outline:none;width:calc(100% - 16px)}
+.editor .pplist .ppo{padding:6px 8px;cursor:pointer;white-space:normal;overflow-wrap:anywhere;border-bottom:1px solid var(--line)}
+.editor .pplist .ppo:last-child{border-bottom:0}
+.editor .pplist .ppo:hover{background:var(--line)}
+.editor .pplist .ppo.on{background:var(--accent);color:#fff}
+.editor .pplist .ppo small{opacity:.75}
 .editor .bar{display:flex;gap:6px;align-items:center;padding:6px 8px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
 .editor .bar .grow{flex:1}
 .editor .bar button{padding:2px 8px;font-size:12px}
@@ -1680,10 +1686,20 @@ function openEditor(td){
   if (c.id==="promo:line"){
     const uses = {}; for (const e2 of data.editions) if (e2.promo_line_id) uses[e2.promo_line_id] = (uses[e2.promo_line_id]||0) + 1;
     const opts = Object.values(data.promo).filter(p=>p.language===ed.language).sort((a,b)=>(uses[b.id]||0)-(uses[a.id]||0) || a.promo_line.localeCompare(b.promo_line));
-    const short = t => t.replace(/\s+/g," ").slice(0,140) + (t.length>140 ? "…" : "");
-    input = document.createElement("select");
-    input.innerHTML = `<option value="">(no promo line)</option>` + opts.map(p=>`<option value="${esc(p.promo_line)}">${esc(short(p.promo_line))} (${uses[p.id]||0} book${uses[p.id]===1?"":"s"})</option>`).join("") + `<option value="__new__">New promo line…</option>` + (old==null ? "" : `<option value="__edit__">Edit this wording (${uses[ed.promo_line_id]||1} book${(uses[ed.promo_line_id]||1)===1?"":"s"} use it)…</option>`);
-    input.value = old==null ? "" : old; input.style.margin="8px"; input.style.width="calc(100% - 16px)";
+    /* a list instead of a dropdown, so every option shows its whole wording (wrapped) */
+    const items = [{v:"", t:"(no promo line)"}].concat(opts.map(p=>({v:p.promo_line, t:p.promo_line, n:` (${uses[p.id]||0} book${uses[p.id]===1?"":"s"})`})), [{v:"__new__", t:"New promo line…"}]);
+    if (old!=null) items.push({v:"__edit__", t:`Edit this wording (${uses[ed.promo_line_id]||1} book${(uses[ed.promo_line_id]||1)===1?"":"s"} use it)…`});
+    input = document.createElement("div"); input.className = "pplist"; input.tabIndex = 0; input.setAttribute("role","listbox");
+    let cur = old==null ? "" : old;
+    const rows = items.map(it=>{ const d = document.createElement("div"); d.className = "ppo"; d.setAttribute("role","option"); d.textContent = it.t; if (it.n){ const sm = document.createElement("small"); sm.textContent = it.n; d.appendChild(sm); } d._v = it.v; input.appendChild(d); return d; });
+    const mark = () => { for (const d of rows) d.classList.toggle("on", d._v===cur); const on = rows.find(d=>d._v===cur); if (on) on.scrollIntoView({block:"nearest"}); };
+    const choose = v => { cur = v; mark(); input.dispatchEvent(new Event("change")); };
+    Object.defineProperty(input, "value", {get:()=>cur, set:v=>{ cur = v; mark(); }});
+    input.addEventListener("click", ev=>{ const d = ev.target.closest(".ppo"); if (d) choose(d._v); });
+    input.addEventListener("keydown", ev=>{
+      if (ev.key==="ArrowDown" || ev.key==="ArrowUp"){ ev.preventDefault(); ev.stopImmediatePropagation(); const i = Math.max(0, rows.findIndex(d=>d._v===cur)); const n = rows[Math.min(rows.length-1, Math.max(0, i + (ev.key==="ArrowDown" ? 1 : -1)))]; cur = n._v; mark(); if (cur==="__new__" || cur==="__edit__") return; }
+    }, true);
+    mark(); input.style.margin="8px";
     input.addEventListener("change", ()=>{
       if (input.value==="__edit__"){
         const ta = document.createElement("textarea"); ta.value = old; ta.style.width="100%"; ta.style.minHeight="160px";
@@ -1729,7 +1745,7 @@ function openEditor(td){
   bar.innerHTML = `<span>${esc(ed.title||ed.file_name)} · ${esc(c.label)}${c.note?" — "+esc(c.note):""}</span><span class="grow"></span><span>${t==="list" ? "One per line · " : ""}Enter saves · Shift+Enter new line · Esc cancels</span><button data-a="cancel">Cancel</button><button class="primary" data-a="save">Save</button>`;
   box.appendChild(bar);
   document.body.appendChild(box);
-  const rc = td.getBoundingClientRect(), W = Math.max(rc.width+40, LONG_HINT.test(c.col||c.field||c.label)?480:300);
+  const rc = td.getBoundingClientRect(), W = Math.min(innerWidth-24, Math.max(rc.width+40, c.id==="promo:line" ? 620 : LONG_HINT.test(c.col||c.field||c.label)?480:300));
   box.style.left = Math.max(8, Math.min(rc.left, innerWidth - W - 16)) + "px";
   box.style.top = Math.max(8, Math.min(rc.top, innerHeight - 260)) + "px";
   box.style.width = W + "px";
