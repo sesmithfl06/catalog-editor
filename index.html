@@ -669,6 +669,7 @@ async function showColumn(id){
 }
 function helpFor(c){
   if (c.kind==="list" && c.col==="language") return "";   // no explanation for the Pet names & invented words column
+  if (c.kind==="est") return "";   // no explanation for the English columns in the Translations section
   const parts = [];
   const regTable = {promo:c.table, ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", sb:"story_bibles", ml:"marketing_links", info:"editions"}[c.kind];
   const r = regTable && (REG[regTable+"."+(c.col||"")] || (c.kind==="info" && REG["edition_info."+(c.col||"")]));
