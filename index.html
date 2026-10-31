@@ -56,7 +56,7 @@ header{grid-column:1/3;display:flex;gap:10px;align-items:center;flex-wrap:wrap;p
 header h1{font-size:16px;margin:0 8px 0 0}
 header .grow{flex:1}
 header .who{color:var(--muted);font-size:12px}
-#status{font-size:12px;color:var(--muted);min-width:120px}
+#status{font-size:12px;color:var(--muted);flex:0 0 260px;width:260px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}   /* fixed width so the buttons after it never shift; full text shows on hover */
 #status.bad{color:var(--bad)} #status.ok{color:var(--ok)} #status.warn{color:var(--warn)}
 
 aside{border-right:1px solid var(--line);background:var(--panel);min-height:0;overflow:auto}
@@ -73,8 +73,8 @@ aside{border-right:1px solid var(--line);background:var(--panel);min-height:0;ov
 #coltools .btns{display:flex;gap:6px;flex-wrap:wrap}
 #coltools .btns button,#rowtools button{padding:3px 8px;font-size:12px}
 #colsearch{width:100%}
-#presetrow{display:flex;gap:6px;align-items:center}
-#presetrow select{flex:1;min-width:0}
+#presetrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#presetrow select{flex:1 1 100%;min-width:0}
 #presetrow button{padding:3px 8px;font-size:12px;white-space:nowrap}
 #collist{padding:4px 0 20px}
 /* collapse / expand chevron on every sidebar heading */
@@ -152,6 +152,17 @@ td.title .v{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellip
 #gridwrap.full td .v{display:block;-webkit-line-clamp:unset;overflow:visible}
 #gridwrap.full td.long{--w:460px}
 td.edit{cursor:default}
+/* header = dark blue (all columns, title too); title column cells = dark purple with slight row banding */
+:root{--hdr:#1f3a66; --hdr-ink:#ffffff; --ttl:#3b2160; --ttl-band:#4a2a73; --ttl-ink:#ffffff}
+th{background:var(--hdr);color:var(--hdr-ink)}
+th .tbl{color:#c5d3ea}
+th .tbl.blk{color:#ffcf8a}
+th .sic{color:#c5d3ea}
+th.sorted .sic{color:#fff}
+td.title{background:var(--ttl);color:var(--ttl-ink)}
+:where(tbody tr:nth-child(even)) td.title{background:var(--ttl-band)}
+td.title.edit:hover{background:#5a3891}
+td.title.msel{background:#6b45a8}
 .cpy{position:absolute;top:2px;right:2px;z-index:4;display:flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 4px;font-size:12px;line-height:1;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:5px;box-shadow:0 1px 3px #0002;cursor:pointer}
 .cpy:hover{color:var(--accent);border-color:var(--accent)}
 .cpy.done{color:var(--ok);border-color:var(--ok);font-weight:600}
@@ -373,6 +384,7 @@ dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
         <div id="presetrow">
           <select id="presetsel" aria-label="View presets"></select>
           <button id="presetsave" type="button" title="Saved in Supabase, works on any device">Save view</button>
+          <button id="presetupd" type="button" disabled title="Overwrite the selected view with the columns, sort and filters you have now">Update view</button>
           <button id="presetdel" type="button" disabled>Delete view</button>
         </div>
         <label class="chk" title="Shows the title plus every column that has a blank for at least one book shown."><input type="checkbox" id="fcolblank"> Blanks</label>
@@ -630,11 +642,11 @@ const GROUP_ITEMS = {
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
     "one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","one:edition_release_notes:payhip_publication","one:edition_release_notes:not_released_reason",
     "list:authors_note","info:author","info:publisher","info:author_bio","ed:sheet_order","ed:story_id","st:story_id"],
-  "Story": ["st:main_plot","st:subplots","st:tags","st:display_tags","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
+  "Story": ["st:main_plot","st:subplots","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
   "Series": ["ser:series_synopsis","ser:series_url","ser:reads_in_order_from","ser:reads_in_order_to","ser:reading_note"],
-  "Marketing": ["ed:tagline","ed:reasons_to_love","ed:excerpts","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy","list:bookclub"],
+  "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","ed:excerpts","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
-  "Story Bible (companion book)": ["sb:price_usd","sb:library_price_usd","sb:isbn","sb:publication_date","sb:word_count","sb:notes","php:Story Bible"],
+  "Story Bible (companion book)": ["sb:price_usd","sb:library_price_usd","sb:isbn","sb:publication_date","sb:word_count","sb:notes","php:Story Bible","list:bookclub"],
   "Links": [],
   "Projects": ["one:projects:title","one:projects:aplus","one:projects:payhip_order","one:projects:blank_on_site","one:projects:seo_site","one:projects:blurb_site","one:projects:slideshow","one:projects:plot"],
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"]
@@ -1000,6 +1012,7 @@ function renderPresetMenu(sel){
   $("#presetsel").value = sel && [...$("#presetsel").options].some(o=>o.value===sel) ? sel : "";
   const cur = presetById($("#presetsel").value.slice(3));
   $("#presetdel").disabled = !(cur && cur.editor_view);
+  $("#presetupd").disabled = !(cur && cur.editor_view);
 }
 async function applyPreset(p){
   checked = new Set(p.cols);
@@ -1016,6 +1029,7 @@ async function applyPreset(p){
 $("#presetsel").onchange = async()=>{
   const v = $("#presetsel").value, row = v.startsWith("id:") ? presetById(v.slice(3)) : null;
   $("#presetdel").disabled = !(row && row.editor_view);
+  $("#presetupd").disabled = !(row && row.editor_view);
   if (row) await applyPreset(presetToView(row));
 };
 $("#presetsave").onclick = async()=>{
@@ -1029,6 +1043,18 @@ $("#presetsave").onclick = async()=>{
     PRESETS = PRESETS.filter(p=>p.id!==row.id).concat(row);
     renderPresetMenu("id:"+row.id); setStatus(`Saved view "${name}" in Supabase`,"ok");
   }catch(err){ setStatus("View not saved: " + friendly(err), "bad"); }
+};
+function currentViewBody(name){
+  return presetRow(name, {cols:[...checked], lang:$("#flang").value, series:$("#fseries").value, find:$("#frow").value, blanks:$("#fcolblank").checked, blankAdd:[...blankAdd], blankOff:[...blankOff], sorts:sortKeys.map(k=>({id:k.id, dir:k.dir})), filters:filtersForSave(), conds:condsForSave(), layout:layoutForSave()});
+}
+$("#presetupd").onclick = async()=>{
+  const row = presetById($("#presetsel").value.slice(3)); if (!row || !row.editor_view) return;
+  if (!confirm(`Overwrite the view "${row.preset_name}" with the columns, sort and filters you have now?`)) return;
+  try{
+    const upd = await patchOne("column_presets", "id=eq."+q(row.id), currentViewBody(row.preset_name));
+    PRESETS = PRESETS.filter(p=>p.id!==upd.id).concat(upd);
+    renderPresetMenu("id:"+upd.id); setStatus(`Updated view "${row.preset_name}" in Supabase`,"ok");
+  }catch(err){ setStatus("View not updated: " + friendly(err), "bad"); }
 };
 $("#presetdel").onclick = async()=>{
   const row = presetById($("#presetsel").value.slice(3)); if (!row || !row.editor_view) return;
@@ -1980,7 +2006,7 @@ document.addEventListener("keydown", e=>{
 });
 
 /* ---------- status ---------- */
-function setStatus(t, kind){ const s = $("#status"); s.textContent = t; s.className = kind||""; }
+function setStatus(t, kind){ const s = $("#status"); s.textContent = t; s.title = t; s.className = kind||""; }
 
 /* ---------- start ---------- */
 function step(name){ document.querySelectorAll("#signin .step").forEach(d=>d.classList.toggle("hidden", d.id!=="st-"+name)); }
