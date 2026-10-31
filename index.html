@@ -489,8 +489,9 @@ const SB_GROUP = "Story Bible (companion book)";
 const SB_FIELDS = ["price_usd","library_price_usd","isbn","publication_date","word_count","notes"];
 const SB_SELECT = "id,file_name," + SB_FIELDS.join(",");   // never the bible text itself (bible_md), which is large
 // Column ids that changed with the October 2026 data changes, so saved views and links still find them.
-const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:long_synopsis_series_intro"], "ed:long_synopsis_closing_line":["promo:line"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"]};
+const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:long_synopsis_series_intro"], "ed:long_synopsis_closing_line":["promo:line"], "promo:text":["promo:line"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"]};
 function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
+const PROMO_EDIT = {id:"promo:text", kind:"promo", col:"promo_line", table:"promo_lines", label:"Promo Line wording"};
 const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id"]);
 let COLS = [], COLMAP = {};
 let REG = {};   // field_registry by "table.column"
@@ -543,8 +544,7 @@ const ML_HELP = {
 };
 function ownHelp(c){
   const col = c.col || c.field || "";
-  if (c.id==="promo:line") return "The promo line that ends this book's Long Synopsis, picked from the shared list for the book's language. Pick \"New promo line…\" to add a wording.";
-  if (c.id==="promo:text") return "The wording of this book's promo line. It is shared: changing it here changes it in every book that uses the same promo line.";
+  if (c.id==="promo:line") return "The promo line that ends this book's Long Synopsis, picked from the shared list for the book's language. Pick \"New promo line…\" to add a wording, or \"Edit this wording…\" to change the text (it changes every book that uses it).";
   if (c.kind==="sl") return LINK_TYPE_HELP[c.lt] || "";
   if (c.kind==="ml") return ML_HELP[c.lt] || "";
   if (c.kind==="est") return "The English text kept next to the translation, so you can compare them.";
@@ -620,7 +620,7 @@ function helpFor(c){
 const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Projects","Translations","Archive"];
 const GROUP_ITEMS = {
   "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","st:english_title","info:english_title","ed:language","ed:series","ed:number_in_series","info:series_and_book_number",
-    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","ed:essential_description","promo:line","promo:text",
+    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","ed:essential_description","promo:line",
     "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience","st:main_genre_differentiated",
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
     "one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","one:edition_release_notes:payhip_publication","one:edition_release_notes:not_released_reason",
@@ -665,10 +665,8 @@ function buildCatalog(sample){
   LISTS.forEach(([k,l],i)=>addCol({id:"list:"+k, kind:"list", col:k, table:"story details", label:l, group:"Story", order:9800+i, ro:true}));
   // Min Age: worked out from Rating (read-only), sits next to Age Max
   addCol({id:"calc:min_age", kind:"calc", col:"min_age", table:"stories", label:"Min Age", group:"Book Basics", order:regOrder("stories","age_max")-0.5, ro:true, note:"Worked out from Rating: G = 10, T = 13, M = 17, E = 18. Change the Rating to change it."});
-  // promo line: pick one from the shared list (promo_lines), or change the shared wording
+  // promo line: pick one from the shared list (promo_lines), add a new one, or edit the shared wording (one column; the wording edit saves through PROMO_EDIT)
   addCol({id:"promo:line", kind:"promo", col:"promo_line_id", table:"editions", label:regLabel("editions","promo_line_id"), group:"Edition", order:regOrder("editions","promo_line_id"), ro:false});
-  addCol({id:"promo:text", kind:"promo", col:"promo_line", table:"promo_lines", label:"Promo Line Wording (shared)", group:"Edition", order:regOrder("editions","promo_line_id")+0.5, ro:false,
-          note:"Shared: this changes every book that uses this promo line"});
   // worked out in edition_info (read-only); long synopsis and series + book number keep their usual place in the grid
   for (const c of ["english_title","whole_book_number","author","publisher","author_bio","long_synopsis","series_and_book_number"]){
     const inInfo = !!REG["edition_info."+c];
@@ -1068,7 +1066,6 @@ function canEdit(ed, c){
   if (c.kind==="ser") return !!ed.series && !!data.ser[rowKey(ed,c)];
   if (c.kind==="fmt") return !!data.fmt[rowKey(ed,c)];   // only formats the book has; add one with right-click → Add format
   if (c.kind==="sb") return !!data.sb[ed.file_name];      // only books that have a story bible; add one with right-click
-  if (c.id==="promo:text") return !!ed.promo_line_id;      // pick the book's Promo Line first
   return true;
 }
 // A format cell (or that format's store link / Payhip price) for a format the book doesn't have, or doesn't offer.
@@ -1451,7 +1448,7 @@ function layoutForSave(){ return {order:[...colOrder], widths:Object.assign({}, 
 function applyLayout(v){
   v = v || {};
   const fix = id => renamed(id)[0];
-  colOrder = (Array.isArray(v.order) ? v.order : []).map(fix).filter(id=>COLMAP[id]);
+  colOrder = (Array.isArray(v.order) ? v.order : []).map(fix).filter(id=>COLMAP[id]).filter((id,i,a)=>a.indexOf(id)===i);
   colWidths = {}; for (const [k,w] of Object.entries(v.widths||{})){ const id = fix(k); if (COLMAP[id] && +w > 20) colWidths[id] = Math.round(+w); }
   frozenN = Math.max(1, Math.min(30, parseInt(v.frozen,10) || 1));
 }
@@ -1685,9 +1682,15 @@ function openEditor(td){
     const opts = Object.values(data.promo).filter(p=>p.language===ed.language).sort((a,b)=>(uses[b.id]||0)-(uses[a.id]||0) || a.promo_line.localeCompare(b.promo_line));
     const short = t => t.replace(/\s+/g," ").slice(0,140) + (t.length>140 ? "…" : "");
     input = document.createElement("select");
-    input.innerHTML = `<option value="">(no promo line)</option>` + opts.map(p=>`<option value="${esc(p.promo_line)}">${esc(short(p.promo_line))} (${uses[p.id]||0} book${uses[p.id]===1?"":"s"})</option>`).join("") + `<option value="__new__">New promo line…</option>`;
+    input.innerHTML = `<option value="">(no promo line)</option>` + opts.map(p=>`<option value="${esc(p.promo_line)}">${esc(short(p.promo_line))} (${uses[p.id]||0} book${uses[p.id]===1?"":"s"})</option>`).join("") + `<option value="__new__">New promo line…</option>` + (old==null ? "" : `<option value="__edit__">Edit this wording (${uses[ed.promo_line_id]||1} book${(uses[ed.promo_line_id]||1)===1?"":"s"} use it)…</option>`);
     input.value = old==null ? "" : old; input.style.margin="8px"; input.style.width="calc(100% - 16px)";
     input.addEventListener("change", ()=>{
+      if (input.value==="__edit__"){
+        const ta = document.createElement("textarea"); ta.value = old; ta.style.width="100%"; ta.style.minHeight="160px";
+        const n = uses[ed.promo_line_id]||1, warn = document.createElement("div"); warn.style.cssText="margin:8px;font-weight:600";
+        warn.textContent = n===1 ? "Only this book uses this wording." : `Used by ${n} books — saving changes the wording in all of them.`;
+        input.replaceWith(ta); box.insertBefore(warn, box.querySelector(".bar")); editing.input = ta; editing.promoEdit = true; ta.addEventListener("keydown", onKey); ta.focus(); return;
+      }
       if (input.value!=="__new__") return;
       const ta = document.createElement("textarea"); ta.style.width="100%"; ta.style.minHeight="120px"; ta.placeholder = "Type the new promo line for " + ed.language + " books";
       input.replaceWith(ta); editing.input = ta; ta.addEventListener("keydown", onKey); ta.focus();
@@ -1746,11 +1749,12 @@ function openEditor(td){
 document.addEventListener("mousedown", e=>{ if (editing && !editing.box.contains(e.target)) closeEditor(true); });
 function closeEditor(save){
   if (!editing) return;
-  const {td, ed, c, old, input, box, t} = editing; editing = null;
+  const {td, ed, input, box, t, promoEdit} = editing; let c = editing.c; const old = editing.old; editing = null;
   box.remove(); td.classList.remove("active");
   if (!save) return;
   let v = input.value;
-  if (v==="__new__") return;
+  if (v==="__new__" || v==="__edit__") return;
+  if (promoEdit){ c = PROMO_EDIT; if (v.trim()===""){ flash(td,"err"); setStatus("The shared wording can't be blank. To take the promo line off this book, pick (no promo line).","bad"); return; } v = v.trim(); }
   if (t==="bool") v = v==="" ? null : v==="true";
   else if (t==="num") v = v.trim()==="" ? null : Number(v.replace(/[$,\s]/g,""));
   else if (t==="list" || t==="date" || t==="minutes" || t==="pick"){
@@ -1840,7 +1844,7 @@ async function write(ed, c, v){
     case "promo": {
       if (c.id==="promo:text"){
         if (!ed.promo_line_id) throw new Error("Pick this book's Promo Line first.");
-        if (v==null) throw new Error("The shared wording can't be blank. To take the promo line off this book, clear its Promo Line instead.");
+        if (v==null) throw new Error("The shared wording can't be blank. To take the promo line off this book, pick (no promo line) instead.");
         const r = await patchOne("promo_lines", "id=eq."+ed.promo_line_id, {promo_line:v}); data.promo[r.id] = r; await refreshInfo(null); return;
       }
       let id = null;
