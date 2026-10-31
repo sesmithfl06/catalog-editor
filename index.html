@@ -146,6 +146,7 @@ td{max-width:var(--w,220px);min-width:90px}
 td .v{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;word-break:break-word}
 td.long{--w:340px}
 td.title,th.title{width:23ch;min-width:23ch;max-width:23ch}
+td.genres .v{display:block;-webkit-line-clamp:unset;overflow:visible}
 td.title .v{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #gridwrap.full td .v{display:block;-webkit-line-clamp:unset;overflow:visible}
 #gridwrap.full td.long{--w:460px}
@@ -1125,12 +1126,14 @@ function splitList(c, text){
   const out = [...new Set(parts.map(x=>x.trim()).filter(Boolean))];
   return out.length ? out : null;
 }
+const isGenreCol = c => /genres$/.test(c.col||c.field||"");   // Bowker, Amazon, B&N, Kobo, Apple and copyright page genres
 // Display only: word counts get thousands separators in the grid; the editor, saved values and comparisons still use show().
 const disp = (v,c) => {
   if (c && v!=null && v!==""){
     if ((c.col==="word_count" || c.field==="word_count") && /^\d+$/.test(String(v).trim())) return Number(v).toLocaleString("en-US");
     if (c.col==="runtime_minutes") return fmtMinutes(v);
     if (isDateCol(c)) return fmtDate(v);
+    if (isGenreCol(c)) return (Array.isArray(v) ? v : String(v).split(";")).map(x=>String(x).trim()).filter(Boolean).join("\n");   // one genre per line (display only)
   }
   return show(v);
 };
@@ -1403,7 +1406,7 @@ function renderGrid(){
     h += "<tr>";
     viewCols.forEach((c,ci)=>{
       const v = valueOf(ed,c), ok = canEdit(ed,c);
-      const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (LONG_HINT.test(c.col||c.field||c.label)?"long":""), (c.id==="ed:title"?"title":"")].join(" ");
+      const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (LONG_HINT.test(c.col||c.field||c.label)?"long":""), (c.id==="ed:title"?"title":""), (isGenreCol(c)?"genres":"")].join(" ");
       const noFmt = c.kind==="fmt" && !data.fmt[rowKey(ed,c)] ? `This book has no ${c.f}. Right-click → Add ${c.f} to add it.`
         : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it." : "";
       h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt, valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
