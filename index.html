@@ -495,7 +495,7 @@ const SB_GROUP = "Story Bible (companion book)";
 const SB_FIELDS = ["price_usd","library_price_usd","isbn","publication_date","word_count","notes"];
 const SB_SELECT = "id,file_name," + SB_FIELDS.join(",");   // never the bible text itself (bible_md), which is large
 // Column ids that changed with the October 2026 data changes, so saved views and links still find them.
-const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:long_synopsis_series_intro"], "ed:long_synopsis_closing_line":["promo:line"], "promo:text":["promo:line"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"]};
+const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:long_synopsis_series_intro"], "ed:long_synopsis_closing_line":["promo:line"], "promo:text":["promo:line"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"], "info:english_title":["st:english_title"]};
 function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
 const PROMO_EDIT = {id:"promo:text", kind:"promo", col:"promo_line", table:"promo_lines", label:"Promo Line wording"};
 const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id"]);
@@ -625,7 +625,7 @@ function helpFor(c){
 // Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
 const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Projects","Translations","Archive"];
 const GROUP_ITEMS = {
-  "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","st:english_title","info:english_title","ed:language","ed:series","ed:number_in_series","info:series_and_book_number",
+  "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","st:english_title","ed:language","ed:series","ed:number_in_series","info:series_and_book_number",
     "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","ed:essential_description","promo:line",
     "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience","st:main_genre_differentiated",
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
@@ -655,7 +655,7 @@ function buildCatalog(sample){
   for (const c of edCols) addCol({id:"ed:"+c, kind:"ed", col:c, table:"editions", label:regLabel("editions",c), group:regGroup("editions",c,"Edition"), order:regOrder("editions",c), ro:c==="sheet_order"});
   for (const c of sample.storyCols) if (c!=="story_id") addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), ro:false});
   for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:(t==="projects" && c==="title") ? "Project title" : regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
-  for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:"English "+f.replace(/_/g," "), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
+  for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:(f==="title" ? "English source title" : "English "+f.replace(/_/g," ")), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
   for (const l of sample.mlTypes){ addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:6000, ro:false});
     if (l==="Cover image") addCol({id:"ml:"+l+":alt_text", kind:"ml", lt:l, col:"alt_text", table:"marketing_links", label:"Cover alt text", group:"Marketing links", order:6001, ro:false}); }
   for (const f of sample.formats) for (const c of (FMT_FIELDS[f] || FMT_FIELDS_OTHER)) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
@@ -674,10 +674,17 @@ function buildCatalog(sample){
   // promo line: pick one from the shared list (promo_lines), add a new one, or edit the shared wording (one column; the wording edit saves through PROMO_EDIT)
   addCol({id:"promo:line", kind:"promo", col:"promo_line_id", table:"editions", label:regLabel("editions","promo_line_id"), group:"Edition", order:regOrder("editions","promo_line_id"), ro:false});
   // worked out in edition_info (read-only); long synopsis and series + book number keep their usual place in the grid
-  for (const c of ["english_title","whole_book_number","author","publisher","author_bio","long_synopsis","series_and_book_number"]){
+  for (const c of ["whole_book_number","author","publisher","author_bio","long_synopsis","series_and_book_number"]){
     const inInfo = !!REG["edition_info."+c];
-    addCol({id:"info:"+c, kind:"info", col:c, table:"edition_info", label:{whole_book_number:"Book # with no decimals (B&N)", english_title:"English title", long_synopsis:"Long Synopsis (built)"}[c]||regLabel(inInfo?"edition_info":"editions",c), group:"Worked out (read-only)", order:inInfo ? regOrder("edition_info",c) : 9900, ro:true});
+    addCol({id:"info:"+c, kind:"info", col:c, table:"edition_info", label:{whole_book_number:"Book # with no decimals (B&N)", long_synopsis:"Long Synopsis (built)"}[c]||regLabel(inInfo?"edition_info":"editions",c), group:"Worked out (read-only)", order:inInfo ? regOrder("edition_info",c) : 9900, ro:true});
   }
+}
+
+/* ---------- check: no two columns may show the same name ---------- */
+function warnDuplicateLabels(){
+  const seen = {}; for (const c of COLS){ const k = String(c.label||"").trim().toLowerCase(); (seen[k] = seen[k] || []).push(c.id); }
+  const dups = Object.entries(seen).filter(([k,ids])=>k && ids.length>1);
+  if (dups.length){ console.warn("Columns with the same name:", dups); setStatus("Two columns share a name: " + dups.map(([k,ids])=>`"${k}" (${ids.join(", ")})`).join("; "), "bad"); }
 }
 
 /* ---------- loading ---------- */
@@ -764,7 +771,7 @@ async function ensureLoaded(cols){
     loaded.add(n);
   }
 }
-const INFO_SELECT = "file_name,english_title,whole_book_number,author,publisher,author_bio,long_synopsis,series_and_book_number";
+const INFO_SELECT = "file_name,whole_book_number,author,publisher,author_bio,long_synopsis,series_and_book_number";
 // After a long synopsis piece changes, read the worked-out Long Synopsis again (one book, or every book when a shared promo wording changed).
 async function refreshInfo(file){
   if (!loaded.has("info")) return;
@@ -805,6 +812,7 @@ async function loadAll(){
   await ensureLoaded(ticked());
   renderGrid();
   setStatus("Ready", "ok");
+  warnDuplicateLabels();   // after "Ready" so the warning stays visible
   queueCount();
   startLive();
   appReady = true;
@@ -828,7 +836,7 @@ function syncColList(){
   document.querySelectorAll("#collist .grp").forEach(g=>{ const n = g.querySelectorAll("input:checked").length; g.querySelector(".n").textContent = n ? n+" ticked" : ""; });
   updateColCount();
 }
-const TITLE_NEXT = {"one:edition_subtitles:subtitle":-99.8, "st:english_title":-99.7, "info:english_title":-99.6};   // right after the title: subtitle, then English title
+const TITLE_NEXT = {"one:edition_subtitles:subtitle":-99.8, "st:english_title":-99.7};   // right after the title: subtitle, then English title
 function isFront(c){ return KEY_COLS.has(c.id) || c.id in TITLE_NEXT; }
 function sortCols(list){ return list.sort((a,b)=>(isFront(b)-isFront(a)) || orderOf(a)-orderOf(b)); }
 function ticked(){ return sortCols(COLS.filter(c=>checked.has(c.id))); }
