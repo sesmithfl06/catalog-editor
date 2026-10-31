@@ -1138,7 +1138,7 @@ $("#presetdel").onclick = async()=>{
   try{ await delWhere("column_presets", "id=eq."+q(row.id)); PRESETS = PRESETS.filter(p=>p!==row); renderPresetMenu(""); setStatus(`Deleted view "${row.preset_name}"`,"ok"); }
   catch(err){ setStatus("View not deleted: " + friendly(err), "bad"); }
 };
-$("#none").onclick = async()=>{ const vb = viewSnap(); if (blanksOn()){ viewCols.forEach(c=>setColOn(c.id,false)); recordView(vb); renderColumnList(); renderGrid(); return; } checked = new Set([...KEY_COLS].filter(k=>k!=="ed:file_name")); recordView(vb); renderColumnList(); await refresh(); };
+$("#none").onclick = async()=>{ const vb = viewSnap(); if (blanksOn()){ viewCols.forEach(c=>setColOn(c.id,false)); recordView(vb); renderColumnList(); renderGrid(); return; } checked = new Set(["ed:title"]); recordView(vb); renderColumnList(); await refresh(); };
 $("#expand").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=true);
 $("#collapse").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=false);
 async function refresh(){ try{ await ensureLoaded(ticked()); renderGrid(); setStatus("Ready","ok"); }catch(err){ setStatus(err.message,"bad"); } }
