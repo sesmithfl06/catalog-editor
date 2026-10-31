@@ -612,11 +612,6 @@ function helpFor(c){
   const r = regTable && (REG[regTable+"."+(c.col||"")] || (c.kind==="info" && REG["edition_info."+(c.col||"")]));
   const own = (c.id==="ed:publication_date" ? ownHelp(c) : "") || (r && r.description) || ownHelp(c);   // Publication date: this short wording wins over the Supabase description
   if (own) parts.push(own);
-  const list = c.col==="language" ? null : refListFor(c);   // no value list for the Language column
-  if (list && list.length <= 12){
-    const withNotes = list.filter(x=>x.note);
-    parts.push(withNotes.length ? list.map(x=>x.value + (x.note ? " = " + x.note : "")).join("\n") : "Values: " + list.map(x=>x.value).join(", "));
-  }
   if (c.note) parts.push(c.note);
   return parts.join("\n\n");
 }
@@ -858,7 +853,7 @@ function renderColumnList(){
     const n = cs.filter(c=>onSet().has(c.id)).length;
     const isOpen = q || open.has(g);
     html += `<details class="grp" data-g="${esc(g)}" ${isOpen?"open":""}><summary>${esc(g)} <span class="n">${n?n+" ticked":""}</span></summary>`;
-    for (const c of show){ const hp = [helpFor(c), c.ro ? "Read-only" : ""].filter(Boolean).join("\n");
+    for (const c of show){ const hp = helpFor(c);
       html += `<label class="col ${c.ro?"ro":""}"><input type="checkbox" data-id="${esc(c.id)}" ${onSet().has(c.id)?"checked":""}><span><span class="lbl">${hp?qm(hp,c.label):esc(c.label)}</span></span></label>`; }
     html += `</details>`;
   }
