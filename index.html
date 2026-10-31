@@ -374,7 +374,8 @@ dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
       <div class="body">
         <select id="flang" aria-label="Language"><option value="">All languages</option></select>
         <select id="fseries" aria-label="Series"><option value="">All series</option></select>
-        <input id="frow" type="search" placeholder="Find a book…" title="Looks in the title, the file name and every ticked column. With several words, a book must have each word somewhere in its row.">
+        <input id="frow" type="search" placeholder="Find a book by title or file name…" title="Looks in the title and the file name. Tick Expand scope to also look in every ticked column. With several words, a book must have each word in what is searched.">
+        <label id="fexpandlbl" style="display:flex;gap:6px;align-items:center;font-size:12px" title="Off: the search looks in the title and the file name. On: it also looks in every ticked column."><input id="fexpand" type="checkbox"> Expand scope (search all columns)</label>
         <div id="rowtools"><button id="addrows" type="button" class="hidden" title="Keep the books found by this search in the list (same as pressing Enter), then search for the next one">Add to list</button> <button id="clearpins" type="button" class="hidden">Clear list</button> <button id="showrows" type="button" class="hidden" title="Bring back every book you hid with right-click → Hide row">Show hidden rows</button></div>
       </div>
     </details>
@@ -515,6 +516,7 @@ const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:l
 function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
 const PROMO_EDIT = {id:"promo:text", kind:"promo", col:"promo_line", table:"promo_lines", label:"Promo Line wording"};
 const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id","audio_files"]);   // audio_files stays in Supabase for the script; the editor does not show it
+const SKIP_ST = new Set(["created_at","updated_at"]);   // Supabase's automatic row stamps; the editor does not show them (same as Editions)
 let COLS = [], COLMAP = {};
 let REG = {};   // field_registry by "table.column"
 const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sb:{}, sl:{}, ser:{}, info:{}, lists:{}, php:{}, promo:{}};
@@ -663,7 +665,7 @@ function buildCatalog(sample){
   COLS = []; COLMAP = {};
   const edCols = Object.keys(sample.editions[0]||{}).filter(c=>!SKIP_ED.has(c));
   for (const c of edCols) addCol({id:"ed:"+c, kind:"ed", col:c, table:"editions", label:regLabel("editions",c), group:regGroup("editions",c,"Edition"), order:regOrder("editions",c), ro:c==="sheet_order"});
-  for (const c of sample.storyCols) if (c!=="story_id") addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), ro:false});
+  for (const c of sample.storyCols) if (c!=="story_id" && !SKIP_ST.has(c)) addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), ro:false});
   for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:(t==="projects" && c==="title") ? "Project title" : regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
   for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:(f==="title" ? "English source title" : "English "+f.replace(/_/g," ")), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
   for (const l of sample.mlTypes){ addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:6000, ro:false});
@@ -1200,11 +1202,12 @@ function addPins(){
 }
 function unpin(fn){ const i = pinned.indexOf(fn); if (i>=0) pinned.splice(i,1); renderGrid(); }
 function clearPins(){ pinned.length = 0; renderGrid(); }
-// The book search looks in the title, the file name and every ticked column that has loaded.
-// Several words: each word has to be somewhere in the book's row (not necessarily in the same cell).
+// The book search looks in the title and the file name. With Expand scope ticked it also looks in every ticked column that has loaded.
+// Several words: each word has to be somewhere in what is searched (not necessarily in the same cell).
 function searchRows(L, S, q){
   const words = (q||"").split(/\s+/).filter(Boolean);
-  const cols = words.length ? ticked().filter(c=>{ const t = needTable(c); return !t || loaded.has(t); }) : [];
+  const wide = $("#fexpand").checked;
+  const cols = words.length && wide ? ticked().filter(c=>{ const t = needTable(c); return !t || loaded.has(t); }) : [];
   return data.editions.filter(ed=>{
     if (hiddenRows.has(ed.file_name)) return false;
     if (L && ed.language!==L) return false;
@@ -1572,6 +1575,7 @@ document.addEventListener("keydown", e=>{ if (e.key==="Escape" && pickMode) setP
 $("#clearsort").onclick = ()=>{ sortKeys = []; renderGrid(); };
 $("#ffull").addEventListener("change", ()=>$("#gridwrap").classList.toggle("full", $("#ffull").checked));
 let ft; $("#frow").addEventListener("input", ()=>{ clearTimeout(ft); ft=setTimeout(renderGrid,150); });
+$("#fexpand").addEventListener("change", ()=>renderGrid());
 $("#frow").addEventListener("keydown", e=>{ if (e.key==="Enter"){ e.preventDefault(); clearTimeout(ft); addPins(); } });
 $("#addrows").onclick = addPins;
 $("#clearpins").onclick = clearPins;
@@ -2889,7 +2893,7 @@ $("#linkexit").onclick = async ()=>{
 // Changing a filter, the book search, a column tick or a preset leaves the link view first (capture
 // runs before those controls' own handlers, which then redraw the grid the usual way).
 ["change","input"].forEach(t=>$("aside").addEventListener(t, e=>{
-  if (e.target.closest("#flang,#fseries,#frow,#fcolblank,#collist,#presetsel")) leaveLinkView();
+  if (e.target.closest("#flang,#fseries,#frow,#fexpand,#fcolblank,#collist,#presetsel")) leaveLinkView();
 }, true));
 
 async function jumpTo(book, colId){
