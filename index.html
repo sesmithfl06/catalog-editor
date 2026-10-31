@@ -620,7 +620,7 @@ const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","
 const GROUP_ITEMS = {
   "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","st:english_title","info:english_title","ed:language","ed:series","ed:number_in_series","info:series_and_book_number",
     "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","ed:essential_description","promo:line","promo:text",
-    "st:rating","st:explicit_content","st:spice","st:age_max","st:audience","st:main_genre_differentiated",
+    "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience","st:main_genre_differentiated",
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
     "one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","one:edition_release_notes:payhip_publication","one:edition_release_notes:not_released_reason",
     "list:authors_note","info:author","info:publisher","info:author_bio","ed:sheet_order","ed:story_id","st:story_id"],
@@ -634,7 +634,7 @@ const GROUP_ITEMS = {
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"],
   "Archive": ["ed:archived_short_synopsis","ed:archived_long_synopsis"]
 };
-const KIND_GROUP = {promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", est:"Translations"};
+const KIND_GROUP = {calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", est:"Translations"};
 const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
 function placeCol(c){
   for (const g of GROUP_ORDER){ const i = GROUP_ITEMS[g].indexOf(c.id); if (i>=0){ c.group = g; c.so = i; return; } }
@@ -662,6 +662,8 @@ function buildCatalog(sample){
     ["technology","Technology"],["language","Pet names & invented words"],["rare","Rare details"],["bookclub","Book club questions"],
     ["reviews","Reviews (edit in Notion)"],["copy","Marketing copy (edit in Notion)"],["pron","Pronunciations"],["scenes","Scene image prompts"],["authors_note","Author's Note"]];
   LISTS.forEach(([k,l],i)=>addCol({id:"list:"+k, kind:"list", col:k, table:"story details", label:l, group:"Story", order:9800+i, ro:true}));
+  // Min Age: worked out from Rating (read-only), sits next to Age Max
+  addCol({id:"calc:min_age", kind:"calc", col:"min_age", table:"stories", label:"Min Age", group:"Book Basics", order:regOrder("stories","age_max")-0.5, ro:true, note:"Worked out from Rating: G = 10, T = 13, M = 17, E = 18. Change the Rating to change it."});
   // promo line: pick one from the shared list (promo_lines), or change the shared wording
   addCol({id:"promo:line", kind:"promo", col:"promo_line_id", table:"editions", label:regLabel("editions","promo_line_id"), group:"Edition", order:regOrder("editions","promo_line_id"), ro:false});
   addCol({id:"promo:text", kind:"promo", col:"promo_line", table:"promo_lines", label:"Promo Line Wording (shared)", group:"Edition", order:regOrder("editions","promo_line_id")+0.5, ro:false,
@@ -674,7 +676,7 @@ function buildCatalog(sample){
 }
 
 /* ---------- loading ---------- */
-function needTable(c){ return {promo:"promo", st:"stories", one:"one:"+c.t, est:"est", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", ser:"ser", info:"info", php:"php", list:"list:"+c.col}[c.kind]; }
+function needTable(c){ return {promo:"promo", st:"stories", one:"one:"+c.t, est:"est", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", ser:"ser", info:"info", php:"php", calc:"stories", list:"list:"+c.col}[c.kind]; }
 // The Payhip product code is the last part of the book's Payhip link (payhip.com/b/<code>).
 const payhipCode = l => { const m = /\/b\/([^\/?#]+)/.exec((l && (l.link_or_id || l.reader_link)) || ""); return m ? m[1] : null; };
 async function ensureLoaded(cols){
@@ -1053,6 +1055,7 @@ function valueOf(ed, c){
     case "sl": r = data.sl[rowKey(ed,c)]; return r ? r.link_or_id : null;
     case "ser": r = data.ser[rowKey(ed,c)]; return r ? r[c.col] : null;
     case "info": r = data.info[ed.file_name]; return r ? r[c.col] : null;
+    case "calc": r = data.stories[ed.story_id]; return r ? ({G:10,T:13,M:17,E:18}[r.rating] ?? null) : null;   // Min Age, worked out from the story's Rating
     case "promo": r = data.promo[ed.promo_line_id]; return r ? r.promo_line : null;
     case "list": return (data.lists[c.col]||{})[ed.file_name] || null;
   }
