@@ -801,7 +801,7 @@ const RENAMED = {"ed:long_synopsis_lead_in":["info:long_synopsis"], "ed:long_syn
 const SYN_GONE = new Set(["ed:long_synopsis_lead_in","ed:long_synopsis_closing_line","promo:text","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","promo:line"]);
 function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
 const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id","audio_files","long_synopsis_award_line","long_synopsis_series_intro"]);   // audio_files stays in Supabase for the script; the editor does not show it. The award line and series intro are edited in the Long Synopsis popup.
-const SKIP_ST = new Set(["created_at","updated_at"]);   // Supabase's automatic row stamps; the editor does not show them (same as Editions)
+const SKIP_ST = new Set(["created_at","updated_at","english_title"]);   // Supabase's automatic row stamps; the editor does not show them (same as Editions). english_title always matches the English edition's title (shown with "Add the corresponding English book"); it stays in Supabase.
 let COLS = [], COLMAP = {};
 let REG = {};   // field_registry by "table.column"
 const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sb:{}, sl:{}, ser:{}, info:{}, lists:{}, php:{}, promo:{}, diff:{}};
@@ -925,7 +925,7 @@ function helpFor(c){
 // Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
 const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Projects","Translations"];
 const GROUP_ITEMS = {
-  "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","st:english_title","ed:language","ed:series","ed:number_in_series","info:series_and_book_number","one:projects:plot",
+  "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","ed:language","ed:series","ed:number_in_series","info:series_and_book_number","one:projects:plot",
     "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:essential_description","ed:archived_short_synopsis","ed:archived_long_synopsis",
     "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience","st:main_genre_differentiated",
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
@@ -1153,7 +1153,7 @@ function syncColList(){
   document.querySelectorAll("#collist .grp").forEach(g=>{ const n = g.querySelectorAll("input:checked").length; g.querySelector(".n").textContent = n ? n+" ticked" : ""; });
   updateColCount();
 }
-const TITLE_NEXT = {"one:edition_subtitles:subtitle":-99.8, "st:english_title":-99.7};   // right after the title: subtitle, then English title
+const TITLE_NEXT = {"one:edition_subtitles:subtitle":-99.8};   // right after the title: subtitle
 function isFront(c){ return KEY_COLS.has(c.id) || c.id in TITLE_NEXT; }
 function sortCols(list){ return list.sort((a,b)=>(isFront(b)-isFront(a)) || orderOf(a)-orderOf(b)); }
 function ticked(){ return sortCols(COLS.filter(c=>checked.has(c.id))); }
