@@ -468,7 +468,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <ul>
       <li><b>Select one cell:</b> click it. It gets a double outline and becomes the <i>starting cell</i>: its value is the one that gets copied to the others.</li>
       <li><b>Select a block:</b> click the starting cell, then <kbd>Shift</kbd>+click the opposite corner. Everything between is selected.</li>
-      <li><b>Select a whole column:</b> <kbd>⌘</kbd>+click (Mac) / <kbd>Ctrl</kbd>+click its heading (works while Sort or Filter is on; a plain click still sorts or filters). <b>Several columns:</b> <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+click more headings to add or remove them, or <kbd>Shift</kbd>+click a heading to select every column between. <b>Move them:</b> drag any selected heading and all selected columns move together, keeping their order. The top cell of the first column you clicked is the starting cell (the value that gets copied). The selection only covers books and columns currently shown, so use a filter first to limit the books.</li>
+      <li><b>Select a whole column:</b> <kbd>⌘</kbd>+click (Mac) / <kbd>Ctrl</kbd>+click its heading (a plain click never selects a column; while Sort or Filter is on, a plain click still sorts or filters).<b>Several columns:</b> <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+click more headings to add or remove them, or <kbd>Shift</kbd>+click a heading to select every column between. <b>Move them:</b> drag any selected heading and all selected columns move together, keeping their order. The top cell of the first column you clicked is the starting cell (the value that gets copied). The selection only covers books and columns currently shown, so use a filter first to limit the books.</li>
       <li><b>Select scattered cells:</b> <kbd>⌘</kbd>+click (Mac) or <kbd>Ctrl</kbd>+click adds a cell or removes it if it is already selected. <kbd>⌘</kbd>+clicking the starting cell clears the selection.</li>
       <li><b>Clear the selection:</b> <kbd>Esc</kbd>, the Clear button in the bar at the bottom, or a plain click on any cell.</li>
       <li><b>Right-click a cell that isn't selected</b> and it is selected first, then the menu opens.</li>
@@ -527,7 +527,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…sort and filter?</summary>
     <ul>
-      <li><b>Selected a column first?</b> Click its heading to select it, then press <b>Sort</b> (sorts it A→Z; press Sort again for Z→A) or <b>Filter</b> (opens its filter box). With several columns selected, Sort stacks them left to right and Filter opens the leftmost one.</li>
+      <li><b>Selected a column first?</b> ⌘/Ctrl+click its heading to select it, then press <b>Sort</b> (sorts it A→Z; press Sort again for Z→A) or <b>Filter</b> (opens its filter box). With several columns selected, Sort stacks them left to right and Filter opens the leftmost one.</li>
       <li><b>Sort</b> button, then click headings: first click A→Z, second Z→A, third removes it. Sorts stack like Excel: the heading you click last is the main sort, and the earlier ones stay inside it (click title, then heat, and the books are grouped by heat, with titles in order inside each heat). <b>Clear sort</b> removes all. Press <kbd>Esc</kbd> to leave Sort / Filter mode without choosing.</li>
       <li><b>Filter</b> button then a heading, or right-click a heading → Filter…. The list shows each value with how many books have it (counted after your other filters). Typing in “Search values” ticks what it finds, like Excel. <kbd>Enter</kbd> in the search or condition boxes = OK.</li>
       <li>The same box has <b>Sort A→Z / Z→A</b> (replaces the sort) and, when a sort already exists, <b>Add A→Z / Z→A</b> (keeps the current sort and makes this column the new main sort).</li>
@@ -2220,12 +2220,13 @@ $("#gridwrap").addEventListener("click", e=>{
   if (!td.hasAttribute("tabindex")) td.setAttribute("tabindex","-1");
   td.focus({preventScroll:true});
 });
-/* click a column heading (outside Sort / Filter mode) to select the whole column; Shift+click = every column between;
-   Ctrl/Cmd+click = add or remove one column. The starting cell (value to copy) is the top cell of the first column clicked. */
+/* Ctrl/Cmd+click a column heading to select the whole column (a plain click does not); Shift+click = every column between;
+   Ctrl/Cmd+click again = add or remove one column. The starting cell (value to copy) is the top cell of the first column clicked. */
 let colAnchor = null;
 $("#gridwrap").addEventListener("click", e=>{
   if ((pickMode && !(e.shiftKey || e.metaKey || e.ctrlKey)) || swallowClick || e.target.closest(".rsz")) return;
   const th = e.target.closest("th[data-sort]"); if (!th || th.dataset.c === undefined) return;
+  if (!(e.metaKey || e.ctrlKey || (e.shiftKey && colAnchor !== null))) return;   // a plain click never selects a column; ⌘/Ctrl+click does (Shift+click extends a column selection already started)
   const ci = +th.dataset.c, nR = viewRows.length; if (!nR) return;
   const addCol = c => { for (let r=0; r<nR; r++) msel.add(r+","+c); };
   const colSelected = c => { for (let r=0; r<nR; r++) if (!msel.has(r+","+c)) return false; return true; };
