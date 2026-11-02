@@ -1137,7 +1137,6 @@ async function loadAll(){
 
 /* ---------- column picker ---------- */
 const DEFAULT_COLS = ["ed:title","ed:file_name"];
-const DEFAULT_SORT = ["ed:number_in_series","ed:series","ed:language"];   // used when no sort is picked, even if these columns are hidden
 let checked = new Set(DEFAULT_COLS);   // opens with Title and File name; add other columns through the column picker
 // Blanks view: columns you added (even with no blanks) or removed (even with blanks), and the ids now shown.
 let blankAdd = new Set(), blankOff = new Set(), blankIds = new Set();
@@ -1883,10 +1882,23 @@ function cmpSortVals(av, bv){
   if (typeof av==="boolean" && typeof bv==="boolean") return av===bv ? 0 : av ? -1 : 1;
   return collator.compare(show(av), show(bv));
 }
+// Default order: book #, then series, then language. Series names are translated per language, so the
+// series is judged by its English name, found through the series code at the start of the file name (ASKT-01-TDT-DE -> ASKT).
+function defaultSortRows(rows){
+  const code = ed => String(ed.file_name||"").split("-")[0];
+  const en = {};
+  for (const e of data.editions) if (e.language==="English" && e.series && !(code(e) in en)) en[code(e)] = e.series;
+  const num = ed => { const n = parseFloat(ed.number_in_series); return isFinite(n) ? n : null; };
+  const ser = ed => en[code(ed)] || ed.series || "";
+  return rows.map((ed,i)=>({ed,i,n:num(ed),s:ser(ed)})).sort((a,b)=>{
+    if ((a.n===null) !== (b.n===null)) return a.n===null ? 1 : -1;   // no book # at the bottom
+    if (a.n!==b.n && a.n!==null) return a.n-b.n;
+    return collator.compare(a.s, b.s) || collator.compare(code(a.ed), code(b.ed)) || collator.compare(a.ed.language||"", b.ed.language||"") || a.i-b.i;
+  }).map(x=>x.ed);
+}
 function sortRows(rows){
   let keys = sortKeys.map(k=>({c:COLMAP[k.id], d:k.dir})).filter(k=>k.c);
-  if (!keys.length) keys = DEFAULT_SORT.map(id=>({c:COLMAP[id], d:1})).filter(k=>k.c);   // default: book #, series, language
-  if (!keys.length) return rows;
+  if (!keys.length) return defaultSortRows(rows);
   return rows.map((ed,i)=>({ed,i,v:keys.map(k=>valueOf(ed,k.c))})).sort((a,b)=>{
     for (let j=0; j<keys.length; j++){
       const av = a.v[j], bv = b.v[j], ea = av==null||av==="", eb = bv==null||bv==="";
