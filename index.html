@@ -1266,8 +1266,7 @@ $("#nttoggle").onclick = async ()=>{
       if (!rows || !rows.length) throw new Error("Only owners and editors can change this.");
       REG[k] = rows[0];
     } else {
-      const id = Math.max(0, ...Object.values(REG).map(x=>+x.id||0)) + 1;
-      const rows = await api("POST", "field_registry", {id, table_name:t, column_name:col, label:c.label, in_notion:on}, {Prefer:"return=representation"});
+      const rows = await api("POST", "field_registry", {table_name:t, column_name:col, label:c.label, in_notion:on}, {Prefer:"return=representation"});   // Supabase numbers the row itself
       REG[k] = rows[0];
     }
     if (on && c.kind !== "info")   // worked-out columns (long synopsis, series + book number) have no table column to watch
