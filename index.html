@@ -175,9 +175,6 @@ td.ro{background:var(--ro);color:var(--muted)}
 :where(tbody tr:nth-child(even)) td{background:var(--band)}
 :where(tbody tr:nth-child(even)) td.ro{background:var(--roband)}
 .qmpop a{color:var(--accent);text-decoration:underline;cursor:pointer}
-td.blank .v::before{content:"—";color:var(--muted)}
-/* empty, but nothing to fill: the book has no row in that table (no award, no subtitle, no such format…) */
-td.na{background-image:repeating-linear-gradient(135deg,transparent 0 6px,var(--line) 6px 7px)}
 td.saving{box-shadow:inset 3px 0 0 var(--warn)}
 td.saved{box-shadow:inset 3px 0 0 var(--ok)}
 td.err{box-shadow:inset 3px 0 0 var(--bad)}
@@ -711,7 +708,7 @@ const GROUP_ITEMS = {
   "Story Bible (companion book)": ["php:Story Bible","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
   "Links": [],
   "Projects": ["one:projects:title","one:projects:aplus","one:projects:payhip_order","one:projects:blank_on_site","one:projects:seo_site","one:projects:blurb_site","one:projects:slideshow","one:projects:plot"],
-  "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"]
+  "Translations": ["ed:translator","ed:proofreader","ed:ai_translations","info:translation_cache","calc:bestseller_line"]
 };
 const KIND_GROUP = {calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
 const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
@@ -749,12 +746,14 @@ function buildCatalog(sample){
   LISTS.forEach(([k,l],i)=>addCol({id:"list:"+k, kind:"list", col:k, table:"story details", label:l, group:"Story", order:9800+i, ro:true}));
   // Min Age: worked out from Rating (read-only), sits next to Age Max
   addCol({id:"calc:min_age", kind:"calc", col:"min_age", table:"stories", label:"Min Age", group:"Book Basics", order:regOrder("stories","age_max")-0.5, ro:true, note:"Worked out from Rating: G = 10, T = 13, M = 17, E = 18. Change the Rating to change it."});
+  // Bestselling author line in the edition's language: read from the Translation Cache (the English line "Internationally acclaimed author, NYT/USA Today bestseller" and the line under it)
+  addCol({id:"calc:bestseller_line", kind:"calc", col:"bestseller_line", table:"edition_info", label:"Bestselling author line (in this language)", group:"Translations", order:9911, ro:true, note:"Taken from the Translation Cache: the translation saved under the English line 'Internationally acclaimed author, NYT/USA Today bestseller'. Blank when the cache has no such pair for this language."});
   // promo line: pick one from the shared list (promo_lines), add a new one, or edit the shared wording (one column; the wording edit saves through PROMO_EDIT)
   addCol({id:"promo:line", kind:"promo", col:"promo_line_id", table:"editions", label:regLabel("editions","promo_line_id"), group:"Edition", order:regOrder("editions","promo_line_id"), ro:false});
   // worked out in edition_info (read-only); long synopsis and series + book number keep their usual place in the grid
-  for (const c of ["whole_book_number","author","publisher","author_bio","long_synopsis","series_and_book_number"]){
+  for (const c of ["whole_book_number","author","publisher","author_bio","translation_cache","long_synopsis","series_and_book_number"]){
     const inInfo = !!REG["edition_info."+c];
-    addCol({id:"info:"+c, kind:"info", col:c, table:"edition_info", label:{whole_book_number:"Book # with no decimals (B&N)", long_synopsis:"Long Synopsis (built)"}[c]||regLabel(inInfo?"edition_info":"editions",c), group:"Worked out (read-only)", order:inInfo ? regOrder("edition_info",c) : 9900, ro:true});
+    addCol({id:"info:"+c, kind:"info", col:c, table:"edition_info", label:{whole_book_number:"Book # with no decimals (B&N)", long_synopsis:"Long Synopsis (built)", translation_cache:"Translation Cache (used to assist marketing translations)"}[c]||regLabel(inInfo?"edition_info":"editions",c), group:"Worked out (read-only)", order:inInfo ? regOrder("edition_info",c) : 9900, ro:true});
   }
   // Columns made with New column: in the section chosen then, right after the column chosen then (oldest first, so one can follow another)
   const made = COLS.filter(c=>regType(c)).map(c=>[c, REG[c.table+"."+c.col]]).sort((a,b)=>a[1].id-b[1].id);
@@ -857,7 +856,7 @@ async function ensureLoaded(cols){
     loaded.add(n);
   }
 }
-const INFO_SELECT = "file_name,whole_book_number,author,publisher,author_bio,long_synopsis,series_and_book_number";
+const INFO_SELECT = "file_name,whole_book_number,author,publisher,author_bio,translation_cache,long_synopsis,series_and_book_number";
 // After a long synopsis piece changes, read the worked-out Long Synopsis again (one book, or every book when a shared promo wording changed).
 async function refreshInfo(file){
   if (!loaded.has("info")) return;
@@ -1203,7 +1202,13 @@ function valueOf(ed, c){
     case "sl": r = data.sl[rowKey(ed,c)]; return r ? r.link_or_id : null;
     case "ser": r = data.ser[rowKey(ed,c)]; return r ? r[c.col] : null;
     case "info": r = data.info[ed.file_name]; return r ? r[c.col] : null;
-    case "calc": r = data.stories[ed.story_id]; return r ? ({G:10,T:13,M:17,E:18}[r.rating] ?? null) : null;   // Min Age, worked out from the story's Rating
+    case "calc":
+      if (c.col==="bestseller_line"){
+        const lines = String((data.info[ed.file_name]||{}).translation_cache||"").split("\n").map(x=>x.trim());
+        const i = lines.findIndex(x=>/^Internationally acclaimed author, NYT\/USA Today bestseller/i.test(x));
+        return i>=0 && lines[i+1] ? lines[i+1] : null;
+      }
+      r = data.stories[ed.story_id]; return r ? ({G:10,T:13,M:17,E:18}[r.rating] ?? null) : null;   // Min Age, worked out from the story's Rating
     case "promo": r = data.promo[ed.promo_line_id]; return r ? r.promo_line : null;
     case "list": return (data.lists[c.col]||{})[ed.file_name] || null;
   }
@@ -1357,9 +1362,9 @@ const isEmpty = v => v==null || v==="" || (Array.isArray(v) && !v.length);
 // A real blank (needs filling): empty, the book has a row in that table, and the cell applies to this book
 // (e.g. "English text" doesn't apply to English editions). Formats a book doesn't have or doesn't offer are not blanks.
 function isBlank(ed, c){ if (formatMissing(ed,c) || !hasRow(ed,c)) return false; return isEmpty(valueOf(ed,c)) && (c.ro || canEdit(ed,c)); }
-// Cell class for an empty cell: "blank" = needs filling, "na" = nothing to fill.
-function emptyCls(ed, c, v){ return !isEmpty(v) ? "" : isBlank(ed,c) ? "blank" : "na"; }
-function setEmptyCls(td, ed, c, v){ const k = emptyCls(ed,c,v); td.classList.toggle("blank", k==="blank"); td.classList.toggle("na", k==="na"); }
+// Empty cells all look the same; only the Blanks checkbox uses isBlank() to decide which columns to show.
+function emptyCls(){ return ""; }
+function setEmptyCls(){}
 
 /* ---------- column filters (like Excel: click ▾ in a heading and tick the values to keep) ----------
    Filters only change what the grid shows; nothing is changed in Supabase. Several columns can be
@@ -1582,8 +1587,7 @@ function renderGrid(){
       const v = valueOf(ed,c), ok = canEdit(ed,c);
       const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", emptyCls(ed,c,v), (isLong(c)?"long":""), (c.id==="ed:title"?"title":""), (isGenreCol(c)?"genres":"")].join(" ");
       const noFmt = c.kind==="fmt" && !data.fmt[rowKey(ed,c)] ? `This book has no ${c.f}. Right-click → Add ${c.f} to add it.`
-        : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it."
-        : isEmpty(v) && !isBlank(ed,c) ? "Nothing to fill: this book isn't part of this table." : "";
+        : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it." : "";
       h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt, valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
     });
     h += "</tr>";
