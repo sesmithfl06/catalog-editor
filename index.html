@@ -739,7 +739,7 @@ async function getAll(table, order){
 // kinds: ed (editions), st (stories, shared by all languages), one (one row per edition),
 // est (English text kept on a translation), ml (marketing link), fmt (format), sb (story bible, the companion book), sl (store link), ser (series), info (worked out, read-only)
 const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","badge"], edition_release_notes:["subscription_publication","collection_publication"],
-  projects:["title","aplus","payhip_order","blank_on_site","seo_site","blurb_site","slideshow","plot"]};
+  projects:["aplus","payhip_order","blank_on_site","seo_site","blurb_site","slideshow","plot"]};
 // Which fields each format uses. eBook and paperback share the book's Publication date (editions); hardcover and audiobook keep their own.
 // The story bible is a companion book with its own row in story_bibles (SB_FIELDS below), not a format.
 // Payhip prices are not here: they come from payhip_products (read-only "Payhip … price" columns).
@@ -937,7 +937,7 @@ const GROUP_ITEMS = {
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
   "Story Bible (companion book)": ["php:Story Bible","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
   "Links": [],
-  "Projects": ["one:projects:title","one:projects:aplus","one:projects:payhip_order","one:projects:blank_on_site","one:projects:seo_site","one:projects:blurb_site","one:projects:slideshow"],
+  "Projects": ["one:projects:aplus","one:projects:payhip_order","one:projects:blank_on_site","one:projects:seo_site","one:projects:blurb_site","one:projects:slideshow"],
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations","info:translation_cache","calc:bestseller_line"]
 };
 const KIND_GROUP = {calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
@@ -953,7 +953,7 @@ function buildCatalog(sample){
   const edCols = Object.keys(sample.editions[0]||{}).filter(c=>!SKIP_ED.has(c));
   for (const c of edCols) addCol({id:"ed:"+c, kind:"ed", col:c, table:"editions", label:regLabel("editions",c), group:regGroup("editions",c,"Edition"), order:regOrder("editions",c), ro:c==="sheet_order"});
   for (const c of sample.storyCols) if (c!=="story_id" && !SKIP_ST.has(c)) addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), ro:false});
-  for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:(t==="projects" && c==="title") ? "Project title" : regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
+  for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
   for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:(f==="title" ? "English source title" : "English "+f.replace(/_/g," ")), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
   for (const l of sample.mlTypes){ const a = AFF_ML[l];
     addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:a ? 6000.1 : 6000, ro:!!a, aff:a, note:a ? AFF_NOTE : undefined});
