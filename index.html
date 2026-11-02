@@ -755,6 +755,7 @@ const FMT_FIELDS_OTHER = ["not_offered","price_usd","isbn","publication_date"];
 const ED_FMT = {paperback_pages:"Paperback", paperback_page_size:"Paperback"};
 // The eBook is offered unless the book's eBook row says Not offered, or (with no eBook row) the book is a collection or anthology-only.
 // So eBook cells (format, store links, store count) on a book with no eBook row yet are blanks to fill, not lines.
+// Kindle Unlimited books are the exception for stores: only their Amazon eBook cells are blanks; other eBook stores get a line.
 function ebookOffered(ed){
   const r = data.fmt[ed.file_name+"|eBook"];
   if (r) return r.not_offered !== true;
@@ -1490,7 +1491,12 @@ function canEdit(ed, c){
 function formatMissing(ed, c){
   if (c.kind==="sb" || ((c.kind==="php" || c.kind==="sl") && c.f==="Story Bible")) return loaded.has("sb") && !data.sb[ed.file_name];
   const f = c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="php" || c.kind==="sl" || c.kind==="slc") ? c.f : c.kind==="ed" ? ED_FMT[c.col] : null;
-  if (f==="eBook") return c.col==="not_offered" ? false : !ebookOffered(ed);
+  if (f==="eBook"){
+    if (c.col==="not_offered") return false;
+    const store = c.aff ? c.aff.s : c.s;   // Kindle Unlimited books are only sold on Amazon, so other eBook stores get a line
+    if (store && store!=="Amazon" && ed.kindle_unlimited===true) return true;
+    return !ebookOffered(ed);
+  }
   if (!f || !FMT_FIELDS[f] || !loaded.has("fmt")) return false;
   const r = data.fmt[ed.file_name+"|"+f];
   return !r || (r.not_offered === true && c.col !== "not_offered");
