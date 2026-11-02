@@ -527,6 +527,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…sort and filter?</summary>
     <ul>
+      <li><b>Selected a column first?</b> Click its heading to select it, then press <b>Sort</b> (sorts it A→Z; press Sort again for Z→A) or <b>Filter</b> (opens its filter box). With several columns selected, Sort stacks them left to right and Filter opens the leftmost one.</li>
       <li><b>Sort</b> button, then click headings: first click A→Z, second Z→A, third removes it. Each heading you click is added as the next level (sort by heat, then title). <b>Clear sort</b> removes all. Press <kbd>Esc</kbd> to leave Sort / Filter mode without choosing.</li>
       <li><b>Filter</b> button then a heading, or right-click a heading → Filter…. The list shows each value with how many books have it (counted after your other filters). Typing in “Search values” ticks what it finds, like Excel. <kbd>Enter</kbd> in the search or condition boxes = OK.</li>
       <li>The same box has <b>Sort A→Z / Z→A</b> (replaces the sort) and, when a sort already exists, <b>Then A→Z / Z→A</b> (adds this column as the next level).</li>
@@ -645,8 +646,8 @@ dialog#ncdlg::backdrop{background:#0006}
   <main>
     <div class="filters">
       <label class="chk" title="Long cells show only their first line."><input type="checkbox" id="ffull"> Show full text</label>
-      <button type="button" id="modesort" title="Then click column headings to sort. Click several to stack the sort (heat, then title).">Sort</button>
-      <button type="button" id="modefilter" title="Then click a column heading to filter it.">Filter</button>
+      <button type="button" id="modesort" title="Sorts the selected column. With nothing selected, click column headings to sort; click several to stack the sort (heat, then title).">Sort</button>
+      <button type="button" id="modefilter" title="Filters the selected column. With nothing selected, click a column heading to filter it.">Filter</button>
       <span class="sortinfo hidden" id="pickmsg">Select a column</span>
       <button id="clearfilters" type="button" class="hidden">Clear all filters</button>
       <span class="sortinfo" id="sortinfo"></span>
@@ -2093,8 +2094,31 @@ function setPickMode(m){
   $("#modesort").classList.toggle("on", m==="sort"); $("#modefilter").classList.toggle("on", m==="filter");
   $("#pickmsg").classList.toggle("hidden", !m); $("#gridwrap").classList.toggle("picking", !!m);
 }
-$("#modesort").onclick = ()=>{ closeCtx(); setPickMode(pickMode==="sort" ? "" : "sort"); };
-$("#modefilter").onclick = ()=>{ closeCtx(); setPickMode(pickMode==="filter" ? "" : "filter"); };
+// whole columns currently selected (every shown row of the column), left to right
+function selectedColIds(){
+  const nR = viewRows.length; if (!nR || !msel.size) return [];
+  const out = [];
+  viewCols.forEach((c,ci)=>{ for (let r=0; r<nR; r++) if (!msel.has(r+","+ci)) return; out.push(c.id); });
+  return out;
+}
+// With a column selected, Sort sorts it (several selected = stacked in that order; pressing Sort again flips a single one) and Filter opens its filter
+$("#modesort").onclick = ()=>{
+  closeCtx(); const ids = selectedColIds();
+  if (ids.length && !pickMode){
+    if (ids.length===1 && sortKeys.length===1 && sortKeys[0].id===ids[0]) sortKeys[0].dir = -sortKeys[0].dir;
+    else sortKeys = ids.map(id=>({id, dir:1}));
+    renderGrid(); setStatus(`Sorted by ${ids.map(id=>COLMAP[id].label).join(", then ")} ${sortKeys[0].dir>0?"A→Z":"Z→A"}. Press Sort again to flip it.`,"ok"); return;
+  }
+  setPickMode(pickMode==="sort" ? "" : "sort");
+};
+$("#modefilter").onclick = ()=>{
+  closeCtx(); const ids = selectedColIds();
+  if (ids.length && !pickMode){
+    const th = document.querySelector(`#gridwrap th[data-sort="${CSS.escape(ids[0])}"]`);
+    if (th){ setPickMode(""); openFilter(ids[0], th); if (ctxMenu) ctxMenu.dataset.col = ids[0]; return; }
+  }
+  setPickMode(pickMode==="filter" ? "" : "filter");
+};
 document.addEventListener("keydown", e=>{ if (e.key==="Escape" && pickMode) setPickMode(""); });
 $("#clearsort").onclick = ()=>{ sortKeys = []; renderGrid(); };
 $("#ffull").addEventListener("change", ()=>{ $("#gridwrap").classList.toggle("full", $("#ffull").checked); renderGrid(); });
