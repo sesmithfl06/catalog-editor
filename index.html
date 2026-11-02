@@ -503,7 +503,7 @@ dialog#ncdlg::backdrop{background:#0006}
       <li>In the editor: <kbd>Enter</kbd> saves and moves down to the next editable cell; <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line in long text; <kbd>Tab</kbd> saves and moves right; <kbd>Shift</kbd>+<kbd>Tab</kbd> saves and moves left; <kbd>Esc</kbd> cancels; clicking outside the editor saves.</li>
       <li><b>Undo</b> <kbd>⌘</kbd>+<kbd>Z</kbd>; <b>Redo</b> <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (or <kbd>Ctrl</kbd>+<kbd>Y</kbd>). They don't work while you are typing in a box; use the Undo / Redo buttons at the top then.</li>
       <li>Right-click a cell in a Formats column with no format yet → “Add … for this book”; right-click a story bible cell with none → “Add a story bible for this book”.</li>
-      <li>Right-click a column heading (or its name in the column list) → <b>Rename column…</b>. Choose <b>Nickname</b> to show a shorter name (right-click → <b>Show full name</b> shows the original), or <b>Change the name permanently</b>. <b>Back to the original name</b> undoes either. Everyone sees the new name, on any device.</li>
+      <li>Right-click a column heading (or its name in the column list) → <b>Rename column…</b>. Choose <b>Nickname</b> to show a shorter name (right-click → <b>Show full name</b> shows the original), or <b>Change the name permanently</b>. <b>Back to the original name</b> undoes either. Everyone sees the new name, on any device. Some columns start with a built-in nickname (BN Bk#, Pb pgs, eB $, eB Lib $, U-link, U-link Custom, Store #, ASIN, Apple ID); rename them the same way.</li>
       <li>Right-click a cell that holds a web address (store links, Website book post, affiliate links…) → <b>Open link in new tab</b>.</li>
     </ul>
   </details>
@@ -958,7 +958,15 @@ function placeCol(c){
   c.group = (c.f==="Story Bible" && c.kind==="php") ? SB_GROUP : (KIND_GROUP[c.kind] || "Book Basics");   // any column not listed above lands with its kind
   c.so = 1000 + ((c.kind==="fmt" || c.kind==="php") ? (FORMAT_RANK[c.f]??9)*1000 + c.order : (c.kind==="ml" || c.kind==="aff") ? 5000 + c.order : c.order);
 }
-function addCol(c){ placeCol(c); const n = COLNAMES[c.id];
+// Built-in nicknames: shown unless a saved name (right-click → Rename column…) replaces them. "Back to the original name" saves {plain:true}.
+const DEFAULT_NICKS = {
+  "info:whole_book_number":"BN Bk#", "ed:paperback_pages":"Pb pgs",
+  "fmt:eBook:price_usd":"eB $", "fmt:eBook:library_price_usd":"eB Lib $",
+  "sl:Books2Read|eBook|Custom Link":"U-link Custom", "sl:Books2Read|eBook|Universal Link":"U-link", "slc:Books2Read|eBook|Universal Link":"Store #",
+  "sl:Amazon|eBook|ASIN":"ASIN", "sl:Apple|eBook|ID":"Apple ID"
+};
+const colNameEntry = id => COLNAMES[id] || (DEFAULT_NICKS[id] ? {nick:DEFAULT_NICKS[id]} : null);
+function addCol(c){ placeCol(c); const n = colNameEntry(c.id);
   if (n && n.nick){ c.full = c.label; c.label = n.nick; }   // nickname: shown everywhere in the editor; right-click → Show full name
   else if (n && n.name){ c.orig = c.label; c.label = n.name; }   // permanent new name
   COLS.push(c); COLMAP[c.id] = c; }
@@ -1228,6 +1236,7 @@ async function saveColName(id, entry){
   $("#rnsave").disabled = $("#rnreset").disabled = true; $("#rnmsg").textContent = "Saving…";
   try{
     const all = parseColNames(await api("GET","settings?select=value&key=eq."+COLNAMES_KEY));   // fresh copy, so names saved elsewhere are kept
+    if (!entry && DEFAULT_NICKS[id]) entry = {plain:true};   // keeps a built-in nickname from coming back
     if (entry) all[id] = entry; else delete all[id];
     const rows = await api("POST","settings?on_conflict=key", {key:COLNAMES_KEY, value:JSON.stringify(all)}, {Prefer:"resolution=merge-duplicates,return=representation"});
     if (!rows || !rows.length) throw new Error("Only owners and editors can change this.");
@@ -1237,7 +1246,7 @@ async function saveColName(id, entry){
     if (entry && entry.nick){ c.full = o; c.label = entry.nick; } else if (entry && entry.name){ c.orig = o; c.label = entry.name; }
     $("#rndlg").close();
     renderColumnList(); renderGrid();
-    setStatus(!entry ? `“${o}” is back to its original name` : entry.nick ? `“${o}” now shows as “${entry.nick}” (right-click → Show full name)` : `“${o}” is now named “${entry.name}”`, "ok");
+    setStatus(!entry || entry.plain ? `“${o}” is back to its original name` : entry.nick ? `“${o}” now shows as “${entry.nick}” (right-click → Show full name)` : `“${o}” is now named “${entry.name}”`, "ok");
     warnDuplicateLabels();
   }catch(e){
     $("#rnsave").disabled = $("#rnreset").disabled = false;
@@ -1338,7 +1347,7 @@ $("#nttoggle").onclick = async ()=>{
       if (!rows || !rows.length) throw new Error("Only owners and editors can change this.");
       REG[k] = rows[0];
     } else {
-      const rows = await api("POST", "field_registry", {table_name:t, column_name:col, label:c.label, in_notion:on}, {Prefer:"return=representation"});   // Supabase numbers the row itself
+      const rows = await api("POST", "field_registry", {table_name:t, column_name:col, label:origLabel(c), in_notion:on}, {Prefer:"return=representation"});   // Supabase numbers the row itself
       REG[k] = rows[0];
     }
     if (on && c.kind !== "info")   // worked-out columns (long synopsis, series + book number) have no table column to watch
