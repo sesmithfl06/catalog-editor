@@ -796,6 +796,7 @@ const ML_HELP = {
 function ownHelp(c){
   const col = c.col || c.field || "";
   if (c.id==="promo:line") return "The promo line that ends this book's Long Synopsis, picked from the shared list for the book's language. Pick \"New promo line…\" to add a wording, or \"Edit this wording…\" to change the text (it changes every book that uses it).";
+  if (c.kind==="slc") return "How many stores the Books2Read Universal Link for this book covers (a whole number).";
   if (c.kind==="sl") return LINK_TYPE_HELP[c.lt] || "";
   if (c.kind==="ml") return ML_HELP[c.lt] || "";
   if (c.kind==="est") return "The English text kept next to the translation, so you can compare them.";
@@ -907,6 +908,7 @@ function buildCatalog(sample){
   SB_FIELDS.forEach((c,i)=>addCol({id:"sb:"+c, kind:"sb", col:c, table:"story_bibles", label:`Story Bible · ${regLabel("story_bibles",c)}`, group:SB_GROUP, order:7800+i, ro:false}));
   for (const f of sample.payhipFormats) addCol({id:`php:${f}`, kind:"php", f, col:"price_usd", table:"payhip_products", label:(f==="Story Bible" ? "Story Bible · Price" : `${f} · Payhip price`), group:"Format: "+f, order:7000+regOrder("formats","payhip_price_usd"), ro:true});
   for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
+  if (sample.slKeys.includes("Books2Read|eBook|Universal Link")) addCol({id:"slc:Books2Read|eBook|Universal Link", kind:"slc", s:"Books2Read", f:"eBook", lt:"Universal Link", col:"store_count", table:"store_links", label:"Books2Read store count", group:"Store links: Books2Read", order:8000.5, ro:false});
   addCol({id:"diff:all", kind:"diffall", table:"edition_differences", label:"Edition differences", group:"Edition differences", order:regOrder("editions","anthology_only") + 0.5, ro:false});
   for (const c of ["series_synopsis","series_url","series_note"]) addCol({id:"ser:"+c, kind:"ser", col:c, table:"series", label:regLabel("series",c), group:"Series (shared by the whole series)", order:9000+regOrder("series",c), ro:false});
   // Story details kept as lists per book (read-only here)
@@ -943,7 +945,7 @@ function warnDuplicateLabels(){
 }
 
 /* ---------- loading ---------- */
-function needTable(c){ if (c.kind==="aff") return "ml"; if (c.kind==="calc" && c.col==="bestseller_line") return "bl"; return {promo:"promo", st:"stories", one:"one:"+c.t, est:"est", diff:"diff", diffall:"diff", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", ser:"ser", info:"info", php:"php", calc:"stories", list:"list:"+c.col}[c.kind]; }
+function needTable(c){ if (c.kind==="aff") return "ml"; if (c.kind==="calc" && c.col==="bestseller_line") return "bl"; return {promo:"promo", st:"stories", one:"one:"+c.t, est:"est", diff:"diff", diffall:"diff", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", slc:"sl", ser:"ser", info:"info", php:"php", calc:"stories", list:"list:"+c.col}[c.kind]; }
 // The Payhip product code is the last part of the book's Payhip link (payhip.com/b/<code>).
 const payhipCode = l => { const m = /\/b\/([^\/?#]+)/.exec((l && (l.link_or_id || l.reader_link)) || ""); return m ? m[1] : null; };
 async function ensureLoaded(cols){
@@ -1388,7 +1390,7 @@ function rowKey(ed, c){
     case "ml": return ed.file_name+"|"+c.lt;
     case "fmt": case "php": return ed.file_name+"|"+c.f;
     case "sb": return ed.file_name;
-    case "sl": return `${ed.file_name}|${c.s}|${c.f}|${c.lt}`;
+    case "sl": case "slc": return `${ed.file_name}|${c.s}|${c.f}|${c.lt}`;
     case "ser": return ed.series+"|"+ed.language;
   }
 }
@@ -1407,6 +1409,7 @@ function valueOf(ed, c){
     case "sb": r = data.sb[ed.file_name]; return r ? r[c.col] : null;
     case "php": return data.php[rowKey(ed,c)] ?? null;
     case "sl": r = data.sl[rowKey(ed,c)]; return r ? r.link_or_id : null;
+    case "slc": r = data.sl[rowKey(ed,c)]; return r ? r.store_count : null;
     case "ser": r = data.ser[rowKey(ed,c)]; return r ? r[c.col] : null;
     case "info": r = data.info[ed.file_name]; return r ? r[c.col] : null;
     case "calc":
@@ -1431,7 +1434,7 @@ function canEdit(ed, c){
 // The same for story bible cells (and story bible store links / Payhip price) on a book without a story bible.
 function formatMissing(ed, c){
   if (c.kind==="sb" || ((c.kind==="php" || c.kind==="sl") && c.f==="Story Bible")) return loaded.has("sb") && !data.sb[ed.file_name];
-  const f = c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="php" || c.kind==="sl") ? c.f : null;
+  const f = c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="php" || c.kind==="sl" || c.kind==="slc") ? c.f : null;
   if (!f || !FMT_FIELDS[f] || !loaded.has("fmt")) return false;
   const r = data.fmt[ed.file_name+"|"+f];
   return !r || (r.not_offered === true && c.col !== "not_offered");
@@ -1445,6 +1448,7 @@ const regType = c => ((c.kind==="ed" || c.kind==="st") && REG[c.table+"."+c.col]
 const REG_TYPE = {list:"list", date:"date", yes_no:"bool", number:"num", whole_number:"num"};
 const isLong = c => LONG_HINT.test(c.col||c.field||c.label) || regType(c)==="long_text";
 function typeOf(c){
+  if (c.kind==="slc") return "num";
   if (c.col==="runtime_minutes") return "minutes";
   if (ARRAY_COLS.has(c.table+"."+c.col)) return "list";
   if (c.table && LISTCOL[c.table+"."+c.col]) return "pick";
@@ -1589,7 +1593,7 @@ function hasRow(ed, c){
     case "ml": return !!data.ml[rowKey(ed,c)];
     case "fmt": return !!data.fmt[rowKey(ed,c)];
     case "sb": return !!data.sb[ed.file_name];
-    case "sl": return !!data.sl[rowKey(ed,c)];
+    case "sl": case "slc": return !!data.sl[rowKey(ed,c)];
     case "ser": return !!data.ser[rowKey(ed,c)];
     case "php": return Object.prototype.hasOwnProperty.call(data.php, rowKey(ed,c));
     default: return true;
@@ -2113,7 +2117,7 @@ fillBar.addEventListener("click", async e=>{
 function parseFor(c, text){
   const t = typeOf(c), s = text.trim();
   if (t==="bool"){ const l = s.toLowerCase(); if (l==="") return {ok:true,v:null}; if (l==="yes"||l==="true") return {ok:true,v:true}; if (l==="no"||l==="false") return {ok:true,v:false}; return {ok:false}; }
-  if (t==="num"){ if (s==="") return {ok:true,v:null}; const n = Number(text.replace(/[$,\s]/g,"")); return isNaN(n) || (regType(c)==="whole_number" && !Number.isInteger(n)) ? {ok:false} : {ok:true,v:n}; }
+  if (t==="num"){ if (s==="") return {ok:true,v:null}; const n = Number(text.replace(/[$,\s]/g,"")); return isNaN(n) || ((regType(c)==="whole_number" || c.kind==="slc") && !Number.isInteger(n)) ? {ok:false} : {ok:true,v:n}; }
   if (t==="list") return {ok:true, v: splitList(c, text)};
   if (t==="date"){ if (s==="") return {ok:true,v:null}; const d = parseDate(s); return d ? {ok:true,v:d} : {ok:false}; }
   if (t==="minutes"){ if (s==="") return {ok:true,v:null}; const m = parseMinutes(s); return m==null ? {ok:false} : {ok:true,v:m}; }
@@ -2238,6 +2242,7 @@ function closeEditor(save){
   }
   else v = v === "" ? null : v;
   if (t==="num" && v!=null && isNaN(v)) { flash(td,"err"); setStatus("That needs to be a number.","bad"); return; }
+  if (c.kind==="slc" && v!=null && !Number.isInteger(v)) { flash(td,"err"); setStatus("The store count needs to be a whole number.","bad"); return; }
   if (show(v) === show(old)) return;
   saveCell(ed, c, v, old, td, true);
 }
@@ -2403,6 +2408,12 @@ async function write(ed, c, v){
       const k = rowKey(ed,c), cur = data.sl[k], f = `${fn}&store=eq.${q(c.s)}&format=eq.${q(c.f)}&link_type=eq.${q(c.lt)}`;
       if (v==null){ if (cur) data.sl[k] = await patchOne("store_links", f, {link_or_id:null}); return; }   // clearing blanks the link and keeps the row (notes, store count)
       data.sl[k] = cur ? await patchOne("store_links", f, {link_or_id:v}) : await insertOne("store_links", {file_name:ed.file_name, store:c.s, format:c.f, link_type:c.lt, link_or_id:v});
+      return;
+    }
+    case "slc": {
+      const k = rowKey(ed,c), cur = data.sl[k];
+      if (!cur) throw new Error("This book has no Books2Read Universal Link row yet. Add the link first, then enter the store count.");
+      data.sl[k] = await patchOne("store_links", `${fn}&store=eq.${q(c.s)}&format=eq.${q(c.f)}&link_type=eq.${q(c.lt)}`, {store_count:v});
       return;
     }
     case "ser": { const k = rowKey(ed,c); data.ser[k] = await patchOne("series", `series=eq.${q(ed.series)}&language=eq.${q(ed.language)}`, {[c.col]:v}); return; }
