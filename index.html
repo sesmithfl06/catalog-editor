@@ -228,6 +228,8 @@ dialog#sydlg{border:1px solid var(--line);border-radius:12px;background:var(--pa
 #syparts .syhead button{padding:1px 7px}
 #syparts textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--panel)}
 #syparts .pplist{max-height:260px}
+#syparts .syscope{font-size:12px;color:var(--muted)}
+#syparts .syscope label{display:block;margin-top:3px;color:var(--ink)}
 #syparts .syjoin,#syparts .syshow{font-size:12px;color:var(--muted);display:flex;gap:4px 6px;align-items:center;flex-wrap:wrap}
 #syparts .syjoin select{flex:1 1 100%;min-width:0}
 #sypreview{white-space:pre-wrap;border:1px solid var(--line);border-radius:6px;padding:8px 10px;max-height:30vh;overflow:auto;background:var(--ro)}
@@ -430,7 +432,7 @@ dialog#ncdlg::backdrop{background:#0006}
 <!-- ============ Long Synopsis (right-click the Long Synopsis cell → Edit) ============ -->
 <dialog id="sydlg">
   <h2 id="sytitle">Long Synopsis</h2>
-  <p class="hint">The boxes are in the order the Long Synopsis uses. The arrows, “Show in every Long Synopsis” and “Next part starts” set the order and spacing for <b>every</b> book; this book's text only changes this book (the promo line list picks this book's line).</p>
+  <p class="hint">The boxes are in the order the Long Synopsis uses. The arrows, “Show in every Long Synopsis” and “Next part starts” set the order and spacing for <b>every</b> book; the text boxes change only this book, and the promo line goes to the books chosen under “Apply this promo line to”.</p>
   <div id="syparts"></div>
   <h3>Long Synopsis preview</h3>
   <div id="sypreview"></div>
@@ -496,10 +498,10 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…change a Long Synopsis, its order, or a promo line?</summary>
     <ul>
-      <li>Right-click a <b>Long Synopsis (built)</b> cell → <b>Edit</b>. A popup shows its parts side by side, in the order the Long Synopsis uses: award line, series intro, essential synopsis, promo line. Type in the boxes and pick the promo line; the preview at the bottom shows the result. Save changes this book only, and Undo reverses it in one step.</li>
+      <li>Right-click a <b>Long Synopsis (built)</b> cell → <b>Edit</b>. A popup shows its parts side by side, in the order the Long Synopsis uses: award line, series intro, essential synopsis, promo line. Type in the boxes and pick the promo line; the preview at the bottom shows the result. Save changes this book (and the promo line on the books you chose), and Undo reverses it in one step. The Essential Description is also a column of its own.</li>
       <li>The <b>◀ ▶</b> arrows, <b>Show in every Long Synopsis</b> and <b>Next part starts</b> (in the same paragraph, on a new line, in a new paragraph) set the order and spacing for <b>every</b> book. You are asked before it is saved, and Undo does not reverse it: change it back in the popup.</li>
       <li>“In the same paragraph” still starts a new paragraph when the next text is a story title (a line with no end punctuation). The essential synopsis is always shown.</li>
-      <li>Right-click <b>any cell</b> of a book → <b>Change promo line…</b> (or <b>Change for more books…</b> in the popup): pick or type the promo line, then choose <b>Just this book</b>, <b>All books that use this same promo line</b>, or <b>All books in this language</b>. Undo reverses all of them in one step.</li>
+      <li>The promo line goes to the books chosen under <b>Apply this promo line to</b> in the popup: <b>Just this book</b>, <b>All books that use this book's current promo line</b>, or <b>All books in this language</b>. The same choice is on right-click <b>any cell</b> of a book → <b>Change promo line…</b>. Undo reverses all of them in one step.</li>
     </ul>
   </details>
 
@@ -783,11 +785,11 @@ const SB_GROUP = "Story Bible (companion book)";
 const SB_FIELDS = ["isbn","publication_date","word_count"];
 const SB_SELECT = "id,file_name," + SB_FIELDS.join(",");   // never the bible text itself (bible_md), which is large
 // Column ids that changed with the October 2026 data changes, so saved views and links still find them.
-const RENAMED = {"ed:long_synopsis_lead_in":["info:long_synopsis"], "ed:long_synopsis_closing_line":["info:long_synopsis"], "promo:text":["info:long_synopsis"], "ed:long_synopsis_award_line":["info:long_synopsis"], "ed:long_synopsis_series_intro":["info:long_synopsis"], "ed:essential_description":["info:long_synopsis"], "promo:line":["info:long_synopsis"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"], "info:english_title":["st:english_title"], "ser:reading_note":["ser:series_note"], "sb:price_usd":["php:Story Bible"], "one:edition_release_notes:not_released_reason":["diff:all"], "diff:extra_stories":["diff:all"], "diff:omitted_stories":["diff:all"], "diff:not_released_reason":["diff:all"], "diff:paperback_price_note":["diff:all"], "diff:audio_release_dates":["diff:all"]};
-// The Long Synopsis parts are no longer columns (right-click the Long Synopsis → Edit shows them all): a saved view that showed one shows the Long Synopsis; its filter, sort or width on that part is dropped.
-const SYN_GONE = new Set(["ed:long_synopsis_lead_in","ed:long_synopsis_closing_line","promo:text","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","ed:essential_description","promo:line"]);
+const RENAMED = {"ed:long_synopsis_lead_in":["info:long_synopsis"], "ed:long_synopsis_closing_line":["info:long_synopsis"], "promo:text":["info:long_synopsis"], "ed:long_synopsis_award_line":["info:long_synopsis"], "ed:long_synopsis_series_intro":["info:long_synopsis"], "promo:line":["info:long_synopsis"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"], "info:english_title":["st:english_title"], "ser:reading_note":["ser:series_note"], "sb:price_usd":["php:Story Bible"], "one:edition_release_notes:not_released_reason":["diff:all"], "diff:extra_stories":["diff:all"], "diff:omitted_stories":["diff:all"], "diff:not_released_reason":["diff:all"], "diff:paperback_price_note":["diff:all"], "diff:audio_release_dates":["diff:all"]};
+// The award line, series intro and promo line are no longer columns (right-click the Long Synopsis → Edit shows them, with the Essential Description): a saved view that showed one shows the Long Synopsis; its filter, sort or width on that part is dropped.
+const SYN_GONE = new Set(["ed:long_synopsis_lead_in","ed:long_synopsis_closing_line","promo:text","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","promo:line"]);
 function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
-const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id","audio_files","long_synopsis_award_line","long_synopsis_series_intro","essential_description"]);   // audio_files stays in Supabase for the script; the editor does not show it. The Long Synopsis parts are edited in the Long Synopsis popup.
+const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id","audio_files","long_synopsis_award_line","long_synopsis_series_intro"]);   // audio_files stays in Supabase for the script; the editor does not show it. The award line and series intro are edited in the Long Synopsis popup.
 const SKIP_ST = new Set(["created_at","updated_at"]);   // Supabase's automatic row stamps; the editor does not show them (same as Editions)
 let COLS = [], COLMAP = {};
 let REG = {};   // field_registry by "table.column"
@@ -913,7 +915,7 @@ function helpFor(c){
 const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Projects","Translations"];
 const GROUP_ITEMS = {
   "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","st:english_title","ed:language","ed:series","ed:number_in_series","info:series_and_book_number",
-    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:archived_short_synopsis","ed:archived_long_synopsis",
+    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:essential_description","ed:archived_short_synopsis","ed:archived_long_synopsis",
     "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience","st:main_genre_differentiated",
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
     "diff:all","one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication",
@@ -3627,13 +3629,13 @@ function makePromoPicker(lang, cur, onChange){
   wrap.reveal = () => { const on = rows.find(d=>d._v===sel); if (on) on.scrollIntoView({block:"nearest"}); };
   return wrap;
 }
-let syEd = null, syOrder = [], syLayoutOrig = "", syVals = {}, syPick = null;
+let syEd = null, syOrder = [], syLayoutOrig = "", syVals = {}, syPick = null, syScope = "book";
 async function openSynDlg(ed){
   if (!ed) return;
   try{ await ensureLoaded([SYN_PARTS.promo.c]); }catch(e){ setStatus("Couldn't load the promo lines: " + friendly(e), "bad"); return; }
   let lay = SYN_DEFAULT_LAYOUT;
   try{ const r = await api("GET","settings?select=value&key=eq.long_synopsis_layout"); if (r && r[0] && r[0].value) lay = r[0].value; }catch(e){}
-  syEd = ed; syLayoutOrig = lay; syOrder = parseLayout(lay);
+  syEd = ed; syLayoutOrig = lay; syOrder = parseLayout(lay); syScope = "book";
   syVals = {award: ed.long_synopsis_award_line || "", intro: ed.long_synopsis_series_intro || "", essential: ed.essential_description || ""};
   syPick = makePromoPicker(ed.language, valueOf(ed, SYN_PARTS.promo.c), updateSynPreview);
   $("#sytitle").textContent = "Long Synopsis · " + (ed.title || ed.file_name) + " (" + ed.file_name + ")";
@@ -3660,10 +3662,10 @@ function renderSyn(){
     }
     if (k==="promo"){
       d.appendChild(syPick);
-      const more = document.createElement("button"); more.type = "button"; more.textContent = "Change for more books…";
-      more.title = "Change the promo line for every book in this language, every book with the same promo line, or just this book";
-      more.onclick = ()=>openPromoDlg(syEd, syPick.getValue(), text=>{ syPick = makePromoPicker(syEd.language, text, updateSynPreview); renderSyn(); syPick.reveal(); });
-      d.appendChild(more);
+      const sc = document.createElement("div"); sc.className = "syscope";
+      sc.innerHTML = `<div>Apply this promo line to:</div>` + promoScopeHtml(syEd, "syscope", syScope);
+      sc.addEventListener("change", ev=>{ if (ev.target.name==="syscope") syScope = ev.target.value; });
+      d.appendChild(sc);
     } else {
       const ta = document.createElement("textarea"); ta.value = syVals[k];
       ta.placeholder = k==="award" ? "e.g. USA Today Bestseller!" : k==="intro" ? "e.g. " + introExample(syEd.language) : "The story synopsis";
@@ -3691,83 +3693,108 @@ $("#sysave").onclick = async ()=>{
   const ed = syEd; if (!ed) return;
   const msg = $("#symsg"), newLayout = layoutText(syOrder), layoutChanged = newLayout !== layoutText(parseLayout(syLayoutOrig));
   if (syPick.isNew() && !syPick.getValue()){ msg.textContent = "Type the new promo line, or pick one from the list."; return; }
+  const promoText = syPick.getValue(), promoJobsList = promoJobs(ed, promoText, syScope);
+  if (promoJobsList.length>1 && !confirm(promoConfirm(ed, promoText, promoJobsList))) return;
   if (layoutChanged && !confirm("Change the order and spacing of the Long Synopsis for every book?\n\n" + describeLayout(syOrder) + "\n\nUndo does not reverse this; change it back in this popup.")) return;
   $("#sysave").disabled = true; msg.textContent = "Saving…";
-  let n = 0;
+  let n = 0, nPromo = 0;
   try{
     undoGrp = Date.now();
-    const vals = synPreviewVals();
-    for (const k of Object.keys(SYN_PARTS)){
-      const c = SYN_PARTS[k].c, old = valueOf(ed, c);
-      let v = vals[k]; if (k!=="promo") v = v==null || v.trim()==="" ? null : v;
+    for (const k of ["award","intro","essential"]){
+      const c = SYN_PARTS[k].c, old = valueOf(ed, c), v = syVals[k]==null || syVals[k].trim()==="" ? null : syVals[k];
       if (show(v) === show(old)) continue;
       if (!await saveCell(ed, c, v, old, null, true)){ msg.textContent = $("#status").textContent; return; }
       n++;
     }
+    if (promoJobsList.length){
+      try{ nPromo = await applyPromo(ed, promoText, promoJobsList, undoGrp); }
+      catch(err){ msg.textContent = (n ? "The text was saved, but the promo line was not: " : "The promo line was not saved: ") + friendly(err); return; }
+    }
   } finally { undoGrp = null; $("#sysave").disabled = false; }
   if (layoutChanged){
-    try{ await saveSetting("long_synopsis_layout", newLayout); await refreshInfo(null); renderGrid(); }
-    catch(err){ msg.textContent = (n ? "The text was saved, but the order was not: " : "The order was not saved: ") + friendly(err); return; }
+    try{ await saveSetting("long_synopsis_layout", newLayout); }
+    catch(err){ msg.textContent = (n || nPromo ? "The text was saved, but the order was not: " : "The order was not saved: ") + friendly(err); return; }
   }
+  if (nPromo || layoutChanged){ await refreshInfo(null); renderGrid(); }
   $("#sydlg").close();
-  const said = []; if (n) said.push(`Saved the Long Synopsis for ${ed.title || ed.file_name}` + (n>1 ? " (Undo reverses it in one step)" : "")); if (layoutChanged) said.push("saved the new order for every book");
+  const said = [];
+  if (n || nPromo) said.push(`Saved the Long Synopsis for ${ed.title || ed.file_name}` + (nPromo>1 || (nPromo===1 && promoJobsList[0]!==ed) ? ` and the promo line of ${nPromo} book${nPromo===1?"":"s"}` : "") + (n + nPromo > 1 ? " (Undo reverses it in one step)" : ""));
+  if (layoutChanged) said.push("saved the new order for every book");
   setStatus(said.length ? said.join(", and ") + "." : "Nothing changed.", "ok");
 };
 
 /* ---------- Change promo line (right-click any cell of a book, or the Long Synopsis popup) ----------
    Just this book, every book that has the same promo line, or every book in the same language. Undo reverses the whole change in one step. */
-let prEd = null, prPick = null, prDone = null;
-async function openPromoDlg(ed, preset, done){
+// Just this book / every book with the same promo line / every book in the language: the radio buttons, the books that would change, and the save.
+function promoScopeHtml(ed, name, sel){
+  const cur = valueOf(ed, SYN_PARTS.promo.c);
+  const same = cur ? data.editions.filter(e=>e.language===ed.language && e.promo_line_id===ed.promo_line_id).length : 0;
+  const all = data.editions.filter(e=>e.language===ed.language).length;
+  if (sel==="same" && !cur) sel = "book";
+  const r = (v, t, off) => `<label><input type="radio" name="${name}" value="${v}"${sel===v ? " checked" : ""}${off ? " disabled" : ""}> ${t}</label>`;
+  return r("book", "Just this book")
+    + r("same", `All ${same} book${same===1?"":"s"} that use${same===1?"s":""} this book's current promo line${cur ? "" : " (this book has none)"}`, !cur)
+    + r("lang", `All ${all} ${esc(ed.language)} books`);
+}
+function promoJobs(ed, text, scope){
+  const pool = scope==="same" && ed.promo_line_id ? data.editions.filter(e=>e.language===ed.language && e.promo_line_id===ed.promo_line_id)
+             : scope==="lang" ? data.editions.filter(e=>e.language===ed.language) : [ed];
+  return pool.filter(e=>show(valueOf(e, SYN_PARTS.promo.c)) !== show(text));
+}
+function promoConfirm(ed, text, jobs){
+  const what = text ? "“" + (text.length>80 ? text.slice(0,80) + "…" : text) + "”" : "no promo line";
+  return `Change the promo line of ${jobs.length} ${ed.language} books to ${what}?\n\nThis saves straight to Supabase. Undo reverses all of them in one step.`;
+}
+// Saves one promo line on every book in jobs (added to the shared list first if it is new); each book is one Undo entry in the group grp. Returns how many changed.
+async function applyPromo(ed, text, jobs, grp){
+  const c = SYN_PARTS.promo.c;
+  let id = null;
+  if (text){
+    let hit = Object.values(data.promo).find(p=>p.language===ed.language && p.promo_line===text);
+    if (!hit){ hit = await insertOne("promo_lines", {language:ed.language, promo_line:text}); data.promo[hit.id] = hit; }
+    id = hit.id;
+  }
+  const olds = new Map(jobs.map(e=>[e, valueOf(e,c)]));
+  const rows = [];
+  for (let i=0; i<jobs.length; i+=80){   // in chunks, so a long list of books still fits in the address
+    const list = jobs.slice(i,i+80).map(e=>'"' + e.file_name.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '"').join(",");
+    rows.push(...(await api("PATCH", "editions?file_name=in.(" + encodeURIComponent(list) + ")", {promo_line_id:id}, PATCH) || []));
+  }
+  const byFn = {}; for (const r of rows) byFn[r.file_name] = r;
+  let n = 0;
+  for (const e of jobs){ const r = byFn[e.file_name]; if (!r) continue; Object.assign(e, r); undoStack.push({ed:e, c, old:olds.get(e), v:text, grp}); n++; }
+  if (!n) throw new Error("0 rows changed (no permission)");
+  redoStack.length = 0; syncUndoBtns();
+  return n;
+}
+let prEd = null, prPick = null;
+async function openPromoDlg(ed){
   if (!ed) return;
   try{ await ensureLoaded([SYN_PARTS.promo.c]); }catch(e){ setStatus("Couldn't load the promo lines: " + friendly(e), "bad"); return; }
-  prEd = ed; prDone = done || null;
+  prEd = ed;
   const cur = valueOf(ed, SYN_PARTS.promo.c);
   $("#prtitle").textContent = "Change promo line · " + (ed.title || ed.file_name) + " (" + ed.language + ")";
   $("#prcur").textContent = cur ? "Now: “" + cur + "”" : "This book has no promo line now.";
-  prPick = makePromoPicker(ed.language, preset!==undefined ? preset : cur, null);
+  prPick = makePromoPicker(ed.language, cur, null);
   $("#prpick").replaceChildren(prPick);
-  const same = cur ? data.editions.filter(e=>e.language===ed.language && e.promo_line_id===ed.promo_line_id).length : 0;
-  const all = data.editions.filter(e=>e.language===ed.language).length;
-  $("#prscope").innerHTML = `<label><input type="radio" name="prscope" value="book" checked> Just this book</label>`
-    + `<label><input type="radio" name="prscope" value="same"${cur ? "" : " disabled"}> All ${same} book${same===1?"":"s"} that use${same===1?"s":""} this same promo line${cur ? "" : " (this book has none)"}</label>`
-    + `<label><input type="radio" name="prscope" value="lang"> All ${all} ${esc(ed.language)} books</label>`;
+  $("#prscope").innerHTML = promoScopeHtml(ed, "prscope", "book");
   $("#prmsg").textContent = "";
   $("#prdlg").showModal(); prPick.reveal();
 }
 $("#prclose").onclick = ()=>$("#prdlg").close();
 $("#prsave").onclick = async ()=>{
   const ed = prEd; if (!ed) return;
-  const msg = $("#prmsg"), c = SYN_PARTS.promo.c, text = prPick.getValue();
+  const msg = $("#prmsg"), text = prPick.getValue();
   if (prPick.isNew() && !text){ msg.textContent = "Type the new promo line."; return; }
-  const scope = ($("#prscope input:checked") || {}).value || "book";
-  const pool = scope==="book" ? [ed] : scope==="same" ? data.editions.filter(e=>e.language===ed.language && e.promo_line_id===ed.promo_line_id) : data.editions.filter(e=>e.language===ed.language);
-  const jobs = pool.filter(e=>show(valueOf(e,c)) !== show(text));
+  const scope = ($("#prscope input:checked") || {}).value || "book", jobs = promoJobs(ed, text, scope);
   if (!jobs.length){ msg.textContent = scope==="book" ? "This book already has that promo line." : "Those books already have that promo line."; return; }
-  const what = text ? "“" + (text.length>80 ? text.slice(0,80) + "…" : text) + "”" : "no promo line";
-  if (jobs.length>1 && !confirm(`Change the promo line of ${jobs.length} ${ed.language} books to ${what}?\n\nThis saves straight to Supabase. Undo reverses all of them in one step.`)) return;
+  if (jobs.length>1 && !confirm(promoConfirm(ed, text, jobs))) return;
   $("#prsave").disabled = true; msg.textContent = "Saving…";
   try{
-    let id = null;
-    if (text){
-      let hit = Object.values(data.promo).find(p=>p.language===ed.language && p.promo_line===text);
-      if (!hit){ hit = await insertOne("promo_lines", {language:ed.language, promo_line:text}); data.promo[hit.id] = hit; }
-      id = hit.id;
-    }
-    const olds = new Map(jobs.map(e=>[e, valueOf(e,c)]));
-    const rows = [];
-    for (let i=0; i<jobs.length; i+=80){   // in chunks, so a long list of books still fits in the address
-      const list = jobs.slice(i,i+80).map(e=>'"' + e.file_name.replace(/\\/g,"\\\\").replace(/"/g,'\\"') + '"').join(",");
-      rows.push(...(await api("PATCH", "editions?file_name=in.(" + encodeURIComponent(list) + ")", {promo_line_id:id}, PATCH) || []));
-    }
-    const byFn = {}; for (const r of rows) byFn[r.file_name] = r;
-    const grp = Date.now(); let n = 0;
-    for (const e of jobs){ const r = byFn[e.file_name]; if (!r) continue; Object.assign(e, r); undoStack.push({ed:e, c, old:olds.get(e), v:text, grp}); n++; }
-    if (!n) throw new Error("0 rows changed (no permission)");
-    redoStack.length = 0; syncUndoBtns();
+    const n = await applyPromo(ed, text, jobs, Date.now());
     await refreshInfo(null); renderGrid();
     $("#prdlg").close();
     setStatus(`Changed the promo line of ${n} book${n===1?"":"s"}` + (n < jobs.length ? ` (${jobs.length - n} were refused)` : "") + `. Undo reverses ${n===1 ? "it" : "all of them in one step"}.`, n < jobs.length ? "bad" : "ok");
-    if (prDone) prDone(text);
   }catch(err){ msg.textContent = "Not saved: " + friendly(err); }
   finally{ $("#prsave").disabled = false; }
 };
