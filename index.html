@@ -739,7 +739,7 @@ async function getAll(table, order){
 // kinds: ed (editions), st (stories, shared by all languages), one (one row per edition),
 // est (English text kept on a translation), ml (marketing link), fmt (format), sb (story bible, the companion book), sl (store link), ser (series), info (worked out, read-only)
 const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","badge"], edition_release_notes:["subscription_publication","collection_publication"],
-  projects:["aplus","payhip_order","blank_on_site","seo_site","blurb_site","slideshow","plot"]};
+  projects:["plot"]};
 // Which fields each format uses. eBook and paperback share the book's Publication date (editions); hardcover and audiobook keep their own.
 // The story bible is a companion book with its own row in story_bibles (SB_FIELDS below), not a format.
 // Payhip prices are not here: they come from payhip_products (read-only "Payhip … price" columns).
@@ -923,7 +923,7 @@ function helpFor(c){
 
 /* ---------- sidebar groups (what a person looks for) ---------- */
 // Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
-const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Projects","Translations"];
+const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Translations"];
 const GROUP_ITEMS = {
   "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","ed:language","ed:series","ed:number_in_series","info:series_and_book_number","one:projects:plot",
     "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:essential_description","ed:archived_short_synopsis","ed:archived_long_synopsis",
@@ -937,7 +937,6 @@ const GROUP_ITEMS = {
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
   "Story Bible (companion book)": ["php:Story Bible","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
   "Links": [],
-  "Projects": ["one:projects:aplus","one:projects:payhip_order","one:projects:blank_on_site","one:projects:seo_site","one:projects:blurb_site","one:projects:slideshow"],
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations","info:translation_cache","calc:bestseller_line"]
 };
 const KIND_GROUP = {calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
