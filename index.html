@@ -499,7 +499,7 @@ dialog#ncdlg::backdrop{background:#0006}
   <details><summary>…change a Long Synopsis, its order, or a promo line?</summary>
     <ul>
       <li>Right-click a <b>Long Synopsis (built)</b> cell → <b>Edit</b>. A popup shows its parts side by side, in the order the Long Synopsis uses: award line, series intro, essential synopsis, promo line. Type in the boxes and pick the promo line; the preview at the bottom shows the result. Save changes this book (and the promo line on the books you chose), and Undo reverses it in one step. The Essential Description is also a column of its own.</li>
-      <li>The <b>◀ ▶</b> arrows, <b>Show in every Long Synopsis</b> and <b>Next part starts</b> (in the same paragraph, on a new line, in a new paragraph) set the order and spacing for <b>every</b> book. You are asked before it is saved, and Undo does not reverse it: change it back in the popup.</li>
+      <li>The <b>◀ ▶</b> arrows, <b>Show in every Long Synopsis</b> and <b>Next part starts</b> (in the same paragraph or in a new paragraph) set the order and spacing for <b>every</b> book. You are asked before it is saved, and Undo does not reverse it: change it back in the popup.</li>
       <li>“In the same paragraph” still starts a new paragraph when the next text is a story title (a line with no end punctuation). The essential synopsis is always shown.</li>
       <li>The promo line goes to the books chosen under <b>Apply this promo line to</b> in the popup: <b>Just this book</b>, <b>All books that use this book's current promo line</b>, or <b>All books in this language</b>. The same choice is on right-click <b>any cell</b> of a book → <b>Change promo line…</b>. Undo reverses all of them in one step.</li>
     </ul>
@@ -3559,7 +3559,7 @@ $("#dfsave").onclick = async ()=>{
 /* ---------- Long Synopsis popup (right-click the Long Synopsis cell → Edit) ----------
    One box per part, in the order the Long Synopsis uses. The order, which parts show and how each part joins the next
    are one setting for every book: settings.long_synopsis_layout, read by build_long_synopsis in Supabase.
-   Layout text: award / intro / essential / promo; after each, + same paragraph, / new line, , new paragraph (how it joins the next part that has text).
+   Layout text: award / intro / essential / promo; after each, + same paragraph or , new paragraph (how it joins the next part that has text). Supabase also reads / as a single line break, but the editor no longer offers it (every synopsis uses paragraphs).
    A part left out is not shown in any Long Synopsis; the essential synopsis is always shown. */
 const SYN_DEFAULT_LAYOUT = "award+intro,essential,promo";
 const SYN_PARTS = {
@@ -3568,11 +3568,11 @@ const SYN_PARTS = {
   essential: {label:"Essential synopsis", grow:2.6, c:{id:"ed:essential_description",      kind:"ed", col:"essential_description",      table:"editions", label:"Essential synopsis"}},
   promo:     {label:"Promo line",         grow:1.5, c:{id:"promo:line",                    kind:"promo", col:"promo_line_id",           table:"editions", label:"Promo line"}}
 };
-const SYN_JOINS = [["+","in the same paragraph"],["/","on a new line"],[",","in a new paragraph"]];
+const SYN_JOINS = [["+","in the same paragraph"],[",","in a new paragraph"]];
 function parseLayout(text){
   const s = String(text||"").trim() || SYN_DEFAULT_LAYOUT;
   const toks = s.split(/\s*[+,\/]\s*/).map(t=>t.trim().toLowerCase()), seps = s.match(/[+,\/]/g) || [], order = [];
-  toks.forEach((t,i)=>{ if (SYN_PARTS[t] && !order.some(o=>o.k===t)) order.push({k:t, join:seps[i] || ","}); });
+  toks.forEach((t,i)=>{ if (SYN_PARTS[t] && !order.some(o=>o.k===t)) order.push({k:t, join:seps[i]==="+" ? "+" : ","}); });   // a single line break (/) becomes a new paragraph
   if (!order.some(o=>o.k==="essential")) order.push({k:"essential", join:","});
   return order;
 }
@@ -3587,7 +3587,7 @@ function buildSyn(vals, order){
     const p = tidyPart(vals[o.k]); if (!p) continue;
     if (out==null) out = p;
     else if (join==="+" && /[.!?…:»"”*)]\s*$/.test(p.split("\n\n")[0])) out += " " + p;   // a story title (no end punctuation) still starts its own paragraph
-    else out += (join==="/" ? "\n" : "\n\n") + p;
+    else out += "\n\n" + p;
     join = o.join;
   }
   return out;
