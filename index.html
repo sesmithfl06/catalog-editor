@@ -528,9 +528,9 @@ dialog#ncdlg::backdrop{background:#0006}
   <details><summary>…sort and filter?</summary>
     <ul>
       <li><b>Selected a column first?</b> Click its heading to select it, then press <b>Sort</b> (sorts it A→Z; press Sort again for Z→A) or <b>Filter</b> (opens its filter box). With several columns selected, Sort stacks them left to right and Filter opens the leftmost one.</li>
-      <li><b>Sort</b> button, then click headings: first click A→Z, second Z→A, third removes it. Each heading you click is added as the next level (sort by heat, then title). <b>Clear sort</b> removes all. Press <kbd>Esc</kbd> to leave Sort / Filter mode without choosing.</li>
+      <li><b>Sort</b> button, then click headings: first click A→Z, second Z→A, third removes it. Sorts stack like Excel: the heading you click last is the main sort, and the earlier ones stay inside it (click title, then heat, and the books are grouped by heat, with titles in order inside each heat). <b>Clear sort</b> removes all. Press <kbd>Esc</kbd> to leave Sort / Filter mode without choosing.</li>
       <li><b>Filter</b> button then a heading, or right-click a heading → Filter…. The list shows each value with how many books have it (counted after your other filters). Typing in “Search values” ticks what it finds, like Excel. <kbd>Enter</kbd> in the search or condition boxes = OK.</li>
-      <li>The same box has <b>Sort A→Z / Z→A</b> (replaces the sort) and, when a sort already exists, <b>Then A→Z / Z→A</b> (adds this column as the next level).</li>
+      <li>The same box has <b>Sort A→Z / Z→A</b> (replaces the sort) and, when a sort already exists, <b>Add A→Z / Z→A</b> (keeps the current sort and makes this column the new main sort).</li>
       <li><b>Condition</b>: Contains, Doesn't contain, Equals, Doesn't equal, Greater than, Less than, Between, Is blank, Is not blank (dates say After / Before). It combines with the ticked values.</li>
       <li><b>Clear all filters</b> appears above the grid once any filter is on.</li>
     </ul>
@@ -1812,7 +1812,7 @@ function openFilter(id, th){
   const label = v => v==="" ? BLANK_LABEL : v.split("\n")[0].slice(0,120);
   m.innerHTML = `<div class="fhead" title="${esc(c.label)}">Filter: ${esc(c.label)}</div>
     <div class="fsort"><button type="button" data-s="1">Sort A→Z</button><button type="button" data-s="-1">Sort Z→A</button></div>` +
-    (sortKeys.some(k=>k.id!==id) ? `<div class="fsort" title="Keep the current sort and add this column as the next level"><button type="button" data-t="1">Then A→Z</button><button type="button" data-t="-1">Then Z→A</button></div>` : "") +
+    (sortKeys.some(k=>k.id!==id) ? `<div class="fsort" title="Keep the current sort and make this column the new main sort"><button type="button" data-t="1">Add A→Z</button><button type="button" data-t="-1">Add Z→A</button></div>` : "") +
     `<div class="fcond"><span class="fcl">Condition${ct==="num" ? " (numbers)" : ct==="date" ? " (dates)" : ""}</span>
       <select data-op aria-label="Condition"><option value="">None</option>${Object.entries(COND_OPS).map(([k,o])=>`<option value="${k}"${cond && cond.op===k ? " selected" : ""}>${esc((ct==="date" && o.date) || o.label)}</option>`).join("")}</select>
       <div class="fab"><input data-ca type="${ct==="date" ? "date" : "text"}" ${ct==="num" ? 'inputmode="decimal"' : ""} aria-label="Value" value="${esc(cond ? cond.a : "")}"><span data-and>and</span><input data-cb type="${ct==="date" ? "date" : "text"}" ${ct==="num" ? 'inputmode="decimal"' : ""} aria-label="Second value" value="${esc(cond ? cond.b : "")}"></div>
@@ -1834,7 +1834,7 @@ function openFilter(id, th){
     const sb = ev.target.closest("button[data-s]");
     if (sb){ sortKeys = [{id, dir:+sb.dataset.s}]; closeCtx(); leaveLinkView(); renderGrid(); return; }
     const tb = ev.target.closest("button[data-t]");
-    if (tb){ sortKeys = sortKeys.filter(k=>k.id!==id).concat({id, dir:+tb.dataset.t}); closeCtx(); leaveLinkView(); renderGrid(); return; }
+    if (tb){ sortKeys = [{id, dir:+tb.dataset.t}].concat(sortKeys.filter(k=>k.id!==id)); closeCtx(); leaveLinkView(); renderGrid(); return; }
     const b = ev.target.closest("button[data-b]"); if (!b) return;
     if (b.dataset.b==="cancel"){ closeCtx(); return; }
     if (b.dataset.b==="clear"){ closeCtx(); clearFilter(id); return; }
@@ -1873,8 +1873,8 @@ $("#clearfilters").onclick = clearAllFilters;
 
 /* ---------- sorting ----------
    Press Sort in the bar above the grid, then click column headings: first click A→Z, second Z→A, third removes it.
-   Each heading you click is added as the next level (stacks), e.g. heat, then title. */
-let sortKeys = [];   // [{id, dir}] first = main sort, then the tie-breakers
+   Stacks like Excel: the heading clicked last goes to the front (main sort); earlier ones stay inside it. */
+let sortKeys = [];   // [{id, dir}] first = main sort (the one clicked last), then the tie-breakers
 const collator = new Intl.Collator(undefined, {numeric:true, sensitivity:"base"});
 function cmpSortVals(av, bv){
   const ea = av==null||av==="", eb = bv==null||bv==="";
@@ -2082,9 +2082,9 @@ $("#gridwrap").addEventListener("click", e=>{
     e.stopPropagation(); setPickMode("");
     openFilter(id, th); if (ctxMenu) ctxMenu.dataset.col = id; return;
   }
-  const i = sortKeys.findIndex(k=>k.id===id);   // Sort: each column you click stacks as the next level
-  if (i < 0) sortKeys.push({id, dir:1});
-  else if (sortKeys[i].dir > 0) sortKeys[i].dir = -1;
+  const i = sortKeys.findIndex(k=>k.id===id);   // Sort: the column you click last becomes the main sort
+  if (i < 0) sortKeys.unshift({id, dir:1});
+  else if (sortKeys[i].dir > 0){ const k = sortKeys.splice(i, 1)[0]; k.dir = -1; sortKeys.unshift(k); }   // re-clicked: becomes the main sort again, like Excel
   else sortKeys.splice(i, 1);
   renderGrid();
 });
