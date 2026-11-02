@@ -455,7 +455,7 @@ dialog#ncdlg::backdrop{background:#0006}
   <p id="ntthis"></p>
   <h3 id="nthead"></h3>
   <div id="ntlist" style="overflow:auto;max-height:50vh"></div>
-  <div class="row"><span class="grow"></span><button id="ntclose" type="button">Done</button></div>
+  <div class="row"><span class="hint" id="ntmsg"></span><span class="grow"></span><button id="nttoggle" type="button" class="primary" hidden></button><button id="ntclose" type="button">Done</button></div>
 </dialog>
 
 <!-- ============ How do I... ============ -->
@@ -559,7 +559,7 @@ dialog#ncdlg::backdrop{background:#0006}
     </ul>
     <h3>What it writes to Notion</h3>
     <ul>
-      <li>A “📚 From the catalog” box at the <b>top</b> of the edition's Notion page: every field marked as going to Notion (right-click any column → “Does this go to Notion?” lists them). Blank fields (empty, n/a, n/d) are left out. The box is <b>replaced at every sync</b>, so edit those things in the Catalog Editor, never in Notion.</li>
+      <li>A “📚 From the catalog” box at the <b>top</b> of the edition's Notion page: every field marked as going to Notion (right-click any column → “Does this go to Notion?” lists them, and its <b>Send to Notion</b> / <b>Stop sending to Notion</b> button changes it; the change shows on each page at its next sync, and the nightly refresh does every synced page). Blank fields (empty, n/a, n/d) are left out. The box is <b>replaced at every sync</b>, so edit those things in the Catalog Editor, never in Notion.</li>
       <li>Everything below “⬇ Your Notion notes” is never touched.</li>
       <li>A translation shows its English text beside it when the two differ.</li>
       <li>An edition with no Notion page gets a new one under <code>notion_parent_page_id</code> in settings (or the _French, _German… version for that language). A page Notion says it can't find usually needs sharing with the integration: in Notion ••• → Connections.</li>
@@ -1204,26 +1204,82 @@ async function setSection(grp, on){
   recordView(vb);
   await refresh();
 }
-/* right-click a column (sidebar or grid header): Does this go to Notion? Answers for that column and lists everything that does (field_registry.in_notion, the same list the Notion sync uses) */
-function notionYes(c){
-  const t = {promo:c.table, ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", sb:"story_bibles", ml:"marketing_links", info:"editions"}[c.kind];
-  if (!t) return false;
-  const col = c.col || "";
-  return !!((REG[t+"."+col] || {}).in_notion || (c.kind==="info" && (REG["edition_info."+col] || {}).in_notion));
+/* right-click a column (sidebar or grid header): Does this go to Notion? Answers for that column, lists everything that does,
+   and has a button to start or stop sending it. The answer comes from field_registry.in_notion, the same list the Notion sync uses.
+   The sync (Supabase edge function notion-sync) only has a place for the fields below; any other column can't be sent from here.
+   notionKey gives the field_registry row the sync checks for an editor column ("all" = the sync always sends it, no setting). */
+const NOTION_PLACES = {
+  editions: ["language","title","series_and_book_number","file_name","publication_date","anthology_only","word_count","paperback_pages","paperback_page_size",
+             "kindle_unlimited","translator","proofreader","copyright_page_genres","keywords","seo","long_synopsis","reasons_to_love","loglines","excerpts"],
+  stories: ["tags","rating","audience","main_plot","subplots"],
+  formats: ["price_usd","library_price_usd","payhip_price_usd","isbn","amazon_isbn","bn_isbn","narrator","narrator_bio","runtime"],
+  series: ["series_url"], edition_awards: ["award"], edition_release_notes: ["subscription_publication","collection_publication"]
+};
+function notionKey(c){
+  if (!c) return "";
+  if (c.kind==="ml") return "all";
+  if (c.kind==="sl") return "store_links.link_or_id";
+  let t = {ed:"editions", info:"editions", st:"stories", ser:"series", fmt:"formats", one:c.t, php:"formats"}[c.kind];
+  let col = c.kind==="php" ? "payhip_price_usd" : c.col==="runtime_minutes" ? "runtime" : c.col;
+  return t && (NOTION_PLACES[t]||[]).includes(col) ? t+"."+col : "";
 }
+function notionYes(c){ const k = notionKey(c); return k==="all" || !!(k && (REG[k]||{}).in_notion); }
+// what else changes with this column (one setting covers every format, every store link)
+function notionShared(c){
+  if (c.kind==="sl") return " This setting covers every store link.";
+  if (c.kind==="fmt" || c.kind==="php") return " This setting covers every format.";
+  if (c.kind==="ser") return " This setting covers every series.";
+  return "";
+}
+let ntCol = "";
 function showNotion(id){
   const c = COLMAP[id]; if (!c) return;
-  $("#ntthis").innerHTML = `<b>${esc(c.label)}</b>: ` + (notionYes(c) ? `Yes. It goes to Notion, in the “📚 From the catalog” box at the top of the book's page.` : `No. It is not in the “📚 From the catalog” box in Notion.`);
+  ntCol = id;
+  const k = notionKey(c), yes = notionYes(c);
+  $("#ntthis").innerHTML = `<b>${esc(c.label)}</b>: ` + (yes ? `Yes. It goes to Notion, in the “📚 From the catalog” box at the top of the book's page.` : `No. It is not in the “📚 From the catalog” box in Notion.`)
+    + (k==="all" ? ` Marketing links always go; there is no setting to stop them.` : !k ? ` The Notion sync has no place for this column, so it can't be sent from here.` : esc(notionShared(c)));
+  const tg = $("#nttoggle");
+  tg.hidden = !k || k==="all";
+  tg.disabled = false;
+  tg.textContent = yes ? "Stop sending to Notion" : "Send to Notion";
+  $("#ntmsg").textContent = "";
   let n = 0, html = "";
   for (const [g, cs] of groups()){
-    const yes = cs.filter(notionYes); if (!yes.length) continue;
-    n += yes.length;
-    html += `<h4 style="margin:10px 0 4px">${esc(g)}</h4><div>` + yes.map(x=>`<div${x.id===id?' style="font-weight:700"':""}>${esc(x.label)}</div>`).join("") + `</div>`;
+    const ys = cs.filter(notionYes); if (!ys.length) continue;
+    n += ys.length;
+    html += `<h4 style="margin:10px 0 4px">${esc(g)}</h4><div>` + ys.map(x=>`<div${x.id===id?' style="font-weight:700"':""}>${esc(x.label)}</div>`).join("") + `</div>`;
   }
   $("#nthead").textContent = `Everything that goes to Notion (${n})`;
   $("#ntlist").innerHTML = html || `<div class="empty">Nothing is marked as going to Notion.</div>`;
-  $("#ntdlg").showModal();
+  if (!$("#ntdlg").open) $("#ntdlg").showModal();
 }
+// Send to Notion / Stop sending to Notion: changes field_registry.in_notion (adds the row when the sync's field has none yet),
+// and on Send makes sure edits to that column queue the book for Notion (notion_watch). Pages change at each book's next sync.
+$("#nttoggle").onclick = async ()=>{
+  const c = COLMAP[ntCol], k = notionKey(c); if (!k || k==="all") return;
+  const on = !notionYes(c), [t, col] = k.split("."), tg = $("#nttoggle");
+  tg.disabled = true; $("#ntmsg").textContent = "Saving…";
+  try{
+    let r = REG[k];
+    if (r){
+      const rows = await api("PATCH", `field_registry?id=eq.${r.id}`, {in_notion:on}, {Prefer:"return=representation"});
+      if (!rows || !rows.length) throw new Error("Only owners and editors can change this.");
+      REG[k] = rows[0];
+    } else {
+      const id = Math.max(0, ...Object.values(REG).map(x=>+x.id||0)) + 1;
+      const rows = await api("POST", "field_registry", {id, table_name:t, column_name:col, label:c.label, in_notion:on}, {Prefer:"return=representation"});
+      REG[k] = rows[0];
+    }
+    if (on && c.kind !== "info")   // worked-out columns (long synopsis, series + book number) have no table column to watch
+      await api("POST", "notion_watch?on_conflict=table_name,column_name", {table_name:t, column_name:col, note:"Added from the Catalog Editor"}, {Prefer:"resolution=ignore-duplicates,return=minimal"}).catch(()=>{});
+    showNotion(ntCol);
+    $("#ntmsg").textContent = on ? "Now sent to Notion. Each book's Notion page shows it after its next sync (the nightly refresh does every synced page)." : "No longer sent to Notion. Each book's Notion page drops it at its next sync (the nightly refresh does every synced page).";
+    setStatus(`${c.label}: ${on ? "now sent to Notion" : "no longer sent to Notion"}`, "ok");
+  }catch(e){
+    tg.disabled = false;
+    $("#ntmsg").textContent = "Not saved: " + e.message;
+  }
+};
 $("#ntclose").onclick = ()=>$("#ntdlg").close();
 $("#howdoi").onclick = ()=>$("#hdlg").showModal();
 $("#hclose").onclick = ()=>$("#hdlg").close();
