@@ -564,10 +564,10 @@ const DIFF_FIELDS = {
                         help:"Only for an audiobook released in parts: each part's release date, separated by semicolons. The first date is the audiobook's Publication Date."}
 };
 const SB_GROUP = "Story Bible (companion book)";
-const SB_FIELDS = ["price_usd","isbn","publication_date","word_count"];
+const SB_FIELDS = ["isbn","publication_date","word_count"];
 const SB_SELECT = "id,file_name," + SB_FIELDS.join(",");   // never the bible text itself (bible_md), which is large
 // Column ids that changed with the October 2026 data changes, so saved views and links still find them.
-const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:long_synopsis_series_intro"], "ed:long_synopsis_closing_line":["promo:line"], "promo:text":["promo:line"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"], "info:english_title":["st:english_title"], "ser:reading_note":["ser:series_note"], "one:edition_release_notes:not_released_reason":["diff:not_released_reason"]};
+const RENAMED = {"ed:long_synopsis_lead_in":["ed:long_synopsis_award_line","ed:long_synopsis_series_intro"], "ed:long_synopsis_closing_line":["promo:line"], "promo:text":["promo:line"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"], "info:english_title":["st:english_title"], "ser:reading_note":["ser:series_note"], "sb:price_usd":["php:Story Bible"], "one:edition_release_notes:not_released_reason":["diff:not_released_reason"]};
 function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
 const PROMO_EDIT = {id:"promo:text", kind:"promo", col:"promo_line", table:"promo_lines", label:"Promo Line wording"};
 const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id","audio_files"]);   // audio_files stays in Supabase for the script; the editor does not show it
@@ -707,7 +707,7 @@ const GROUP_ITEMS = {
   "Series": ["ser:series_synopsis","ser:series_url","ser:series_note"],
   "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","ed:excerpts","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number","diff:paperback_price_note","diff:audio_release_dates"],
-  "Story Bible (companion book)": ["sb:price_usd","sb:isbn","sb:publication_date","sb:word_count","php:Story Bible","list:bookclub"],
+  "Story Bible (companion book)": ["php:Story Bible","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
   "Links": [],
   "Projects": ["one:projects:title","one:projects:aplus","one:projects:payhip_order","one:projects:blank_on_site","one:projects:seo_site","one:projects:blurb_site","one:projects:slideshow","one:projects:plot"],
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"]
@@ -731,7 +731,7 @@ function buildCatalog(sample){
     if (l==="Cover image") addCol({id:"ml:"+l+":alt_text", kind:"ml", lt:l, col:"alt_text", table:"marketing_links", label:"Cover alt text", group:"Marketing links", order:6001, ro:false}); }
   for (const f of sample.formats) for (const c of (FMT_FIELDS[f] || FMT_FIELDS_OTHER)) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
   SB_FIELDS.forEach((c,i)=>addCol({id:"sb:"+c, kind:"sb", col:c, table:"story_bibles", label:`Story Bible · ${regLabel("story_bibles",c)}`, group:SB_GROUP, order:7800+i, ro:false}));
-  for (const f of sample.payhipFormats) addCol({id:`php:${f}`, kind:"php", f, col:"price_usd", table:"payhip_products", label:`${f} · Payhip price`, group:"Format: "+f, order:7000+regOrder("formats","payhip_price_usd"), ro:true});
+  for (const f of sample.payhipFormats) addCol({id:`php:${f}`, kind:"php", f, col:"price_usd", table:"payhip_products", label:(f==="Story Bible" ? "Story Bible · Price" : `${f} · Payhip price`), group:"Format: "+f, order:7000+regOrder("formats","payhip_price_usd"), ro:true});
   for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
   for (const [f, d] of Object.entries(DIFF_FIELDS)) addCol({id:"diff:"+f, kind:"diff", field:f, table:"edition_differences", label:d.label, group:"Edition differences", order:(d.after[0]==="formats" ? 7000 : 0) + regOrder(d.after[0], d.after[1]) + 0.5, ro:false});
   for (const c of ["series_synopsis","series_url","series_note"]) addCol({id:"ser:"+c, kind:"ser", col:c, table:"series", label:regLabel("series",c), group:"Series (shared by the whole series)", order:9000+regOrder("series",c), ro:false});
@@ -1994,7 +1994,7 @@ async function addFormat(ed, f){
   catch(err){ setStatus("Not added: " + friendly(err), "bad"); }
 }
 async function addStoryBible(ed){
-  if (!confirm(`Add a story bible for "${ed.title||ed.file_name}"?\n\nThis creates an empty story bible row in Supabase so you can fill in its price, ISBN and so on. Undo does not remove it.`)) return;
+  if (!confirm(`Add a story bible for "${ed.title||ed.file_name}"?\n\nThis creates an empty story bible row in Supabase so you can fill in its ISBN, publication date and so on. Undo does not remove it.`)) return;
   try{ data.sb[ed.file_name] = await insertOne("story_bibles?select="+SB_SELECT, {file_name:ed.file_name}); renderGrid(); setStatus(`Added a story bible for ${ed.title||ed.file_name}`,"ok"); }
   catch(err){ setStatus("Not added: " + friendly(err), "bad"); }
 }
