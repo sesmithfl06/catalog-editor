@@ -147,7 +147,6 @@ td{max-width:var(--w,220px);min-width:90px}
 td .v{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;word-break:break-word}
 td.long{--w:340px}
 td.title,th.title{width:23ch;min-width:23ch;max-width:23ch}
-td.genres .v{display:block;-webkit-line-clamp:unset;overflow:visible}
 td.title .v{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #gridwrap.full td .v{display:block;-webkit-line-clamp:unset;overflow:visible}
 #gridwrap.full td.long{--w:460px}
@@ -1250,7 +1249,7 @@ const disp = (v,c) => {
     if ((c.col==="word_count" || c.field==="word_count") && /^\d+$/.test(String(v).trim())) return Number(v).toLocaleString("en-US");
     if (c.col==="runtime_minutes") return fmtMinutes(v);
     if (isDateCol(c)) return fmtDate(v);
-    if (isGenreCol(c)) return (Array.isArray(v) ? v : String(v).split(";")).map(x=>String(x).trim()).filter(Boolean).join("\n");   // one genre per line (display only)
+    if (isGenreCol(c)) return (Array.isArray(v) ? v : String(v).split(";")).map(x=>String(x).trim()).filter(Boolean).join($("#gridwrap").classList.contains("full") ? "\n" : "; ");   // one genre per line only when Show full text is ticked (display only)
   }
   return show(v);
 };
@@ -1653,7 +1652,7 @@ $("#modesort").onclick = ()=>{ closeCtx(); setPickMode(pickMode==="sort" ? "" : 
 $("#modefilter").onclick = ()=>{ closeCtx(); setPickMode(pickMode==="filter" ? "" : "filter"); };
 document.addEventListener("keydown", e=>{ if (e.key==="Escape" && pickMode) setPickMode(""); });
 $("#clearsort").onclick = ()=>{ sortKeys = []; renderGrid(); };
-$("#ffull").addEventListener("change", ()=>$("#gridwrap").classList.toggle("full", $("#ffull").checked));
+$("#ffull").addEventListener("change", ()=>{ $("#gridwrap").classList.toggle("full", $("#ffull").checked); renderGrid(); });
 let ft; $("#frow").addEventListener("input", ()=>{ clearTimeout(ft); ft=setTimeout(renderGrid,150); });
 $("#fexpand").addEventListener("change", ()=>renderGrid());
 $("#frow").addEventListener("keydown", e=>{ if (e.key==="Enter"){ e.preventDefault(); clearTimeout(ft); addPins(); } });
