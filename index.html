@@ -713,12 +713,12 @@ const GROUP_ITEMS = {
   "Projects": ["one:projects:title","one:projects:aplus","one:projects:payhip_order","one:projects:blank_on_site","one:projects:seo_site","one:projects:blurb_site","one:projects:slideshow","one:projects:plot"],
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations"]
 };
-const KIND_GROUP = {calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", est:"Translations"};
+const KIND_GROUP = {calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
 const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
 function placeCol(c){
   for (const g of GROUP_ORDER){ const i = GROUP_ITEMS[g].indexOf(c.id); if (i>=0){ c.group = g; c.so = i; return; } }
   c.group = (c.f==="Story Bible" && c.kind==="php") ? SB_GROUP : (KIND_GROUP[c.kind] || "Book Basics");   // any column not listed above lands with its kind
-  c.so = 1000 + ((c.kind==="fmt" || c.kind==="php") ? (FORMAT_RANK[c.f]??9)*1000 + c.order : c.kind==="ml" ? 5000 + c.order : c.order);
+  c.so = 1000 + ((c.kind==="fmt" || c.kind==="php") ? (FORMAT_RANK[c.f]??9)*1000 + c.order : (c.kind==="ml" || c.kind==="aff") ? 5000 + c.order : c.order);
 }
 function addCol(c){ placeCol(c); COLS.push(c); COLMAP[c.id] = c; }
 function buildCatalog(sample){
@@ -728,8 +728,13 @@ function buildCatalog(sample){
   for (const c of sample.storyCols) if (c!=="story_id" && !SKIP_ST.has(c)) addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), ro:false});
   for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:(t==="projects" && c==="title") ? "Project title" : regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
   for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:(f==="title" ? "English source title" : "English "+f.replace(/_/g," ")), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
-  for (const l of sample.mlTypes){ addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:6000, ro:false});
+  for (const l of sample.mlTypes){ const a = AFF_ML[l];
+    addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:a ? 6000.1 : 6000, ro:!!a, aff:a, note:a ? AFF_NOTE : undefined});
     if (l==="Cover image") addCol({id:"ml:"+l+":alt_text", kind:"ml", lt:l, col:"alt_text", table:"marketing_links", label:"Cover alt text", group:"Marketing links", order:6001, ro:false}); }
+  // Affiliate links for every Amazon format and region (read-only, worked out like the view calculated_store_urls). US eBook and Apple are the two columns above.
+  const affRegs = [...new Set(AFF_REGIONS.filter(r=>r.store==="Amazon").map(r=>r.region))].sort((a,b)=>(AFF_REGION_ORDER.indexOf(a)+1||99)-(AFF_REGION_ORDER.indexOf(b)+1||99));
+  AFF_FORMATS.forEach((f,fi)=>affRegs.forEach((g,gi)=>{ if (f==="eBook" && g==="US") return;
+    addCol({id:`aff:Amazon|${f}|${g}`, kind:"aff", aff:{s:"Amazon", f, region:g}, table:"calculated_store_urls", label:`Amazon ${f} ${g} affiliate link`, group:"Affiliate links", order:6000.2 + fi*0.01 + gi*0.0001, ro:true, note:AFF_NOTE}); }));
   for (const f of sample.formats) for (const c of (FMT_FIELDS[f] || FMT_FIELDS_OTHER)) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
   SB_FIELDS.forEach((c,i)=>addCol({id:"sb:"+c, kind:"sb", col:c, table:"story_bibles", label:`Story Bible · ${regLabel("story_bibles",c)}`, group:SB_GROUP, order:7800+i, ro:false}));
   for (const f of sample.payhipFormats) addCol({id:`php:${f}`, kind:"php", f, col:"price_usd", table:"payhip_products", label:(f==="Story Bible" ? "Story Bible · Price" : `${f} · Payhip price`), group:"Format: "+f, order:7000+regOrder("formats","payhip_price_usd"), ro:true});
@@ -768,7 +773,7 @@ function warnDuplicateLabels(){
 }
 
 /* ---------- loading ---------- */
-function needTable(c){ return {promo:"promo", st:"stories", one:"one:"+c.t, est:"est", diff:"diff", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", ser:"ser", info:"info", php:"php", calc:"stories", list:"list:"+c.col}[c.kind]; }
+function needTable(c){ if (c.kind==="aff") return "ml"; return {promo:"promo", st:"stories", one:"one:"+c.t, est:"est", diff:"diff", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", ser:"ser", info:"info", php:"php", calc:"stories", list:"list:"+c.col}[c.kind]; }
 // The Payhip product code is the last part of the book's Payhip link (payhip.com/b/<code>).
 const payhipCode = l => { const m = /\/b\/([^\/?#]+)/.exec((l && (l.link_or_id || l.reader_link)) || ""); return m ? m[1] : null; };
 async function ensureLoaded(cols){
@@ -864,7 +869,7 @@ async function loadAll(){
   appReady = false;
   setStatus("Loading…");
   loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","php","promo","diff"]) data[k]={}; data.one={};
-  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols] = await Promise.all([
+  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols, affR] = await Promise.all([
     api("GET","field_registry?select=*").catch(()=>[]),
     api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000").catch(()=>[]),
     getAll("editions","sheet_order.asc.nullslast,file_name.asc"),
@@ -873,8 +878,10 @@ async function loadAll(){
     api("GET","marketing_links?select=link_type&limit=5000").catch(()=>[]),
     api("GET","formats?select=format&limit=5000").catch(()=>[]),
     getAll("store_links").catch(()=>[]),
-    api("GET","list_columns?select=list_name,table_name,column_name").catch(()=>[])
+    api("GET","list_columns?select=list_name,table_name,column_name").catch(()=>[]),
+    api("GET","store_url_regions?select=store,region,language,base_url,affiliate_param,affiliate_code&active=is.true").catch(()=>[])
   ]);
+  AFF_REGIONS = affR;
   LISTCOL = {}; for (const r of lcols) LISTCOL[r.table_name+"."+r.column_name] = r.list_name;
   REG = {}; for (const r of reg) REG[r.table_name+"."+r.column_name] = r;
   REF = {}; for (const r of refs) (REF[r.list_name] = REF[r.list_name] || []).push(r);
@@ -1144,6 +1151,31 @@ $("#expand").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=t
 $("#collapse").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=false);
 async function refresh(){ try{ await ensureLoaded(ticked()); renderGrid(); setStatus("Ready","ok"); }catch(err){ setStatus(err.message,"bad"); } }
 
+/* ---------- affiliate links (worked out from the ASIN / Apple ID, the same way as the view calculated_store_urls) ---------- */
+let AFF_REGIONS = [];   // store_url_regions: base address and affiliate code per store and region
+const AFF_REGION_ORDER = ["US","UK","CA","AU","DE","FR","IT","ES"];
+const AFF_FORMATS = ["eBook","Paperback","Hardcover"];
+const AFF_ML = {"Amazon affiliate link":{s:"Amazon", f:"eBook", region:"US"}, "Apple Books affiliate link":{s:"Apple", f:"eBook", region:"All"}};
+const AFF_NOTE = "Worked out from the Amazon ASIN or Apple ID in Store links and the store's affiliate code, so it fills in as soon as the ASIN or Apple ID is entered. It can't be typed here.";
+const AFF_ID_OK = {Amazon:/^(B0[A-Z0-9]{8}|[0-9]{9}[0-9X])$/, Apple:/^[0-9]{6,}$/};
+function affRegion(ed, a){ return AFF_REGIONS.find(r=>r.store===a.s && r.region===a.region && (r.language===ed.language || r.language==="All")) || null; }
+function affHandRegion(url){
+  const u = url.toLowerCase();
+  if (u.includes("amazon.co.uk")) return "UK"; if (u.includes("amazon.com.au")) return "AU"; if (u.includes("amazon.ca")) return "CA";
+  if (u.includes("amazon.de")) return "DE"; if (u.includes("amazon.fr")) return "FR"; if (u.includes("amazon.it")) return "IT"; if (u.includes("amazon.es")) return "ES";
+  if (u.includes("amazon.com") || u.includes("amzn.to")) return "US"; if (u.includes("apple.com")) return "All"; return "US";
+}
+function affUrl(ed, a){
+  const r = affRegion(ed, a); if (!r) return null;
+  const row = data.sl[`${ed.file_name}|${a.s}|${a.f}|${a.s==="Amazon" ? "ASIN" : "ID"}`];
+  const id = row && row.link_or_id ? String(row.link_or_id).trim() : "";
+  if (!(a.s==="Amazon" ? a.f in {eBook:1,Paperback:1,Hardcover:1} : a.f==="eBook") || !AFF_ID_OK[a.s].test(id)) return null;
+  // An older link already in marketing_links wins when it is for this store, region and ASIN / Apple ID (or an amzn.to short link for the eBook)
+  const h = data.ml[ed.file_name+"|"+(a.s==="Amazon" ? "Amazon affiliate link" : "Apple Books affiliate link")];
+  if (h && h.url && affHandRegion(h.url)===a.region && (h.url.includes(id) || (/amzn\.to/i.test(h.url) && a.f==="eBook"))) return h.url;
+  return r.base_url + id + (r.affiliate_code ? `?${r.affiliate_param}=${r.affiliate_code}` : "");
+}
+
 /* ---------- values ---------- */
 function rowKey(ed, c){
   switch(c.kind){
@@ -1157,6 +1189,7 @@ function rowKey(ed, c){
 }
 function valueOf(ed, c){
   let r;
+  if (c.aff) return affUrl(ed, c.aff);   // affiliate links are worked out, never typed
   switch(c.kind){
     case "ed": return ed[c.col];
     case "st": r = data.stories[ed.story_id]; return r ? r[c.col] : null;
@@ -1188,7 +1221,7 @@ function canEdit(ed, c){
 // The same for story bible cells (and story bible store links / Payhip price) on a book without a story bible.
 function formatMissing(ed, c){
   if (c.kind==="sb" || ((c.kind==="php" || c.kind==="sl") && c.f==="Story Bible")) return loaded.has("sb") && !data.sb[ed.file_name];
-  const f = (c.kind==="fmt" || c.kind==="php" || c.kind==="sl") ? c.f : null;
+  const f = c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="php" || c.kind==="sl") ? c.f : null;
   if (!f || !FMT_FIELDS[f] || !loaded.has("fmt")) return false;
   const r = data.fmt[ed.file_name+"|"+f];
   return !r || (r.not_offered === true && c.col !== "not_offered");
@@ -1305,6 +1338,7 @@ function searchRows(L, S, q){
 // Does the book have a row in this column's table? No row = the book isn't part of that table
 // (e.g. no award, no subtitle, no release note, no edition difference), so the empty cell is nothing to fill.
 function hasRow(ed, c){
+  if (c.aff) return !!affRegion(ed, c.aff) && !!data.sl[`${ed.file_name}|${c.aff.s}|${c.aff.f}|${c.aff.s==="Amazon" ? "ASIN" : "ID"}`];   // needs the store's ID row; Amazon Italy only applies to Italian editions
   switch(c.kind){
     case "st": return !!data.stories[ed.story_id];
     case "one": return !!(data.one[c.t]||{})[ed.file_name];
