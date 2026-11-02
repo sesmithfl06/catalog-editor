@@ -753,6 +753,13 @@ const FMT_FIELDS_OTHER = ["not_offered","price_usd","isbn","publication_date"];
 // Book columns (editions) that belong to one format: they get a line when the book doesn't have or doesn't offer that format
 // (e.g. paperback pages on a book under 20,000 words, which has no paperback).
 const ED_FMT = {paperback_pages:"Paperback", paperback_page_size:"Paperback"};
+// The eBook is offered unless the book's eBook row says Not offered, or (with no eBook row) the book is a collection or anthology-only.
+// So eBook cells (format, store links, store count) on a book with no eBook row yet are blanks to fill, not lines.
+function ebookOffered(ed){
+  const r = data.fmt[ed.file_name+"|eBook"];
+  if (r) return r.not_offered !== true;
+  return !isCollection(ed) && !ed.anthology_only;
+}
 // One-book differences kept in edition_differences (one row per book and field). The editor shows them merged in one
 // "Edition differences" column; right-click → Edit opens a list where each difference is added, changed or removed.
 // Fields marked own:true replace the usual value (story, series or author) for this book only.
@@ -1474,7 +1481,7 @@ function canEdit(ed, c){
   if (c.kind==="st") return !!ed.story_id;
   if (c.kind==="est") return ed.language !== "English";
   if (c.kind==="ser") return !!ed.series && !!data.ser[rowKey(ed,c)];
-  if (c.kind==="fmt") return !!data.fmt[rowKey(ed,c)];   // only formats the book has; add one with right-click → Add format
+  if (c.kind==="fmt") return !!data.fmt[rowKey(ed,c)] || c.f==="eBook";   // only formats the book has (add one with right-click → Add format); the eBook row is made on the first save
   if (c.kind==="sb") return !!data.sb[ed.file_name];      // only books that have a story bible; add one with right-click
   return true;
 }
@@ -1483,6 +1490,7 @@ function canEdit(ed, c){
 function formatMissing(ed, c){
   if (c.kind==="sb" || ((c.kind==="php" || c.kind==="sl") && c.f==="Story Bible")) return loaded.has("sb") && !data.sb[ed.file_name];
   const f = c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="php" || c.kind==="sl" || c.kind==="slc") ? c.f : c.kind==="ed" ? ED_FMT[c.col] : null;
+  if (f==="eBook") return c.col==="not_offered" ? false : !ebookOffered(ed);
   if (!f || !FMT_FIELDS[f] || !loaded.has("fmt")) return false;
   const r = data.fmt[ed.file_name+"|"+f];
   return !r || (r.not_offered === true && c.col !== "not_offered");
@@ -1639,9 +1647,9 @@ function hasRow(ed, c){
     case "diff": return !!data.diff[rowKey(ed,c)];
     case "diffall": return diffRows(ed.file_name).length > 0;
     case "ml": return !!data.ml[rowKey(ed,c)];
-    case "fmt": return !!data.fmt[rowKey(ed,c)];
+    case "fmt": return !!data.fmt[rowKey(ed,c)] || (c.f==="eBook" && ebookOffered(ed));
     case "sb": return !!data.sb[ed.file_name];
-    case "sl": case "slc": return !!data.sl[rowKey(ed,c)];
+    case "sl": case "slc": return !!data.sl[rowKey(ed,c)] || (c.f==="eBook" && ebookOffered(ed));
     case "ser": return !!data.ser[rowKey(ed,c)];
     case "php": return Object.prototype.hasOwnProperty.call(data.php, rowKey(ed,c));
     default: return true;
@@ -2414,8 +2422,9 @@ async function write(ed, c, v){
     }
     case "fmt": {
       const k = rowKey(ed,c), cur = data.fmt[k], f = fn+"&format=eq."+q(c.f);
-      if (!cur) throw new Error(`This book has no ${c.f}. Right-click → Add ${c.f} first.`);
-      data.fmt[k] = await patchOne("formats", f, {[c.col]:v});
+      if (!cur && c.f!=="eBook") throw new Error(`This book has no ${c.f}. Right-click → Add ${c.f} first.`);
+      if (!cur && v==null) return;
+      data.fmt[k] = cur ? await patchOne("formats", f, {[c.col]:v}) : await insertOne("formats", {file_name:ed.file_name, format:c.f, [c.col]:v});
       return;
     }
     case "sb": {
@@ -2431,7 +2440,7 @@ async function write(ed, c, v){
     }
     case "slc": {
       const k = rowKey(ed,c), cur = data.sl[k];
-      if (!cur) throw new Error("This book has no Books2Read Universal Link row yet. Add the link first, then enter the store count.");
+      if (!cur){ if (v!=null) data.sl[k] = await insertOne("store_links", {file_name:ed.file_name, store:c.s, format:c.f, link_type:c.lt, store_count:v}); return; }
       data.sl[k] = await patchOne("store_links", `${fn}&store=eq.${q(c.s)}&format=eq.${q(c.f)}&link_type=eq.${q(c.lt)}`, {store_count:v});
       return;
     }
