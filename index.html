@@ -750,6 +750,9 @@ const FMT_FIELDS = {
   "Audiobook":   ["not_offered","price_usd","library_price_usd","isbn","publication_date","narrator","narrator_bio","runtime_minutes"]
 };
 const FMT_FIELDS_OTHER = ["not_offered","price_usd","isbn","publication_date"];
+// Book columns (editions) that belong to one format: they get a line when the book doesn't have or doesn't offer that format
+// (e.g. paperback pages on a book under 20,000 words, which has no paperback).
+const ED_FMT = {paperback_pages:"Paperback", paperback_page_size:"Paperback"};
 // One-book differences kept in edition_differences (one row per book and field). The editor shows them merged in one
 // "Edition differences" column; right-click → Edit opens a list where each difference is added, changed or removed.
 // Fields marked own:true replace the usual value (story, series or author) for this book only.
@@ -990,7 +993,7 @@ function warnDuplicateLabels(){
 }
 
 /* ---------- loading ---------- */
-function needTable(c){ if (c.kind==="aff") return "ml"; if (c.kind==="calc" && c.col==="bestseller_line") return "bl"; return {promo:"promo", st:"stories", one:"one:"+c.t, est:"est", diff:"diff", diffall:"diff", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", slc:"sl", ser:"ser", info:"info", php:"php", calc:"stories", list:"list:"+c.col}[c.kind]; }
+function needTable(c){ if (c.kind==="aff") return "ml"; if (c.kind==="ed" && ED_FMT[c.col]) return "fmt"; if (c.kind==="calc" && c.col==="bestseller_line") return "bl"; return {promo:"promo", st:"stories", one:"one:"+c.t, est:"est", diff:"diff", diffall:"diff", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", slc:"sl", ser:"ser", info:"info", php:"php", calc:"stories", list:"list:"+c.col}[c.kind]; }
 // The Payhip product code is the last part of the book's Payhip link (payhip.com/b/<code>).
 const payhipCode = l => { const m = /\/b\/([^\/?#]+)/.exec((l && (l.link_or_id || l.reader_link)) || ""); return m ? m[1] : null; };
 async function ensureLoaded(cols){
@@ -1479,7 +1482,7 @@ function canEdit(ed, c){
 // The same for story bible cells (and story bible store links / Payhip price) on a book without a story bible.
 function formatMissing(ed, c){
   if (c.kind==="sb" || ((c.kind==="php" || c.kind==="sl") && c.f==="Story Bible")) return loaded.has("sb") && !data.sb[ed.file_name];
-  const f = c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="php" || c.kind==="sl" || c.kind==="slc") ? c.f : null;
+  const f = c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="php" || c.kind==="sl" || c.kind==="slc") ? c.f : c.kind==="ed" ? ED_FMT[c.col] : null;
   if (!f || !FMT_FIELDS[f] || !loaded.has("fmt")) return false;
   const r = data.fmt[ed.file_name+"|"+f];
   return !r || (r.not_offered === true && c.col !== "not_offered");
