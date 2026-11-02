@@ -669,7 +669,7 @@ dialog#ncdlg::backdrop{background:#0006}
 const DEFAULT_URL = "https://qurcnkeqxfqqfnygkpmd.supabase.co";
 const DEFAULT_KEY = "sb_publishable_SCKdsKDMAWp8htqoVF7VPA_TN9A5KOU";
 
-// Column order for the key columns (not a view; the page opens with Title and File name).
+// Column order for the key columns (not a view; the page opens with Title, File name, Series and Book number).
 const FAVORITES = ["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name","info:long_synopsis","st:rating","ed:word_count"];
 // Always shown first, never counted for "blanks".
 const KEY_COLS = new Set(["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name"]);
@@ -1137,8 +1137,8 @@ async function loadAll(){
 }
 
 /* ---------- column picker ---------- */
-const DEFAULT_COLS = ["ed:title","ed:file_name"];
-let checked = new Set(DEFAULT_COLS);   // opens with Title and File name; add other columns through the column picker
+const DEFAULT_COLS = ["ed:title","ed:file_name","ed:series","ed:number_in_series"];
+let checked = new Set(DEFAULT_COLS);   // opens with Title, File name, Series and Book number; add other columns through the column picker
 // Blanks view: columns you added (even with no blanks) or removed (even with blanks), and the ids now shown.
 let blankAdd = new Set(), blankOff = new Set(), blankIds = new Set();
 const BLANK_KEEP = "ed:title";
