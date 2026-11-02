@@ -668,7 +668,7 @@ dialog#ncdlg::backdrop{background:#0006}
 const DEFAULT_URL = "https://qurcnkeqxfqqfnygkpmd.supabase.co";
 const DEFAULT_KEY = "sb_publishable_SCKdsKDMAWp8htqoVF7VPA_TN9A5KOU";
 
-// Column order for the key columns (not a view; the page opens with Title only).
+// Column order for the key columns (not a view; the page opens with Title and File name).
 const FAVORITES = ["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name","info:long_synopsis","st:rating","ed:word_count"];
 // Always shown first, never counted for "blanks".
 const KEY_COLS = new Set(["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name"]);
@@ -1136,7 +1136,9 @@ async function loadAll(){
 }
 
 /* ---------- column picker ---------- */
-let checked = new Set(["ed:title"]);   // opens with Title only; add other columns through the column picker
+const DEFAULT_COLS = ["ed:title","ed:file_name"];
+const DEFAULT_SORT = ["ed:number_in_series","ed:series","ed:language"];   // used when no sort is picked, even if these columns are hidden
+let checked = new Set(DEFAULT_COLS);   // opens with Title and File name; add other columns through the column picker
 // Blanks view: columns you added (even with no blanks) or removed (even with blanks), and the ids now shown.
 let blankAdd = new Set(), blankOff = new Set(), blankIds = new Set();
 const BLANK_KEEP = "ed:title";
@@ -1408,7 +1410,7 @@ $("#presetdel").onclick = async()=>{
   try{ await delWhere("column_presets", "id=eq."+q(row.id)); PRESETS = PRESETS.filter(p=>p!==row); renderPresetMenu(""); setStatus(`Deleted view "${row.preset_name}"`,"ok"); }
   catch(err){ setStatus("View not deleted: " + friendly(err), "bad"); }
 };
-$("#none").onclick = async()=>{ const vb = viewSnap(); if (blanksOn()){ viewCols.forEach(c=>setColOn(c.id,false)); recordView(vb); renderColumnList(); renderGrid(); return; } checked = new Set(["ed:title"]); recordView(vb); renderColumnList(); await refresh(); };
+$("#none").onclick = async()=>{ const vb = viewSnap(); if (blanksOn()){ viewCols.forEach(c=>setColOn(c.id,false)); recordView(vb); renderColumnList(); renderGrid(); return; } checked = new Set(DEFAULT_COLS); recordView(vb); renderColumnList(); await refresh(); };
 $("#expand").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=true);
 $("#collapse").onclick = ()=>document.querySelectorAll(".grp").forEach(d=>d.open=false);
 async function refresh(){ try{ await ensureLoaded(ticked()); renderGrid(); setStatus("Ready","ok"); }catch(err){ setStatus(err.message,"bad"); } }
@@ -1827,7 +1829,8 @@ function cmpSortVals(av, bv){
   return collator.compare(show(av), show(bv));
 }
 function sortRows(rows){
-  const keys = sortKeys.map(k=>({c:COLMAP[k.id], d:k.dir})).filter(k=>k.c);
+  let keys = sortKeys.map(k=>({c:COLMAP[k.id], d:k.dir})).filter(k=>k.c);
+  if (!keys.length) keys = DEFAULT_SORT.map(id=>({c:COLMAP[id], d:1})).filter(k=>k.c);   // default: book #, series, language
   if (!keys.length) return rows;
   return rows.map((ed,i)=>({ed,i,v:keys.map(k=>valueOf(ed,k.c))})).sort((a,b)=>{
     for (let j=0; j<keys.length; j++){
