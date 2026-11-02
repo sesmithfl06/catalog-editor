@@ -457,6 +457,17 @@ dialog#ncdlg::backdrop{background:#0006}
   <div class="row"><span class="hint" id="ntmsg"></span><span class="grow"></span><button id="nttoggle" type="button" class="primary" hidden></button><button id="ntclose" type="button">Done</button></div>
 </dialog>
 
+<!-- ============ Rename column ============ -->
+<dialog id="rndlg">
+  <h2>Rename column</h2>
+  <p class="hint" id="rnorig"></p>
+  <label>New name <input id="rnname" type="text" style="width:100%"></label>
+  <p><label><input type="radio" name="rnhow" value="nick" checked> Nickname: show this name instead; the full name stays one right-click away (Show full name)</label><br>
+     <label><input type="radio" name="rnhow" value="name"> Change the name permanently</label></p>
+  <p class="hint">Saved in Supabase (settings → editor_column_names), so everyone sees it on any device. Only the Catalog Editor uses it; Notion and Supabase keep their names.</p>
+  <div class="row"><span class="hint" id="rnmsg"></span><span class="grow"></span><button id="rnreset" type="button">Back to the original name</button><button id="rnsave" type="button" class="primary">Save</button><button id="rnclose" type="button">Cancel</button></div>
+</dialog>
+
 <!-- ============ How do I... ============ -->
 <dialog id="hdlg">
   <h2>How do I…</h2>
@@ -491,6 +502,7 @@ dialog#ncdlg::backdrop{background:#0006}
       <li>In the editor: <kbd>Enter</kbd> saves and moves down to the next editable cell; <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line in long text; <kbd>Tab</kbd> saves and moves right; <kbd>Shift</kbd>+<kbd>Tab</kbd> saves and moves left; <kbd>Esc</kbd> cancels; clicking outside the editor saves.</li>
       <li><b>Undo</b> <kbd>⌘</kbd>+<kbd>Z</kbd>; <b>Redo</b> <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (or <kbd>Ctrl</kbd>+<kbd>Y</kbd>). They don't work while you are typing in a box; use the Undo / Redo buttons at the top then.</li>
       <li>Right-click a cell in a Formats column with no format yet → “Add … for this book”; right-click a story bible cell with none → “Add a story bible for this book”.</li>
+      <li>Right-click a column heading (or its name in the column list) → <b>Rename column…</b>. Choose <b>Nickname</b> to show a shorter name (right-click → <b>Show full name</b> shows the original), or <b>Change the name permanently</b>. <b>Back to the original name</b> undoes either. Everyone sees the new name, on any device.</li>
       <li>Right-click a cell that holds a web address (store links, Website book post, affiliate links…) → <b>Open link in new tab</b>.</li>
     </ul>
   </details>
@@ -945,7 +957,10 @@ function placeCol(c){
   c.group = (c.f==="Story Bible" && c.kind==="php") ? SB_GROUP : (KIND_GROUP[c.kind] || "Book Basics");   // any column not listed above lands with its kind
   c.so = 1000 + ((c.kind==="fmt" || c.kind==="php") ? (FORMAT_RANK[c.f]??9)*1000 + c.order : (c.kind==="ml" || c.kind==="aff") ? 5000 + c.order : c.order);
 }
-function addCol(c){ placeCol(c); COLS.push(c); COLMAP[c.id] = c; }
+function addCol(c){ placeCol(c); const n = COLNAMES[c.id];
+  if (n && n.nick){ c.full = c.label; c.label = n.nick; }   // nickname: shown everywhere in the editor; right-click → Show full name
+  else if (n && n.name){ c.orig = c.label; c.label = n.name; }   // permanent new name
+  COLS.push(c); COLMAP[c.id] = c; }
 function buildCatalog(sample){
   COLS = []; COLMAP = {};
   const edCols = Object.keys(sample.editions[0]||{}).filter(c=>!SKIP_ED.has(c));
@@ -1096,7 +1111,7 @@ async function loadAll(){
   appReady = false;
   setStatus("Loading…");
   loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","php","promo","diff","bl"]) data[k]={}; data.one={};
-  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols, affR] = await Promise.all([
+  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols, affR, cnames] = await Promise.all([
     api("GET","field_registry?select=*").catch(()=>[]),
     api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000").catch(()=>[]),
     getAll("editions","sheet_order.asc.nullslast,file_name.asc"),
@@ -1106,9 +1121,11 @@ async function loadAll(){
     api("GET","formats?select=format&limit=5000").catch(()=>[]),
     getAll("store_links").catch(()=>[]),
     api("GET","list_columns?select=list_name,table_name,column_name").catch(()=>[]),
-    api("GET","store_url_regions?select=store,region,language,base_url,affiliate_param,affiliate_code&active=is.true").catch(()=>[])
+    api("GET","store_url_regions?select=store,region,language,base_url,affiliate_param,affiliate_code&active=is.true").catch(()=>[]),
+    api("GET","settings?select=value&key=eq."+COLNAMES_KEY).catch(()=>[])
   ]);
   AFF_REGIONS = affR;
+  COLNAMES = parseColNames(cnames);
   LISTCOL = {}; for (const r of lcols) LISTCOL[r.table_name+"."+r.column_name] = r.list_name;
   REG = {}; for (const r of reg) REG[r.table_name+"."+r.column_name] = r;
   REF = {}; for (const r of refs) (REF[r.list_name] = REF[r.list_name] || []).push(r);
@@ -1169,7 +1186,7 @@ function renderColumnList(){
   let html = "";
   for (const [g, cs] of groups()){
     const words = q.split(/\s+/).filter(Boolean);
-    const show = cs.filter(c=>{ const hay = (c.label+" "+g+" "+(c.col||"")).toLowerCase().replace(/_/g," "); return words.every(w=>hay.includes(w)); });
+    const show = cs.filter(c=>{ const hay = (c.label+" "+(c.full||c.orig||"")+" "+g+" "+(c.col||"")).toLowerCase().replace(/_/g," "); return words.every(w=>hay.includes(w)); });
     if (!show.length) continue;
     const n = cs.filter(c=>onSet().has(c.id)).length;
     const isOpen = q || open.has(g);
@@ -1189,6 +1206,62 @@ $("#collist").addEventListener("change", async e=>{
 });
 $("#colsearch").addEventListener("input", renderColumnList);
 /* right-click a section header: Check all / Uncheck all for that section only (shown rows; works open or closed) */
+/* ---------- column nicknames and new names (right-click a column → Rename column…) ----------
+   Kept in the Supabase table settings, key editor_column_names, as {"column id": {"nick": "…"} or {"name": "…"}}. */
+const COLNAMES_KEY = "editor_column_names";
+let COLNAMES = {};
+function parseColNames(rows){ try{ const v = JSON.parse(((rows||[])[0]||{}).value || "{}"); return v && typeof v==="object" ? v : {}; }catch(e){ return {}; } }
+const origLabel = c => c.full || c.orig || c.label;
+let rnCol = "";
+function openRename(id){
+  const c = COLMAP[id]; if (!c) return;
+  rnCol = id;
+  $("#rnorig").textContent = "Original name: " + origLabel(c) + (c.full ? ` · Now shown as the nickname “${c.label}”` : c.orig ? ` · Now named “${c.label}”` : "");
+  $("#rnname").value = c.label;
+  document.querySelector(`input[name=rnhow][value=${c.orig ? "name" : "nick"}]`).checked = true;
+  $("#rnreset").hidden = !(c.full || c.orig);
+  $("#rnmsg").textContent = ""; $("#rnsave").disabled = $("#rnreset").disabled = false;
+  $("#rndlg").showModal(); $("#rnname").select();
+}
+async function saveColName(id, entry){
+  $("#rnsave").disabled = $("#rnreset").disabled = true; $("#rnmsg").textContent = "Saving…";
+  try{
+    const all = parseColNames(await api("GET","settings?select=value&key=eq."+COLNAMES_KEY));   // fresh copy, so names saved elsewhere are kept
+    if (entry) all[id] = entry; else delete all[id];
+    const rows = await api("POST","settings?on_conflict=key", {key:COLNAMES_KEY, value:JSON.stringify(all)}, {Prefer:"resolution=merge-duplicates,return=representation"});
+    if (!rows || !rows.length) throw new Error("Only owners and editors can change this.");
+    COLNAMES = all;
+    const c = COLMAP[id], o = origLabel(c);
+    delete c.full; delete c.orig; c.label = o;
+    if (entry && entry.nick){ c.full = o; c.label = entry.nick; } else if (entry && entry.name){ c.orig = o; c.label = entry.name; }
+    $("#rndlg").close();
+    renderColumnList(); renderGrid();
+    setStatus(!entry ? `“${o}” is back to its original name` : entry.nick ? `“${o}” now shows as “${entry.nick}” (right-click → Show full name)` : `“${o}” is now named “${entry.name}”`, "ok");
+    warnDuplicateLabels();
+  }catch(e){
+    $("#rnsave").disabled = $("#rnreset").disabled = false;
+    $("#rnmsg").textContent = "Not saved: " + e.message;
+  }
+}
+$("#rnsave").onclick = ()=>{
+  const c = COLMAP[rnCol], v = $("#rnname").value.trim(); if (!c) return;
+  if (!v || v === origLabel(c)){ saveColName(rnCol, null); return; }
+  const dup = COLS.find(x=>x.id!==rnCol && String(x.label).trim().toLowerCase()===v.toLowerCase());
+  if (dup){ $("#rnmsg").textContent = `Another column is already called “${dup.label}”.`; return; }
+  saveColName(rnCol, document.querySelector("input[name=rnhow]:checked").value==="name" ? {name:v} : {nick:v});
+};
+$("#rnname").addEventListener("keydown", e=>{ if (e.key==="Enter"){ e.preventDefault(); $("#rnsave").click(); } });
+$("#rnreset").onclick = ()=>saveColName(rnCol, null);
+$("#rnclose").onclick = ()=>$("#rndlg").close();
+// Show full name: a small box by the pointer with the column's full name
+function showFullName(id, x, y){
+  const c = COLMAP[id]; if (!c || !c.full) return;
+  closeCtx();
+  const m = document.createElement("div"); m.className = "ctx";
+  m.innerHTML = `<div style="padding:6px 10px;max-width:320px"><span class="hint">Full name</span><br><b>${esc(c.full)}</b></div>`;
+  m.style.left = Math.min(x, innerWidth-330)+"px"; m.style.top = Math.min(y, innerHeight-70)+"px";
+  document.body.appendChild(m); ctxMenu = m;
+}
 let ctxMenu = null;
 function closeCtx(){ if(ctxMenu){ ctxMenu.remove(); ctxMenu = null; } }
 async function setSection(grp, on){
@@ -1285,9 +1358,10 @@ $("#collist").addEventListener("contextmenu", e=>{
   if (lab && cid){   // right-click a column name: What's this? (when it has an explanation) and Does this go to Notion?
     e.preventDefault(); closeCtx(); qmClose();
     const m = document.createElement("div"); m.className = "ctx";
-    m.innerHTML = (q ? `<button type="button" data-a="what">What's this?</button>` : "") + `<button type="button" data-a="notion">Does this go to Notion?</button>`;
-    m.style.left = Math.min(e.clientX, innerWidth-200)+"px"; m.style.top = Math.min(e.clientY, innerHeight-90)+"px";
-    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); if (b.dataset.a==="notion") showNotion(cid); else qmShow(q); });
+    const cc = COLMAP[cid];
+    m.innerHTML = (cc && cc.full ? `<button type="button" data-a="full">Show full name</button>` : "") + (q ? `<button type="button" data-a="what">What's this?</button>` : "") + `<button type="button" data-a="notion">Does this go to Notion?</button><button type="button" data-a="rename">Rename column…</button>`;
+    m.style.left = Math.min(e.clientX, innerWidth-200)+"px"; m.style.top = Math.min(e.clientY, innerHeight-150)+"px";
+    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; ev.stopPropagation(); closeCtx(); if (b.dataset.a==="full") showFullName(cid, ev.clientX, ev.clientY); else if (b.dataset.a==="rename") openRename(cid); else if (b.dataset.a==="notion") showNotion(cid); else qmShow(q); });
     document.body.appendChild(m); ctxMenu = m;
     return;
   }
@@ -1350,14 +1424,16 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   const id = th.dataset.sort;
   const locked = blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
   const m = document.createElement("div"); m.className = "ctx";
-  m.innerHTML = `<button type="button" data-a="filter">Filter…</button><button type="button" data-a="notion">Does this go to Notion?</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "") + (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`
+  m.innerHTML = (COLMAP[id] && COLMAP[id].full ? `<button type="button" data-a="full">Show full name</button>` : "") + `<button type="button" data-a="filter">Filter…</button><button type="button" data-a="notion">Does this go to Notion?</button><button type="button" data-a="rename">Rename column…</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "") + (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`
     + `<button type="button" data-a="freeze">Freeze up to this column</button>` + (frozenN>1 ? `<button type="button" data-a="unfreeze">Unfreeze (first column only)</button>` : "")
     + (colWidths[id] ? `<button type="button" data-a="unsize">Reset this column's width</button>` : "")
     + (Object.keys(colWidths).length ? `<button type="button" data-a="unsizeall">Reset all column widths</button>` : "")
     + (colOrder.length ? `<button type="button" data-a="unorder">Reset column order</button>` : "");
-  m.style.left = Math.min(e.clientX, innerWidth-200)+"px"; m.style.top = Math.min(e.clientY, innerHeight-320)+"px";
+  m.style.left = Math.min(e.clientX, innerWidth-200)+"px"; m.style.top = Math.min(e.clientY, innerHeight-380)+"px";
   m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx();
     if (b.dataset.a==="notion"){ showNotion(id); return; }
+    if (b.dataset.a==="full"){ ev.stopPropagation(); showFullName(id, ev.clientX, ev.clientY); return; }
+    if (b.dataset.a==="rename"){ openRename(id); return; }
     if (b.dataset.a==="filter"){ ev.stopPropagation(); openFilter(id, th); return; }
     if (b.dataset.a==="unfilter"){ clearFilter(id); return; }
     if (b.dataset.a==="freeze"){ freezeTo(id); return; }
