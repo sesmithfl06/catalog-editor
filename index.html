@@ -175,7 +175,9 @@ td.ro{background:var(--ro);color:var(--muted)}
 :where(tbody tr:nth-child(even)) td{background:var(--band)}
 :where(tbody tr:nth-child(even)) td.ro{background:var(--roband)}
 .qmpop a{color:var(--accent);text-decoration:underline;cursor:pointer}
-td.blank .v::before{content:"—";color:var(--line)}
+td.blank .v::before{content:"—";color:var(--muted)}
+/* empty, but nothing to fill: the book has no row in that table (no award, no subtitle, no such format…) */
+td.na{background-image:repeating-linear-gradient(135deg,transparent 0 6px,var(--line) 6px 7px)}
 td.saving{box-shadow:inset 3px 0 0 var(--warn)}
 td.saved{box-shadow:inset 3px 0 0 var(--ok)}
 td.err{box-shadow:inset 3px 0 0 var(--bad)}
@@ -428,7 +430,7 @@ dialog#ncdlg::backdrop{background:#0006}
           <button id="presetupd" type="button" disabled title="Overwrite the selected view with the columns, sort and filters you have now">Update view</button>
           <button id="presetdel" type="button" disabled>Delete view</button>
         </div>
-        <label class="chk" title="Shows the title plus every column that has a blank for at least one book shown."><input type="checkbox" id="fcolblank"> Blanks</label>
+        <label class="chk" title="Shows the title plus every column that has a blank to fill for at least one book shown. Striped cells are empty because the book isn't part of that table (no award, no subtitle, no such format…), so they don't count."><input type="checkbox" id="fcolblank"> Blanks</label>
         <input id="colsearch" type="search" placeholder="Find a column…">
         <div class="btns">
           <button id="none" title="Untick everything">Clear</button>
@@ -1300,9 +1302,30 @@ function searchRows(L, S, q){
     return true;
   });
 }
-// A real blank: empty, and the cell applies to this book (e.g. "English text" doesn't apply to English editions).
-// Formats a book doesn't have or doesn't offer are not blanks.
-function isBlank(ed, c){ if (formatMissing(ed,c)) return false; const v = valueOf(ed,c); return (v==null || v==="" || (Array.isArray(v) && !v.length)) && (c.ro || canEdit(ed,c)); }
+// Does the book have a row in this column's table? No row = the book isn't part of that table
+// (e.g. no award, no subtitle, no release note, no edition difference), so the empty cell is nothing to fill.
+function hasRow(ed, c){
+  switch(c.kind){
+    case "st": return !!data.stories[ed.story_id];
+    case "one": return !!(data.one[c.t]||{})[ed.file_name];
+    case "est": return !!data.est[rowKey(ed,c)];
+    case "diff": return !!data.diff[rowKey(ed,c)];
+    case "ml": return !!data.ml[rowKey(ed,c)];
+    case "fmt": return !!data.fmt[rowKey(ed,c)];
+    case "sb": return !!data.sb[ed.file_name];
+    case "sl": return !!data.sl[rowKey(ed,c)];
+    case "ser": return !!data.ser[rowKey(ed,c)];
+    case "php": return Object.prototype.hasOwnProperty.call(data.php, rowKey(ed,c));
+    default: return true;
+  }
+}
+const isEmpty = v => v==null || v==="" || (Array.isArray(v) && !v.length);
+// A real blank (needs filling): empty, the book has a row in that table, and the cell applies to this book
+// (e.g. "English text" doesn't apply to English editions). Formats a book doesn't have or doesn't offer are not blanks.
+function isBlank(ed, c){ if (formatMissing(ed,c) || !hasRow(ed,c)) return false; return isEmpty(valueOf(ed,c)) && (c.ro || canEdit(ed,c)); }
+// Cell class for an empty cell: "blank" = needs filling, "na" = nothing to fill.
+function emptyCls(ed, c, v){ return !isEmpty(v) ? "" : isBlank(ed,c) ? "blank" : "na"; }
+function setEmptyCls(td, ed, c, v){ const k = emptyCls(ed,c,v); td.classList.toggle("blank", k==="blank"); td.classList.toggle("na", k==="na"); }
 
 /* ---------- column filters (like Excel: click ▾ in a heading and tick the values to keep) ----------
    Filters only change what the grid shows; nothing is changed in Supabase. Several columns can be
@@ -1523,9 +1546,10 @@ function renderGrid(){
     h += "<tr>";
     viewCols.forEach((c,ci)=>{
       const v = valueOf(ed,c), ok = canEdit(ed,c);
-      const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", (v==null||v==="")?"blank":"", (isLong(c)?"long":""), (c.id==="ed:title"?"title":""), (isGenreCol(c)?"genres":"")].join(" ");
+      const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", emptyCls(ed,c,v), (isLong(c)?"long":""), (c.id==="ed:title"?"title":""), (isGenreCol(c)?"genres":"")].join(" ");
       const noFmt = c.kind==="fmt" && !data.fmt[rowKey(ed,c)] ? `This book has no ${c.f}. Right-click → Add ${c.f} to add it.`
-        : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it." : "";
+        : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it."
+        : isEmpty(v) && !isBlank(ed,c) ? "Nothing to fill: this book isn't part of this table." : "";
       h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt, valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
     });
     h += "</tr>";
@@ -2072,7 +2096,7 @@ function updateCell(ed, c){
       if (!same) return;
       const td = cellAt(ri,ci); if (!td) return;
       const v = valueOf(r,cc); td.querySelector(".v").textContent = disp(v,cc); td.title = disp(v,cc).slice(0,600);
-      td.classList.toggle("blank", v==null||v==="");
+      setEmptyCls(td, r, cc, v);
     });
   });
 }
@@ -2263,7 +2287,7 @@ function liveRefresh(pred){
       const td = cellAt(ri,ci); if (!td || (editing && editing.td === td)) return;
       const v = valueOf(r,cc), sp = td.querySelector(".v"); if (!sp) return;
       sp.textContent = disp(v,cc); td.title = disp(v,cc).slice(0,600);
-      td.classList.toggle("blank", v==null || v==="" || (Array.isArray(v) && !v.length));
+      setEmptyCls(td, r, cc, v);
     });
   });
 }
