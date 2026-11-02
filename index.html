@@ -1882,18 +1882,16 @@ function cmpSortVals(av, bv){
   if (typeof av==="boolean" && typeof bv==="boolean") return av===bv ? 0 : av ? -1 : 1;
   return collator.compare(show(av), show(bv));
 }
-// Default order: book #, then series, then language. Series names are translated per language, so the
-// series is judged by its English name, found through the series code at the start of the file name (ASKT-01-TDT-DE -> ASKT).
+// Default order, stacked like Excel sorts: sort by book #, then series, then language. The last sort is the outermost group,
+// so the rows end up grouped by language, inside each language by series (its own name), inside each series by book #.
 function defaultSortRows(rows){
-  const code = ed => String(ed.file_name||"").split("-")[0];
-  const en = {};
-  for (const e of data.editions) if (e.language==="English" && e.series && !(code(e) in en)) en[code(e)] = e.series;
   const num = ed => { const n = parseFloat(ed.number_in_series); return isFinite(n) ? n : null; };
-  const ser = ed => en[code(ed)] || ed.series || "";
-  return rows.map((ed,i)=>({ed,i,n:num(ed),s:ser(ed)})).sort((a,b)=>{
+  return rows.map((ed,i)=>({ed,i,n:num(ed)})).sort((a,b)=>{
+    const l = collator.compare(a.ed.language||"", b.ed.language||""); if (l) return l;
+    const s = collator.compare(a.ed.series||"", b.ed.series||""); if (s) return s;
     if ((a.n===null) !== (b.n===null)) return a.n===null ? 1 : -1;   // no book # at the bottom
     if (a.n!==b.n && a.n!==null) return a.n-b.n;
-    return collator.compare(a.s, b.s) || collator.compare(code(a.ed), code(b.ed)) || collator.compare(a.ed.language||"", b.ed.language||"") || a.i-b.i;
+    return a.i-b.i;
   }).map(x=>x.ed);
 }
 function sortRows(rows){
