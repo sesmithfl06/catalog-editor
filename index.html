@@ -171,6 +171,7 @@ td.msel.anchor{outline-width:3px;outline-style:double}
 td:not(.frz){position:relative}
 td.edit:hover{background:var(--sel)}
 td.ro{background:var(--ro);color:var(--muted)}
+td.nt .v::after{content:"\2014";color:var(--muted);opacity:.7}
 :where(tbody tr:nth-child(even)) td{background:var(--band)}
 :where(tbody tr:nth-child(even)) td.ro{background:var(--roband)}
 .qmpop a{color:var(--accent);text-decoration:underline;cursor:pointer}
@@ -260,8 +261,7 @@ dialog#ncdlg::backdrop{background:#0006}
 #sllist td.acts{white-space:nowrap}
 #sllist td.acts button{padding:2px 8px;font-size:12px}
 #sllist .ev{color:var(--muted);font-size:12px;max-width:340px}
-.conf{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600;border:1px solid currentColor;white-space:nowrap}
-.conf.sure{color:var(--ok)} .conf.check{color:var(--warn)} .conf.hand{color:var(--muted)}
+#sllist td.val input{min-width:320px}
 </style>
 </head>
 <body>
@@ -343,10 +343,10 @@ dialog#ncdlg::backdrop{background:#0006}
 <!-- ============ Find store links ============ -->
 <dialog id="sldlg">
   <h2>Find store links for shown books</h2>
-  <p class="hint">“Sure” links are saved on their own. The rest wait here for Approve or Reject; a rejected link is never suggested again.</p>
+  <p class="hint">Press Search, open the right book, copy its address and paste it in the box (for Apple and Amazon the ID is taken out of the link for you). Type n/a for a store the book isn't on.</p>
   <div class="row"><span class="hint" id="slmsg"></span></div>
   <div id="sllist"><div class="empty">Looking up…</div></div>
-  <div class="row"><span class="grow"></span><button id="slclose" type="button">Done</button></div>
+  <div class="row"><span class="grow"></span><button id="slsaveall" class="primary" type="button" disabled>Save all</button><button id="slclose" type="button">Done</button></div>
 </dialog>
 
 <!-- ============ Payhip footer code ============ -->
@@ -430,7 +430,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <ul>
       <li><b>Select one cell:</b> click it. It gets a double outline and becomes the <i>starting cell</i>: its value is the one that gets copied to the others.</li>
       <li><b>Select a block:</b> click the starting cell, then <kbd>Shift</kbd>+click the opposite corner. Everything between is selected.</li>
-      <li><b>Select a whole column:</b> there is no shortcut and clicking a column heading does not select it. Click the first cell of the column, then <kbd>Shift</kbd>+click the last one (scroll down, or use a filter first so only the books you want are shown). The selection only covers books and columns currently shown.</li>
+      <li><b>Select a whole column:</b> <kbd>⌘</kbd>+click (Mac) / <kbd>Ctrl</kbd>+click its heading (works while Sort or Filter is on; a plain click still sorts or filters). <b>Several columns:</b> <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+click more headings to add or remove them, or <kbd>Shift</kbd>+click a heading to select every column between. <b>Move them:</b> drag any selected heading and all selected columns move together, keeping their order. The top cell of the first column you clicked is the starting cell (the value that gets copied). The selection only covers books and columns currently shown, so use a filter first to limit the books.</li>
       <li><b>Select scattered cells:</b> <kbd>⌘</kbd>+click (Mac) or <kbd>Ctrl</kbd>+click adds a cell or removes it if it is already selected. <kbd>⌘</kbd>+clicking the starting cell clears the selection.</li>
       <li><b>Clear the selection:</b> <kbd>Esc</kbd>, the Clear button in the bar at the bottom, or a plain click on any cell.</li>
       <li><b>Right-click a cell that isn't selected</b> and it is selected first, then the menu opens.</li>
@@ -454,6 +454,7 @@ dialog#ncdlg::backdrop{background:#0006}
       <li>In the editor: <kbd>Enter</kbd> saves and moves down to the next editable cell; <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line in long text; <kbd>Tab</kbd> saves and moves right; <kbd>Shift</kbd>+<kbd>Tab</kbd> saves and moves left; <kbd>Esc</kbd> cancels; clicking outside the editor saves.</li>
       <li><b>Undo</b> <kbd>⌘</kbd>+<kbd>Z</kbd>; <b>Redo</b> <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (or <kbd>Ctrl</kbd>+<kbd>Y</kbd>). They don't work while you are typing in a box; use the Undo / Redo buttons at the top then.</li>
       <li>Right-click a cell in a Formats column with no format yet → “Add … for this book”; right-click a story bible cell with none → “Add a story bible for this book”.</li>
+      <li>Right-click a cell that holds a web address (store links, Website book post, affiliate links…) → <b>Open link in new tab</b>.</li>
     </ul>
   </details>
 
@@ -554,7 +555,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <button id="export" title="Download a CSV file (opens in Excel): what you see now, or everything">Export</button>
     <button id="notionShown" title="Sync the books shown in the grid (after your filters) to Notion">Send shown to Notion</button>
     <span class="helptip" tabindex="0" role="note" aria-label="Help: Send shown to Notion" data-tip="Sends all the prearranged columns for each visible row, not just the visible ones.">?</span>
-    <button id="storelinks" title="Look up the blank store links of the books shown in the grid (after your filters)">Find store links for shown books</button>
+    <button id="storelinks" title="List the blank store links of the books shown in the grid (after your filters), with a Search link for each store">Find store links for shown books</button>
     <button id="payhipfooter" title="Make new Payhip footer code from the catalog">Payhip footer</button>
   </header>
 
@@ -1224,10 +1225,11 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     const canEd = td.classList.contains("edit"), cc = viewCols[+td.dataset.c];
     const addF = cc && cc.kind==="fmt" && !data.fmt[rowKey(ed,cc)] ? cc.f : null;
     const addSB = !!(cc && cc.kind==="sb" && !data.sb[ed.file_name]);
+    let cellUrl = ""; try{ const mu = String(cc ? valueOf(ed, cc) ?? "" : "").match(/https?:\/\/[^\s;,"'<>]+/); if (mu) cellUrl = mu[0]; }catch(_){}
     const m = document.createElement("div"); m.className = "ctx";
-    m.innerHTML = (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
+    m.innerHTML = (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
     m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
-    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
+    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="openurl"){ window.open(cellUrl, "_blank", "noopener"); return; } if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
     document.body.appendChild(m); ctxMenu = m;
     return;
   }
@@ -1597,8 +1599,9 @@ const isEmpty = v => v==null || v==="" || (Array.isArray(v) && !v.length);
 // A real blank (needs filling): empty, the book has a row in that table, and the cell applies to this book
 // (e.g. "English text" doesn't apply to English editions). Formats a book doesn't have or doesn't offer are not blanks.
 function isBlank(ed, c){ if (formatMissing(ed,c) || !hasRow(ed,c)) return false; return isEmpty(valueOf(ed,c)) && (c.ro || canEdit(ed,c)); }
-// Empty cells all look the same; only the Blanks checkbox uses isBlank() to decide which columns to show.
-function emptyCls(){ return ""; }
+// An empty cell that is blank because the book isn't part of that column's table (no row, or a format/story bible it doesn't have)
+// gets a line (class "nt"). Empty cells that are waiting to be filled stay plain; the Blanks checkbox uses isBlank() for those.
+function emptyCls(ed, c, v){ return isEmpty(v) && (formatMissing(ed,c) || !hasRow(ed,c)) ? "nt" : ""; }
 function setEmptyCls(){}
 
 /* ---------- column filters (like Excel: click ▾ in a heading and tick the values to keep) ----------
@@ -1852,14 +1855,25 @@ function layoutCss(){
   for (let i=0; i<Math.min(frozenN, ths.length); i++){ if (i) css += `#gridwrap th[data-c="${i}"],#gridwrap td[data-c="${i}"]{left:${left}px}\n`; left += ths[i].getBoundingClientRect().width; }
   st.textContent = css;
 }
-function moveColumn(id, toId, after){
-  if (id===toId) return;
-  const ids = viewCols.map(c=>c.id).filter(x=>x!==id);
+function moveColumn(idOrIds, toId, after){
+  const group = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+  if (group.includes(toId)) return;
+  const all = viewCols.map(c=>c.id), moving = all.filter(x=>group.includes(x));   // moved columns keep their order among themselves
+  const ids = all.filter(x=>!group.includes(x));
   let j = ids.indexOf(toId); if (j<0) return;
-  ids.splice(after ? j+1 : j, 0, id);
+  ids.splice(after ? j+1 : j, 0, ...moving);
   // keep the dragged order for the columns you see, and any earlier order for columns not shown now
-  colOrder = ids.concat(colOrder.filter(x=>!ids.includes(x) && x!==id));
+  colOrder = ids.concat(colOrder.filter(x=>!ids.includes(x)));
   renderGrid();
+  if (moving.length > 1){   // keep the moved columns selected in their new places
+    clearSel();
+    moving.forEach(id=>{ const c = viewCols.findIndex(x=>x.id===id); if (c>=0) for (let r=0; r<viewRows.length; r++) msel.add(r+","+c); });
+    const f = viewCols.findIndex(x=>x.id===moving[0]); manchor = "0," + f; colAnchor = f; paintSel();
+  }
+}
+function selectedColIds(){   // columns whose every shown cell is selected, in screen order
+  if (!msel.size || !viewRows.length) return [];
+  return viewCols.filter((c,i)=>{ for (let r=0; r<viewRows.length; r++) if (!msel.has(r+","+i)) return false; return true; }).map(c=>c.id);
 }
 function layoutForSave(){ return {order:[...colOrder], widths:Object.assign({}, colWidths), frozen:frozenN}; }
 function applyLayout(v){
@@ -1895,12 +1909,14 @@ $("#gridwrap").addEventListener("dblclick", e=>{
   delete colWidths[h.closest("th").dataset.sort]; renderGrid();
 });
 /* drag a heading to move the column */
-let dragCol = null;
+let dragCol = null, dragCols = [];
 function clearDrop(){ document.querySelectorAll("#gridwrap th.dropL,#gridwrap th.dropR").forEach(t=>t.classList.remove("dropL","dropR")); }
 $("#gridwrap").addEventListener("dragstart", e=>{
   const th = e.target.closest && e.target.closest("th[data-sort]");
   if (!th || rsz){ if (th) e.preventDefault(); return; }
-  dragCol = th.dataset.sort; th.classList.add("dragging"); closeCtx();
+  dragCol = th.dataset.sort; closeCtx();
+  const sel = selectedColIds(); dragCols = sel.length > 1 && sel.includes(dragCol) ? sel : [dragCol];   // dragging one of several selected columns moves them all
+  document.querySelectorAll("#gridwrap th[data-sort]").forEach(t=>{ if (dragCols.includes(t.dataset.sort)) t.classList.add("dragging"); });
   e.dataTransfer.effectAllowed = "move"; try{ e.dataTransfer.setData("text/plain", dragCol); }catch(err){}
 });
 $("#gridwrap").addEventListener("dragover", e=>{
@@ -1908,16 +1924,16 @@ $("#gridwrap").addEventListener("dragover", e=>{
   const th = e.target.closest("th[data-sort]"); if (!th) return;
   e.preventDefault(); e.dataTransfer.dropEffect = "move";
   const r = th.getBoundingClientRect(), after = e.clientX > r.left + r.width/2;
-  clearDrop(); if (th.dataset.sort !== dragCol) th.classList.add(after ? "dropR" : "dropL");
+  clearDrop(); if (!dragCols.includes(th.dataset.sort)) th.classList.add(after ? "dropR" : "dropL");
 });
 $("#gridwrap").addEventListener("drop", e=>{
   if (!dragCol) return;
   const th = e.target.closest("th[data-sort]"); if (!th) return;
   e.preventDefault();
-  const r = th.getBoundingClientRect(), after = e.clientX > r.left + r.width/2, id = dragCol;
-  dragCol = null; clearDrop(); moveColumn(id, th.dataset.sort, after);
+  const r = th.getBoundingClientRect(), after = e.clientX > r.left + r.width/2, ids = dragCols.length ? dragCols : [dragCol];
+  dragCol = null; dragCols = []; clearDrop(); moveColumn(ids, th.dataset.sort, after);
 });
-$("#gridwrap").addEventListener("dragend", ()=>{ dragCol = null; clearDrop(); document.querySelectorAll("#gridwrap th.dragging").forEach(t=>t.classList.remove("dragging")); });
+$("#gridwrap").addEventListener("dragend", ()=>{ dragCol = null; dragCols = []; clearDrop(); document.querySelectorAll("#gridwrap th.dragging").forEach(t=>t.classList.remove("dragging")); });
 function freezeTo(id){ const i = viewCols.findIndex(c=>c.id===id); if (i<0) return; frozenN = i+1; renderGrid(); setStatus(frozenN>1 ? `Froze ${frozenN} columns on the left` : "Only the first column is frozen","ok"); }
 ["#flang","#fseries"].forEach(s=>$(s).addEventListener("change", renderGrid));
 $("#fcolblank").addEventListener("change", async()=>{
@@ -1926,7 +1942,7 @@ $("#fcolblank").addEventListener("change", async()=>{
 });
 $("#gridwrap").addEventListener("click", e=>{
   if (swallowClick || e.target.closest(".rsz")) return;   // finishing a resize does not sort
-  const th = e.target.closest("th[data-sort]"); if (!th || !pickMode) return;
+  const th = e.target.closest("th[data-sort]"); if (!th || !pickMode || e.shiftKey || e.metaKey || e.ctrlKey) return;   // Shift/Cmd/Ctrl+click selects columns instead
   const id = th.dataset.sort;
   if (pickMode==="filter"){
     e.stopPropagation(); setPickMode("");
@@ -2046,6 +2062,27 @@ $("#gridwrap").addEventListener("click", e=>{
   clearSel(); manchor = keyOf(td); msel.add(manchor); paintSel(); // plain click: select just this cell (also the starting cell for the next Shift+click)
   if (!td.hasAttribute("tabindex")) td.setAttribute("tabindex","-1");
   td.focus({preventScroll:true});
+});
+/* click a column heading (outside Sort / Filter mode) to select the whole column; Shift+click = every column between;
+   Ctrl/Cmd+click = add or remove one column. The starting cell (value to copy) is the top cell of the first column clicked. */
+let colAnchor = null;
+$("#gridwrap").addEventListener("click", e=>{
+  if ((pickMode && !(e.shiftKey || e.metaKey || e.ctrlKey)) || swallowClick || e.target.closest(".rsz")) return;
+  const th = e.target.closest("th[data-sort]"); if (!th || th.dataset.c === undefined) return;
+  const ci = +th.dataset.c, nR = viewRows.length; if (!nR) return;
+  const addCol = c => { for (let r=0; r<nR; r++) msel.add(r+","+c); };
+  const colSelected = c => { for (let r=0; r<nR; r++) if (!msel.has(r+","+c)) return false; return true; };
+  if (e.shiftKey && colAnchor !== null){
+    msel.clear(); const c1 = Math.min(colAnchor, ci), c2 = Math.max(colAnchor, ci);
+    for (let c=c1; c<=c2; c++) addCol(c);
+    manchor = "0," + colAnchor;
+  } else if (e.metaKey || e.ctrlKey){
+    if (colSelected(ci)){ for (let r=0; r<nR; r++) msel.delete(r+","+ci); if (manchor === "0,"+ci) manchor = null; }
+    else { addCol(ci); if (!manchor || !msel.has(manchor)) manchor = "0," + ci; }
+    if (colAnchor === null) colAnchor = ci;
+  } else { msel.clear(); addCol(ci); manchor = "0," + ci; colAnchor = ci; }
+  if (!msel.size){ clearSel(); colAnchor = null; return; }
+  paintSel();
 });
 document.addEventListener("keydown", e=>{ if (e.key==="Escape" && !editing && msel.size) clearSel(); });
 fillBar.addEventListener("mousedown", e=>e.preventDefault());
@@ -2635,7 +2672,6 @@ function liveApply(p){
       api("GET","column_presets?select=*&order=sort_order.asc.nullslast,preset_name.asc")
         .then(rows=>{ PRESETS = rows || []; renderPresetMenu($("#presetsel").value); }).catch(()=>{});
       return;
-    case "store_link_suggestions": if ($("#sldlg").open && !slBusy) slLoad(); return;
     default: return;
   }
   // a row of a per-book table changed: redraw that book's cells
@@ -2764,11 +2800,16 @@ $("#ncgo").onclick = async ()=>{
   }catch(err){ msg("Not added: " + friendly(err)); b.disabled = false; }
 };
 
-/* ---------- Find store links for shown books ----------
-   Only the books shown in the grid (after filters). For each one with blank store cells, the Edge Function
-   find-store-links fills store_link_suggestions; "Sure" ones are then saved with approve_store_link;
-   the rest wait in the list for Approve / Reject. */
-let slRows = [], slChanged = 0, slShown = [], slBusy = false;
+/* ---------- Find store links for shown books (search helper) ----------
+   Lists the blank store links of the books shown in the grid (after filters), from the view store_link_blanks.
+   Nothing is saved on its own: Amazon and B&N give each new paperback their own number, and B&N gives each eBook
+   its own EAN (2940…), so B&N and Amazon paperbacks are searched by title. Prefilled to check: a Payhip link that matches one Live Payhip product.
+   Everything else has a Search link that opens the store's search in the browser; paste the link and Save.
+   Pasted links are tidied: Apple and Amazon keep just the ID/ASIN, Google Play and Kobo lose tracking bits. */
+const SL_CC = { English:"us", French:"fr", German:"de", Italian:"it", Spanish:"es" };
+const SL_LANG = { English:"en", French:"fr", German:"de", Italian:"it", Spanish:"es" };
+const SL_AMZ = { English:"amazon.com", French:"amazon.fr", German:"amazon.de", Italian:"amazon.it", Spanish:"amazon.es" };
+let slRows = [], slChanged = 0, slBusy = false;
 function slMsg(t){ $("#slmsg").textContent = t||""; }
 // file_name=in.(...) in chunks, so a long list of books still fits in the address
 async function slIn(path, files){
@@ -2779,96 +2820,121 @@ async function slIn(path, files){
   }
   return out;
 }
-async function slLoad(){
-  try{
-    slRows = slShown.length ? await slIn("store_link_suggestions?select=*&status=eq.waiting&order=file_name,store,format&limit=2000", slShown) : [];
-    slRender();
-  }catch(err){ $("#sllist").innerHTML = `<div class="empty">${esc(friendly(err))}</div>`; }
+const slNorm = s => (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[’']/g,"").replace(/[^a-z0-9]+/g," ").trim();
+const slSameTitle = (a,b) => { const x = slNorm(a), y = slNorm(b); return !!x && !!y && (x===y || y.startsWith(x) || x.startsWith(y)); };
+// What can be filled with no lookup: {value, sure, why}
+function slWorkedOut(b, products){
+  if (b.store==="Payhip"){
+    const want = b.format==="Paperback" ? /\(pa/i : /\(eb/i;
+    const hits = products.filter(p=>p.status==="Live" && slSameTitle(b.title, String(p.name||"").split(/[:(]/)[0]) && want.test(p.name||""));
+    if (hits.length===1) return {value:`https://payhip.com/b/${hits[0].code}`, sure:false, why:`Payhip product “${hits[0].name}”, check it`};
+  }
+  return null;
+}
+// Where to look it up in the browser
+function slSearch(b){
+  const isbn = b.format==="Paperback" ? b.paperback_isbn : b.ebook_isbn;
+  const t = `${b.title} S.E. Smith`, cc = SL_CC[b.language]||"us", lang = SL_LANG[b.language]||"en", e = encodeURIComponent;
+  switch (b.store){
+    case "Amazon": return `https://www.${SL_AMZ[b.language]||"amazon.com"}/s?k=${e(b.format==="eBook" ? (isbn || t) : t)}` + (b.format==="eBook" ? "&i=digital-text" : "&i=stripbooks");   // paperbacks: Amazon gives its own number, so search by title
+    case "Apple": return `https://www.google.com/search?q=${e(`site:books.apple.com "${b.title}" S.E. Smith`)}`;
+    case "Kobo": return `https://www.kobo.com/${cc}/${lang}/search?query=${e(isbn || t)}`;
+    case "Google Play": return `https://play.google.com/store/search?q=${e(isbn || t)}&c=books`;
+    case "Barnes & Noble": return `https://www.barnesandnoble.com/s/${e(t)}`;   // B&N gives its own EAN (2940…), so search by title
+    case "Books2Read": return "https://books2read.com/";
+    default: return "";
+  }
+}
+// Tidy a pasted link into what the column keeps
+function slTidy(b, v){
+  v = (v||"").trim(); if (!v || /^n\/?a$/i.test(v)) return v ? "n/a" : "";
+  if (b.store==="Apple" && b.link_type==="ID"){ const m = /\/id(\d+)/.exec(v) || /^(\d+)$/.exec(v); if (m) return m[1]; }
+  if (b.store==="Amazon" && b.link_type==="ASIN"){ const m = /\/(?:dp|gp\/product|ASIN)\/([A-Z0-9]{10})/i.exec(v) || /^([A-Z0-9]{10})$/i.exec(v); if (m) return m[1].toUpperCase(); }
+  if (b.store==="Google Play"){ const m = /[?&]id=([^&#]+)/.exec(v); if (m) return `https://play.google.com/store/books/details?id=${m[1]}`; }
+  if (b.store==="Kobo" && /kobo\.com\/.+\/ebook\//.test(v)) return v.split(/[?#]/)[0];
+  return v;
+}
+function slCol(b){
+  const id = `sl:${b.store}|${b.format}|${b.link_type}`;
+  return COLMAP[id] || {id, kind:"sl", s:b.store, f:b.format, lt:b.link_type, table:"store_links", label:`${b.store} ${b.format} ${b.link_type}`};
+}
+async function slSave(b, v){
+  const ed = data.editions.find(e=>e.file_name===b.file_name); if (!ed) throw new Error("book not found");
+  const c = slCol(b), k = `${b.file_name}|${b.store}|${b.format}|${b.link_type}`;
+  const old = data.sl[k] ? data.sl[k].link_or_id : null;
+  if (!(await saveCell(ed, c, v, old, null, true))) throw new Error($("#status").textContent.replace(/^Not saved: /,""));
+  slChanged++;
 }
 function slRender(){
-  const titles = {}; (data.editions||[]).forEach(e=>{ titles[e.file_name] = e.title; });
-  if (!slRows.length){ $("#sllist").innerHTML = `<div class="empty">${slBusy ? "Looking up…" : "Nothing waiting for the books shown."}</div>`; return; }
-  const cls = c => c==="sure" ? "sure" : c==="check" ? "check" : "hand";
-  const lbl = c => c==="sure" ? "Sure" : c==="check" ? "Check" : "Add by hand";
-  $("#sllist").innerHTML = `<table><thead><tr><th>Book</th><th>Store</th><th>Link or ID</th><th>How sure</th><th>Why</th><th></th></tr></thead><tbody>` +
-    slRows.map(r=>{
-      const v = r.suggested_value||"";
-      const open = /^https?:\/\//.test(v) ? ` <a href="${esc(v)}" target="_blank" rel="noopener">open</a>` : "";
-      return `<tr data-id="${r.id}">
-        <td>${esc(titles[r.file_name]||r.file_name)}<div class="ev">${esc(r.file_name)}</div></td>
-        <td>${esc(r.store)}<div class="ev">${esc(r.format)} · ${esc(r.link_type)}</div></td>
-        <td class="val"><input type="text" value="${esc(v)}">${open}</td>
-        <td><span class="conf ${cls(r.confidence)}">${lbl(r.confidence)}</span></td>
-        <td class="ev">${esc(r.evidence||"")}</td>
-        <td class="acts"><button type="button" class="primary" data-a="ok">Approve</button> <button type="button" data-a="no">Reject</button></td>
+  if (!slRows.length){ $("#sllist").innerHTML = `<div class="empty">${slBusy ? "Looking up…" : "No blank store links left for the books shown."}</div>`; $("#slsaveall").disabled = true; return; }
+  $("#slsaveall").disabled = false;
+  $("#sllist").innerHTML = `<table><thead><tr><th>Book</th><th>Store</th><th>Look it up</th><th>Paste the link or ID</th><th></th></tr></thead><tbody>` +
+    slRows.map((b,i)=>{
+      const s = slSearch(b);
+      return `<tr data-i="${i}">
+        <td>${esc(b.title||b.file_name)}<div class="ev">${esc(b.file_name)}</div></td>
+        <td>${esc(b.store)}<div class="ev">${esc(b.format)} · ${esc(b.link_type)}</div></td>
+        <td>${s ? `<a href="${esc(s)}" target="_blank" rel="noopener">${b.store==="Books2Read" ? "Open Books2Read" : "Search"}</a>` : `<span class="ev">${b.store==="Payhip" ? "Payhip → Products" : ""}</span>`}</td>
+        <td class="val"><input type="text" value="${esc(b.value||"")}" placeholder="${b.link_type==="URL" || b.link_type==="Universal Link" ? "Paste the store page link" : "Paste the store page link or the " + esc(b.link_type)}">${b.why ? `<div class="ev">${esc(b.why)}</div>` : ""}</td>
+        <td class="acts"><button type="button" class="primary" data-a="save">Save</button></td>
       </tr>`;
     }).join("") + `</tbody></table>`;
-}
-async function slApprove(id, value){
-  const msg = await api("POST","rpc/approve_store_link", {p_id:id, p_value:value||null});
-  if (msg === "Added.") slChanged++;
-  return msg;
-}
-async function slReject(id){
-  await api("PATCH", `store_link_suggestions?id=eq.${id}`, {status:"rejected", decided_at:new Date().toISOString()}, {Prefer:"return=minimal"});
-}
-async function slLookUp(file){
-  const r = await fetch(cfg.url + "/functions/v1/find-store-links", {method:"POST", headers: await headers(), body: JSON.stringify({file_name:file})});
-  const j = await r.json().catch(()=>({}));
-  if (!r.ok) throw new Error(j.error || j.message || ("Error " + r.status));
-  return j;
 }
 async function slRun(){
   if (slBusy) return;
   const btn = $("#storelinks");
-  slShown = visibleRows().map(ed=>ed.file_name);
+  const shown = visibleRows().map(ed=>ed.file_name);
   slChanged = 0; slRows = []; slBusy = true; btn.disabled = true;
   slMsg(""); slRender(); $("#sldlg").showModal();
-  const failed = [];
-  let todo = [];
+  let auto = 0;
   try{
-    if (!slShown.length){ slMsg("No books are shown in the grid."); return; }
+    if (!shown.length){ slMsg("No books are shown in the grid."); return; }
     slMsg("Checking which shown books have blank store links…");
-    const has = new Set((await slIn("store_link_blanks?select=file_name&limit=5000", slShown)).map(r=>r.file_name));
-    todo = slShown.filter(f=>has.has(f));
-    let n = 0;
-    const queue = todo.slice();
-    const worker = async ()=>{
-      for (let f = queue.shift(); f; f = queue.shift()){
-        slMsg(`Looking up book ${++n} of ${todo.length}…`);
-        try{ await slLookUp(f); }catch(err){ failed.push(f); }
+    const blanks = await slIn("store_link_blanks?select=*&order=file_name,store,format&limit=5000", shown);
+    const products = blanks.some(b=>b.store==="Payhip") ? (await api("GET","payhip_products?select=code,name,status") || []) : [];
+    for (const b of blanks){
+      const w = slWorkedOut(b, products);
+      if (w && w.sure){
+        try{ slMsg(`Saving ${b.store} ${b.format} for ${b.title}…`); await slSave(b, w.value); auto++; continue; }catch(err){ b.why = "Not saved: " + friendly(err); }
       }
-    };
-    await Promise.all([worker(), worker(), worker()]);
-    await slLoad();
-    const sure = slRows.filter(r=>r.confidence==="sure");
-    for (let i=0; i<sure.length; i++){
-      slMsg(`Saving “Sure” link ${i+1} of ${sure.length}…`);
-      try{ await slApprove(sure[i].id, sure[i].suggested_value); }catch(err){ /* stays in the list to approve by hand */ }
+      if (w){ b.value = w.value; b.why = b.why || w.why; }
+      slRows.push(b);
     }
   }catch(err){ slMsg(friendly(err)); return; }
-  finally{
-    slBusy = false; btn.disabled = false;
-    await slLoad();
-  }
-  const titles = {}; (data.editions||[]).forEach(e=>{ titles[e.file_name] = e.title; });
-  slMsg(`${slShown.length} book(s) shown, ${todo.length} with blank store links. ${slChanged} “Sure” link(s) saved. ${slRows.length} waiting below.` +
-    (failed.length ? ` Could not look up: ${failed.map(f=>titles[f]||f).join(", ")}.` : ""));
+  finally{ slBusy = false; btn.disabled = false; slRender(); }
+  slMsg(`${shown.length} book(s) shown. ` + (auto ? `${auto} Amazon paperback ASIN(s) worked out from the ISBN and saved. ` : "") +
+    (slRows.length ? `${slRows.length} blank link(s) below: press Search, open the right book, copy its link from the address bar, paste it here, then Save or Save all.` : "No blank store links left."));
 }
+async function slSaveRow(tr){
+  const i = Number(tr.dataset.i), b = slRows[i], v = slTidy(b, tr.querySelector("input").value);
+  if (!v) return false;
+  tr.querySelectorAll("button,input").forEach(x=>x.disabled = true);
+  try{ await slSave(b, v); b.done = true; tr.remove(); return true; }
+  catch(err){ slMsg(`${b.title} · ${b.store}: ${friendly(err)}`); tr.querySelectorAll("button,input").forEach(x=>x.disabled = false); return false; }
+}
+function slPrune(){ slRows = slRows.filter(b=>!b.done); slRender(); }
 $("#storelinks").onclick = ()=>slRun();
+$("#slsaveall").onclick = async ()=>{
+  const trs = [...$("#sllist").querySelectorAll("tr[data-i]")].filter(tr=>tr.querySelector("input").value.trim());
+  if (!trs.length){ slMsg("Nothing pasted yet."); return; }
+  $("#slsaveall").disabled = true;
+  let n = 0; for (const tr of trs) if (await slSaveRow(tr)) n++;
+  slPrune(); slMsg(`${n} of ${trs.length} saved.` + (slRows.length ? ` ${slRows.length} still blank.` : ""));
+};
 $("#slclose").onclick = ()=>{
   $("#sldlg").close();
   if (slChanged) setStatus(`${slChanged} store link(s) added.`, "ok");
 };
 $("#sllist").addEventListener("click", async ev=>{
   const btn = ev.target.closest("button[data-a]"); if (!btn) return;
-  const tr = btn.closest("tr"), id = Number(tr.dataset.id);
-  tr.querySelectorAll("button").forEach(x=>x.disabled = true);
-  try{
-    if (btn.dataset.a === "ok") slMsg(await slApprove(id, tr.querySelector("input").value.trim()));
-    else { await slReject(id); slMsg("Rejected."); }
-    slRows = slRows.filter(r=>r.id !== id); slRender();
-  }catch(err){ slMsg(friendly(err)); tr.querySelectorAll("button").forEach(x=>x.disabled = false); }
+  const tr = btn.closest("tr");
+  if (!tr.querySelector("input").value.trim()){ slMsg("Paste the link first."); return; }
+  if (await slSaveRow(tr)){ slPrune(); slMsg("Saved."); }
+});
+$("#sllist").addEventListener("keydown", async ev=>{
+  if (ev.key!=="Enter" || !ev.target.matches("input")) return;
+  ev.preventDefault(); const tr = ev.target.closest("tr");
+  if (tr.querySelector("input").value.trim() && await slSaveRow(tr)){ slPrune(); slMsg("Saved."); }
 });
 
 /* ---------- Payhip footer code (was payhip_footer_update.py) ----------
