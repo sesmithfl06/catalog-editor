@@ -212,6 +212,7 @@ code{font-size:12px;word-break:break-all}
 .ctx{position:fixed;z-index:1000;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:4px}
 .ctx button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:6px 10px;border-radius:5px;font-size:13px}
 .ctx button:hover{background:var(--soft)}
+.ctx .sub{padding-left:12px}
 /* Find store links */
 dialog#sldlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:1100px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
 dialog#sldlg::backdrop{background:#0006}
@@ -529,7 +530,7 @@ dialog#ncdlg::backdrop{background:#0006}
   <details><summary>…choose, hide, move and freeze columns?</summary>
     <ul>
       <li>Tick columns in the sidebar. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”.</li>
-      <li>Right-click a column heading → Does this go to Notion?, Clear filter, Hide column, Hide from here to end, <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, Reset this column's width, Reset all column widths, Reset column order. Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
+      <li>Right-click a column heading → Does this go to Notion?, Clear filter, <b>Hide</b> (Hide column, Hide from here to end), <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, <b>Reset</b> (this column's width, all column widths, column order). Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
       <li>Drag a heading to move the column (a blue edge shows where it lands). Drag the right edge of a heading to resize; double-click that edge to reset the width.</li>
       <li><b>Show full text</b> (above the grid) shows long cells in full; otherwise only the first line shows.</li>
       <li><b>Blanks</b> (Columns section) shows the title plus every column that has a blank to fill for at least one book shown. Striped cells are empty because the book has no such thing (no award, no subtitle, no such format) and don't count. It loads every column, so it can take a minute.</li>
@@ -1275,22 +1276,6 @@ async function setSection(grp, on){
   recordView(vb);
   await refresh();
 }
-/* right-click a group in the sidebar → Reset this group: its columns go back to the opening state (ticked only if they are in the opening
-   columns), and their widths, filters and place in the sort are cleared. Nothing is changed in Supabase. */
-async function resetSection(grp){
-  const vb = viewSnap();
-  grp.querySelectorAll("input[data-id]").forEach(i=>{
-    const id = i.dataset.id;
-    setColOn(id, DEFAULT_COLS.includes(id));
-    delete colWidths[id]; delete colFilters[id]; delete colConds[id];
-    colOrder = colOrder.filter(x=>x!==id);
-  });
-  sortKeys = sortKeys.filter(k=>!grp.querySelector(`input[data-id="${CSS.escape(k.id)}"]`));
-  recordView(vb);
-  renderColumnList();
-  await refresh();
-  setStatus("Group reset to its opening columns","ok");
-}
 /* right-click a column (sidebar or grid header): Does this go to Notion? Answers for that column, lists everything that does,
    and has a button to start or stop sending it. The answer comes from field_registry.in_notion, the same list the Notion sync uses.
    The sync (Supabase edge function notion-sync) only has a place for the fields below; any other column can't be sent from here.
@@ -1385,9 +1370,9 @@ $("#collist").addEventListener("contextmenu", e=>{
   e.preventDefault(); closeCtx();
   const grp = sum.parentElement;
   const m = document.createElement("div"); m.className = "ctx";
-  m.innerHTML = `<button data-on="1">Check all</button><button data-on="0">Hide all columns in this group</button><button data-on="reset">Reset this group</button>`;
-  m.style.left = Math.min(e.clientX, innerWidth-230)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
-  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); if (b.dataset.on==="reset") resetSection(grp); else setSection(grp, b.dataset.on==="1"); });
+  m.innerHTML = `<button data-on="1">Check all</button><button data-on="0">Uncheck all</button>`;
+  m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-90)+"px";
+  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); setSection(grp, b.dataset.on==="1"); });
   document.body.appendChild(m); ctxMenu = m;
 });
 document.addEventListener("click", closeCtx);
@@ -1440,13 +1425,16 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   const id = th.dataset.sort;
   const locked = blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
   const m = document.createElement("div"); m.className = "ctx";
-  m.innerHTML = (COLMAP[id] && COLMAP[id].full ? `<button type="button" data-a="full">Show full name</button>` : "") + `<button type="button" data-a="notion">Does this go to Notion?</button><button type="button" data-a="rename">Rename column…</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "") + (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`
+  m.innerHTML = (COLMAP[id] && COLMAP[id].full ? `<button type="button" data-a="full">Show full name</button>` : "") + `<button type="button" data-a="notion">Does this go to Notion?</button><button type="button" data-a="rename">Rename column…</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "") + `<button type="button" data-a="tog" data-s="hide">Hide ▸</button><div class="sub" data-s="hide" hidden>` + (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button></div>`
     + `<button type="button" data-a="freeze">Freeze up to this column</button>` + (frozenN>1 ? `<button type="button" data-a="unfreeze">Unfreeze (first column only)</button>` : "")
-    + (colWidths[id] ? `<button type="button" data-a="unsize">Reset this column's width</button>` : "")
-    + (Object.keys(colWidths).length ? `<button type="button" data-a="unsizeall">Reset all column widths</button>` : "")
-    + (colOrder.length ? `<button type="button" data-a="unorder">Reset column order</button>` : "");
+    + (colWidths[id] || Object.keys(colWidths).length || colOrder.length ? `<button type="button" data-a="tog" data-s="reset">Reset ▸</button><div class="sub" data-s="reset" hidden>`
+      + (colWidths[id] ? `<button type="button" data-a="unsize">Reset this column's width</button>` : "")
+      + (Object.keys(colWidths).length ? `<button type="button" data-a="unsizeall">Reset all column widths</button>` : "")
+      + (colOrder.length ? `<button type="button" data-a="unorder">Reset column order</button>` : "") + `</div>` : "");
   m.style.left = Math.min(e.clientX, innerWidth-200)+"px"; m.style.top = Math.min(e.clientY, innerHeight-380)+"px";
-  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx();
+  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return;
+    if (b.dataset.a==="tog"){ ev.stopPropagation(); const sub = m.querySelector(`.sub[data-s="${b.dataset.s}"]`); sub.hidden = !sub.hidden; b.textContent = b.textContent.replace(/[▸▾]/, sub.hidden ? "▸" : "▾"); return; }
+    closeCtx();
     if (b.dataset.a==="notion"){ showNotion(id); return; }
     if (b.dataset.a==="full"){ ev.stopPropagation(); showFullName(id, ev.clientX, ev.clientY); return; }
     if (b.dataset.a==="rename"){ openRename(id); return; }
