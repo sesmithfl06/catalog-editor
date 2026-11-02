@@ -112,9 +112,8 @@ th .fic{display:inline-block;margin-left:4px;padding:0 4px;border-radius:4px;fon
 .filters button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .fpop{width:290px;padding:8px;display:flex;flex-direction:column;gap:6px;font-size:13px}
 .fpop .fhead{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fpop .fsort{display:flex;gap:6px}
-.fpop .fsort button,.fpop .fbtns button{width:auto;display:inline-block;border:1px solid var(--line);background:var(--soft);padding:4px 10px;border-radius:5px}
-.fpop .fsort button:hover,.fpop .fbtns button:hover{border-color:var(--accent)}
+.fpop .fbtns button{width:auto;display:inline-block;border:1px solid var(--line);background:var(--soft);padding:4px 10px;border-radius:5px}
+.fpop .fbtns button:hover{border-color:var(--accent)}
 .fpop .fbtns{display:flex;gap:6px;justify-content:flex-end}
 .fpop .fbtns .ok{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .fpop input[type=search]{width:100%;box-sizing:border-box}
@@ -530,7 +529,6 @@ dialog#ncdlg::backdrop{background:#0006}
       <li><b>Selected a column first?</b> ⌘/Ctrl+click its heading to select it, then press <b>Sort</b> (sorts it A→Z; press Sort again for Z→A) or <b>Filter</b> (opens its filter box). With several columns selected, Sort stacks them left to right and Filter opens the leftmost one.</li>
       <li><b>Sort</b> button, then click headings: first click A→Z, second Z→A, third removes it. Sorts stack like Excel: the heading you click last is the main sort, and the earlier ones stay inside it (click title, then heat, and the books are grouped by heat, with titles in order inside each heat). <b>Clear sort</b> removes all. Press <kbd>Esc</kbd> to leave Sort / Filter mode without choosing.</li>
       <li><b>Filter</b> button then a heading, or right-click a heading → Filter…. The list shows each value with how many books have it (counted after your other filters). Typing in “Search values” ticks what it finds, like Excel. <kbd>Enter</kbd> in the search or condition boxes = OK.</li>
-      <li>The same box has <b>Sort A→Z / Z→A</b> (replaces the sort) and, when a sort already exists, <b>Add A→Z / Z→A</b> (keeps the current sort and makes this column the new main sort).</li>
       <li><b>Condition</b>: Contains, Doesn't contain, Equals, Doesn't equal, Greater than, Less than, Between, Is blank, Is not blank (dates say After / Before). It combines with the ticked values.</li>
       <li><b>Clear all filters</b> appears above the grid once any filter is on.</li>
     </ul>
@@ -1811,9 +1809,7 @@ function openFilter(id, th){
   const m = document.createElement("div"); m.className = "ctx fpop";
   const label = v => v==="" ? BLANK_LABEL : v.split("\n")[0].slice(0,120);
   m.innerHTML = `<div class="fhead" title="${esc(c.label)}">Filter: ${esc(c.label)}</div>
-    <div class="fsort"><button type="button" data-s="1">Sort A→Z</button><button type="button" data-s="-1">Sort Z→A</button></div>` +
-    (sortKeys.some(k=>k.id!==id) ? `<div class="fsort" title="Keep the current sort and make this column the new main sort"><button type="button" data-t="1">Add A→Z</button><button type="button" data-t="-1">Add Z→A</button></div>` : "") +
-    `<div class="fcond"><span class="fcl">Condition${ct==="num" ? " (numbers)" : ct==="date" ? " (dates)" : ""}</span>
+    <div class="fcond"><span class="fcl">Condition${ct==="num" ? " (numbers)" : ct==="date" ? " (dates)" : ""}</span>
       <select data-op aria-label="Condition"><option value="">None</option>${Object.entries(COND_OPS).map(([k,o])=>`<option value="${k}"${cond && cond.op===k ? " selected" : ""}>${esc((ct==="date" && o.date) || o.label)}</option>`).join("")}</select>
       <div class="fab"><input data-ca type="${ct==="date" ? "date" : "text"}" ${ct==="num" ? 'inputmode="decimal"' : ""} aria-label="Value" value="${esc(cond ? cond.a : "")}"><span data-and>and</span><input data-cb type="${ct==="date" ? "date" : "text"}" ${ct==="num" ? 'inputmode="decimal"' : ""} aria-label="Second value" value="${esc(cond ? cond.b : "")}"></div>
     </div>
@@ -1831,10 +1827,6 @@ function openFilter(id, th){
   syncAll();
   m.addEventListener("click", ev=>{
     ev.stopPropagation();   // clicks inside the filter box keep it open
-    const sb = ev.target.closest("button[data-s]");
-    if (sb){ sortKeys = [{id, dir:+sb.dataset.s}]; closeCtx(); leaveLinkView(); renderGrid(); return; }
-    const tb = ev.target.closest("button[data-t]");
-    if (tb){ sortKeys = [{id, dir:+tb.dataset.t}].concat(sortKeys.filter(k=>k.id!==id)); closeCtx(); leaveLinkView(); renderGrid(); return; }
     const b = ev.target.closest("button[data-b]"); if (!b) return;
     if (b.dataset.b==="cancel"){ closeCtx(); return; }
     if (b.dataset.b==="clear"){ closeCtx(); clearFilter(id); return; }
