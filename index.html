@@ -529,7 +529,7 @@ dialog#ncdlg::backdrop{background:#0006}
   <details><summary>…choose, hide, move and freeze columns?</summary>
     <ul>
       <li>Tick columns in the sidebar. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”.</li>
-      <li>Right-click a column heading → Filter…, Does this go to Notion?, Clear filter, Hide column, Hide from here to end, <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, Reset this column's width, Reset all column widths, Reset column order. Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
+      <li>Right-click a column heading → Does this go to Notion?, Clear filter, Hide column, Hide from here to end, <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, Reset this column's width, Reset all column widths, Reset column order. Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
       <li>Drag a heading to move the column (a blue edge shows where it lands). Drag the right edge of a heading to resize; double-click that edge to reset the width.</li>
       <li><b>Show full text</b> (above the grid) shows long cells in full; otherwise only the first line shows.</li>
       <li><b>Blanks</b> (Columns section) shows the title plus every column that has a blank to fill for at least one book shown. Striped cells are empty because the book has no such thing (no award, no subtitle, no such format) and don't count. It loads every column, so it can take a minute.</li>
@@ -540,7 +540,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <ul>
       <li><b>Selected a column first?</b> ⌘/Ctrl+click its heading to select it, then press <b>Sort</b> (sorts it A→Z; press Sort again for Z→A) or <b>Filter</b> (opens its filter box). With several columns selected, Sort stacks them left to right and Filter opens the leftmost one.</li>
       <li><b>Sort</b> button, then click headings: first click A→Z, second Z→A, third removes it. Sorts stack like Excel: the heading you click last is the main sort, and the earlier ones stay inside it (click title, then heat, and the books are grouped by heat, with titles in order inside each heat). <b>Clear sort</b> removes all. Press <kbd>Esc</kbd> to leave Sort / Filter mode without choosing.</li>
-      <li><b>Filter</b> button then a heading, or right-click a heading → Filter…. The list shows each value with how many books have it (counted after your other filters). Typing in “Search values” ticks what it finds, like Excel. <kbd>Enter</kbd> in the search or condition boxes = OK.</li>
+      <li><b>Filter</b> button then a heading. The list shows each value with how many books have it (counted after your other filters). Typing in “Search values” ticks what it finds, like Excel. <kbd>Enter</kbd> in the search or condition boxes = OK.</li>
       <li><b>Condition</b>: Contains, Doesn't contain, Equals, Doesn't equal, Greater than, Less than, Between, Is blank, Is not blank (dates say After / Before). It combines with the ticked values.</li>
       <li><b>Clear all filters</b> appears above the grid once any filter is on.</li>
     </ul>
@@ -1424,7 +1424,7 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   const id = th.dataset.sort;
   const locked = blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
   const m = document.createElement("div"); m.className = "ctx";
-  m.innerHTML = (COLMAP[id] && COLMAP[id].full ? `<button type="button" data-a="full">Show full name</button>` : "") + `<button type="button" data-a="filter">Filter…</button><button type="button" data-a="notion">Does this go to Notion?</button><button type="button" data-a="rename">Rename column…</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "") + (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`
+  m.innerHTML = (COLMAP[id] && COLMAP[id].full ? `<button type="button" data-a="full">Show full name</button>` : "") + `<button type="button" data-a="notion">Does this go to Notion?</button><button type="button" data-a="rename">Rename column…</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "") + (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`
     + `<button type="button" data-a="freeze">Freeze up to this column</button>` + (frozenN>1 ? `<button type="button" data-a="unfreeze">Unfreeze (first column only)</button>` : "")
     + (colWidths[id] ? `<button type="button" data-a="unsize">Reset this column's width</button>` : "")
     + (Object.keys(colWidths).length ? `<button type="button" data-a="unsizeall">Reset all column widths</button>` : "")
@@ -1434,7 +1434,6 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     if (b.dataset.a==="notion"){ showNotion(id); return; }
     if (b.dataset.a==="full"){ ev.stopPropagation(); showFullName(id, ev.clientX, ev.clientY); return; }
     if (b.dataset.a==="rename"){ openRename(id); return; }
-    if (b.dataset.a==="filter"){ ev.stopPropagation(); openFilter(id, th); return; }
     if (b.dataset.a==="unfilter"){ clearFilter(id); return; }
     if (b.dataset.a==="freeze"){ freezeTo(id); return; }
     if (b.dataset.a==="unfreeze"){ frozenN = 1; renderGrid(); return; }
