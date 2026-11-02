@@ -1275,6 +1275,22 @@ async function setSection(grp, on){
   recordView(vb);
   await refresh();
 }
+/* right-click a group in the sidebar → Reset this group: its columns go back to the opening state (ticked only if they are in the opening
+   columns), and their widths, filters and place in the sort are cleared. Nothing is changed in Supabase. */
+async function resetSection(grp){
+  const vb = viewSnap();
+  grp.querySelectorAll("input[data-id]").forEach(i=>{
+    const id = i.dataset.id;
+    setColOn(id, DEFAULT_COLS.includes(id));
+    delete colWidths[id]; delete colFilters[id]; delete colConds[id];
+    colOrder = colOrder.filter(x=>x!==id);
+  });
+  sortKeys = sortKeys.filter(k=>!grp.querySelector(`input[data-id="${CSS.escape(k.id)}"]`));
+  recordView(vb);
+  renderColumnList();
+  await refresh();
+  setStatus("Group reset to its opening columns","ok");
+}
 /* right-click a column (sidebar or grid header): Does this go to Notion? Answers for that column, lists everything that does,
    and has a button to start or stop sending it. The answer comes from field_registry.in_notion, the same list the Notion sync uses.
    The sync (Supabase edge function notion-sync) only has a place for the fields below; any other column can't be sent from here.
@@ -1369,9 +1385,9 @@ $("#collist").addEventListener("contextmenu", e=>{
   e.preventDefault(); closeCtx();
   const grp = sum.parentElement;
   const m = document.createElement("div"); m.className = "ctx";
-  m.innerHTML = `<button data-on="1">Check all</button><button data-on="0">Uncheck all</button>`;
-  m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-90)+"px";
-  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); setSection(grp, b.dataset.on==="1"); });
+  m.innerHTML = `<button data-on="1">Check all</button><button data-on="0">Hide all columns in this group</button><button data-on="reset">Reset this group</button>`;
+  m.style.left = Math.min(e.clientX, innerWidth-230)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
+  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); if (b.dataset.on==="reset") resetSection(grp); else setSection(grp, b.dataset.on==="1"); });
   document.body.appendChild(m); ctxMenu = m;
 });
 document.addEventListener("click", closeCtx);
