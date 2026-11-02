@@ -55,6 +55,7 @@ details.setup{margin-top:18px;font-size:13px;color:var(--muted)}
 header{grid-column:1/3;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
 header h1{font-size:16px;margin:0 8px 0 0}
 header .grow{flex:1}
+header .brk{flex:0 0 100%;height:0}   /* forces a new line: Sign out stays on the top line, the status text starts the second line */
 header .who{color:var(--muted);font-size:12px}
 #status{font-size:12px;color:var(--muted);flex:0 0 260px;width:260px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}   /* fixed width so the buttons after it never shift; full text shows on hover */
 #status.bad{color:var(--bad)} #status.ok{color:var(--ok)} #status.warn{color:var(--warn)}
@@ -85,8 +86,6 @@ aside{border-right:1px solid var(--line);background:var(--panel);min-height:0;ov
 .grp > summary{list-style:none;cursor:pointer;padding:7px 12px;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);display:flex;align-items:center;gap:6px}
 .grp > summary .n{font-weight:400;text-transform:none;margin-left:auto}
 .grp[open] > summary{color:var(--ink)}
-.qm{text-decoration:underline;text-underline-offset:2px;cursor:pointer}
-.qm:hover{color:var(--accent)}
 .qmpop{position:fixed;z-index:9999;max-width:320px;padding:8px 10px;background:var(--panel);color:var(--ink);border:1px solid var(--accent);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.2);font-size:12px;font-weight:400;line-height:1.4;white-space:pre-line}
 .col{display:flex;gap:8px;align-items:flex-start;padding:3px 12px 3px 18px;cursor:pointer;font-size:13px}
 .col:hover{background:var(--soft)}
@@ -216,10 +215,22 @@ code{font-size:12px;word-break:break-all}
 /* Find store links */
 dialog#sldlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:1100px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
 dialog#sldlg::backdrop{background:#0006}
-dialog#pfdlg,dialog#nfdlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:820px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
-dialog#pfdlg::backdrop,dialog#nfdlg::backdrop{background:#0006}
+dialog#pfdlg,dialog#nfdlg,dialog#ntdlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:820px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
+dialog#pfdlg::backdrop,dialog#nfdlg::backdrop,dialog#ntdlg::backdrop{background:#0006}
 #pfdlg label{display:block;margin:10px 0 0;font-size:13px}
 /* New column */
+dialog#hdlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:820px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
+dialog#hdlg::backdrop{background:#0006}
+#hbody{overflow:auto;max-height:calc(100vh - 170px);padding-right:6px}
+#hbody details{border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:0 12px}
+#hbody summary{cursor:pointer;font-weight:600;padding:9px 0}
+#hbody details[open] summary{border-bottom:1px solid var(--line);margin-bottom:8px}
+#hbody ul{margin:6px 0 12px;padding-left:20px;font-size:13px;line-height:1.5}
+#hbody li{margin:5px 0}
+#hbody p{font-size:13px;line-height:1.5;margin:6px 0}
+#hbody kbd{display:inline-block;padding:0 6px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;background:var(--bg);font:12px/1.5 inherit;white-space:nowrap}
+#hbody code{font-size:12px}
+#hbody h3{margin:14px 0 4px}
 dialog#ncdlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:520px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
 dialog#ncdlg::backdrop{background:#0006}
 #ncdlg label{display:block;margin:10px 0 0;font-size:13px}
@@ -229,8 +240,8 @@ dialog#ncdlg::backdrop{background:#0006}
 #ncdlg .row .grow{flex:1}
 #pfdlg textarea{display:block;width:100%;box-sizing:border-box;min-height:110px;margin-top:4px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 #pfdlg input[type=file]{display:block;margin-top:4px}
-#pfdlg .row,#nfdlg .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
-#pfdlg .row .grow,#nfdlg .row .grow{flex:1}
+#pfdlg .row,#nfdlg .row,#ntdlg .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}
+#pfdlg .row .grow,#nfdlg .row .grow,#ntdlg .row .grow{flex:1}
 #pfout ul,#nflist ul{margin:8px 0;padding-left:20px;font-size:13px}
 #pfout details{margin-top:8px;font-size:13px}
 #nflist li{margin:6px 0}
@@ -387,10 +398,140 @@ dialog#ncdlg::backdrop{background:#0006}
   <div class="row"><button id="nfretry" class="primary" type="button">Try these again</button><span class="hint" id="nfmsg"></span><span class="grow"></span><button id="nfclose" type="button">Done</button></div>
 </dialog>
 
+<!-- ============ What goes to Notion ============ -->
+<dialog id="ntdlg">
+  <h2>Does this go to Notion?</h2>
+  <p id="ntthis"></p>
+  <h3 id="nthead"></h3>
+  <div id="ntlist" style="overflow:auto;max-height:50vh"></div>
+  <div class="row"><span class="grow"></span><button id="ntclose" type="button">Done</button></div>
+</dialog>
+
+<!-- ============ How do I... ============ -->
+<dialog id="hdlg">
+  <h2>How do I…</h2>
+  <p class="hint">Things the editor does that you can't see by looking at it. On a Windows keyboard, ⌘ is Ctrl.</p>
+  <div id="hbody">
+
+  <details open><summary>…select cells (a column, a block, several cells)?</summary>
+    <ul>
+      <li><b>Select one cell:</b> click it. It gets a double outline and becomes the <i>starting cell</i>: its value is the one that gets copied to the others.</li>
+      <li><b>Select a block:</b> click the starting cell, then <kbd>Shift</kbd>+click the opposite corner. Everything between is selected.</li>
+      <li><b>Select a whole column:</b> there is no shortcut and clicking a column heading does not select it. Click the first cell of the column, then <kbd>Shift</kbd>+click the last one (scroll down, or use a filter first so only the books you want are shown). The selection only covers books and columns currently shown.</li>
+      <li><b>Select scattered cells:</b> <kbd>⌘</kbd>+click (Mac) or <kbd>Ctrl</kbd>+click adds a cell or removes it if it is already selected. <kbd>⌘</kbd>+clicking the starting cell clears the selection.</li>
+      <li><b>Clear the selection:</b> <kbd>Esc</kbd>, the Clear button in the bar at the bottom, or a plain click on any cell.</li>
+      <li><b>Right-click a cell that isn't selected</b> and it is selected first, then the menu opens.</li>
+    </ul>
+  </details>
+
+  <details><summary>…copy one value into many cells?</summary>
+    <ul>
+      <li>Select the starting cell (the value to copy), then <kbd>Shift</kbd>+click or <kbd>⌘</kbd>+click the cells to fill. A bar appears at the bottom: “Copy to N selected cells: …”. Press the ⧉ button in it.</li>
+      <li>You are asked to confirm. The fill saves straight to Supabase, one cell at a time. <b>Undo</b> (<kbd>⌘</kbd>+<kbd>Z</kbd>) reverses the whole fill in one step.</li>
+      <li>Only editable cells are filled. A cell is skipped if the value doesn't fit its column (text into a Yes/No column, a decimal into a whole-number column, a date it can't read, a value that isn't on a pick-one list). Yes/No accepts yes, no, true, false or blank; numbers ignore $, commas and spaces.</li>
+      <li>If Supabase refuses one cell, the fill stops there. The message says how many were filled; Undo reverses those.</li>
+      <li>To copy a cell's text to the clipboard instead, hover the cell and press the small ⧉ at its top right.</li>
+    </ul>
+  </details>
+
+  <details><summary>…edit a cell from the keyboard?</summary>
+    <ul>
+      <li>A plain click only <i>selects</i>. To edit: <kbd>Enter</kbd> or <kbd>F2</kbd> on the selected cell, or right-click → Edit (it says “not editable” if the column is read-only).</li>
+      <li><kbd>↑ ↓ ← →</kbd> move to the next <i>editable</i> cell (read-only cells are skipped).</li>
+      <li>In the editor: <kbd>Enter</kbd> saves and moves down to the next editable cell; <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line in long text; <kbd>Tab</kbd> saves and moves right; <kbd>Shift</kbd>+<kbd>Tab</kbd> saves and moves left; <kbd>Esc</kbd> cancels; clicking outside the editor saves.</li>
+      <li><b>Undo</b> <kbd>⌘</kbd>+<kbd>Z</kbd>; <b>Redo</b> <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (or <kbd>Ctrl</kbd>+<kbd>Y</kbd>). They don't work while you are typing in a box; use the Undo / Redo buttons at the top then.</li>
+      <li>Right-click a cell in a Formats column with no format yet → “Add … for this book”; right-click a story bible cell with none → “Add a story bible for this book”.</li>
+    </ul>
+  </details>
+
+  <details><summary>…find books and keep several on screen?</summary>
+    <ul>
+      <li>The <b>Find a book</b> box looks in the title and file name only. Tick <b>Expand scope</b> to search every ticked column too. With several words, a book must contain all of them.</li>
+      <li>Press <kbd>Enter</kbd> (or <b>Add to list</b>) to keep the books found, then type the next search. Kept books stay at the top; what you are typing now is listed after them. <b>Clear list</b> empties it; right-click a kept book → “Remove from list” removes just that one.</li>
+      <li>Right-click a row → <b>Hide row</b> or <b>Hide from here to end</b>. They stay hidden until <b>Show hidden rows</b> (in the Books section or the right-click menu).</li>
+      <li>The Language and Series drop-downs narrow the list too; “Send shown to Notion”, Export → “Only what I see” and “Find store links for shown books” all use whatever is shown after these.</li>
+    </ul>
+  </details>
+
+  <details><summary>…choose, hide, move and freeze columns?</summary>
+    <ul>
+      <li>Tick columns in the sidebar. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”.</li>
+      <li>Right-click a column heading → Filter…, Does this go to Notion?, Clear filter, Hide column, Hide from here to end, <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, Reset this column's width, Reset all column widths, Reset column order. Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
+      <li>Drag a heading to move the column (a blue edge shows where it lands). Drag the right edge of a heading to resize; double-click that edge to reset the width.</li>
+      <li><b>Show full text</b> (above the grid) shows long cells in full; otherwise only the first line shows.</li>
+      <li><b>Blanks</b> (Columns section) shows the title plus every column that has a blank to fill for at least one book shown. Striped cells are empty because the book has no such thing (no award, no subtitle, no such format) and don't count. It loads every column, so it can take a minute.</li>
+    </ul>
+  </details>
+
+  <details><summary>…sort and filter?</summary>
+    <ul>
+      <li><b>Sort</b> button, then click headings: first click A→Z, second Z→A, third removes it. Each heading you click is added as the next level (sort by heat, then title). <b>Clear sort</b> removes all. Press <kbd>Esc</kbd> to leave Sort / Filter mode without choosing.</li>
+      <li><b>Filter</b> button then a heading, or right-click a heading → Filter…. The list shows each value with how many books have it (counted after your other filters). Typing in “Search values” ticks what it finds, like Excel. <kbd>Enter</kbd> in the search or condition boxes = OK.</li>
+      <li>The same box has <b>Sort A→Z / Z→A</b> (replaces the sort) and, when a sort already exists, <b>Then A→Z / Z→A</b> (adds this column as the next level).</li>
+      <li><b>Condition</b>: Contains, Doesn't contain, Equals, Doesn't equal, Greater than, Less than, Between, Is blank, Is not blank (dates say After / Before). It combines with the ticked values.</li>
+      <li><b>Clear all filters</b> appears above the grid once any filter is on.</li>
+    </ul>
+  </details>
+
+  <details><summary>…save a view and open a book from a link?</summary>
+    <ul>
+      <li><b>Save view</b> (Columns section) stores the ticked columns, sort, filters, column order, widths and frozen columns in Supabase, so it follows you to any device. <b>Update view</b> overwrites the selected view with what you have now. Older views from Excel keep columns only and can't be updated here.</li>
+      <li>A link ending in <code>#book=&lt;file name&gt;&amp;col=&lt;column id&gt;</code> opens the editor on that book (and flashes that cell). The Distribution Clipboard Queue app makes these. The link view shows only that book, its title and the linked column; press <b>Show all books &amp; columns</b> to go back.</li>
+      <li><b>Export</b> downloads a CSV (opens in Excel): “Only what I see” or “Everything”.</li>
+    </ul>
+  </details>
+
+  <details><summary>…send books to Notion, and what exactly happens?</summary>
+    <h3>Sending</h3>
+    <ul>
+      <li><b>Send shown to Notion</b> needs two clicks: the first turns the button into “Click again to send N” for 4 seconds, the second sends. It sends the books shown in the grid after your filters, with <i>all</i> the Notion columns for each, not only the columns you can see.</li>
+      <li>Each book is added to the queue unless it is already Waiting or Working. Then the sync starts. If it can't start right away, the every-minute schedule starts it.</li>
+      <li>The top bar shows “N waiting for Notion · N failed”. Click the red “failed” to see the reason for each book and press “Try these again”. You can close the page; the sync carries on.</li>
+    </ul>
+    <h3>How the sync runs (Supabase Edge Function notion-sync)</h3>
+    <ul>
+      <li>One book at a time, about 10 seconds each (it pauses 0.34 seconds between Notion requests because Notion allows about 3 a second). A run works up to about 100 seconds, then the next run carries on; only one run works at a time.</li>
+      <li>Every minute a schedule starts a run if anything is Waiting. A request Notion turns down as too busy (or a temporary error) is retried up to 5 times.</li>
+      <li>Only owners and editors can start it from the editor; the schedule uses a secret kept in Supabase Vault. The Notion token is in Vault too (name <code>notion_token</code>).</li>
+      <li>A queue line goes Waiting → Working → Done (or Failed, with the reason). Done lines are deleted after 30 days.</li>
+    </ul>
+    <h3>What it writes to Notion</h3>
+    <ul>
+      <li>A “📚 From the catalog” box at the <b>top</b> of the edition's Notion page: every field marked as going to Notion (right-click any column → “Does this go to Notion?” lists them). Blank fields (empty, n/a, n/d) are left out. The box is <b>replaced at every sync</b>, so edit those things in the Catalog Editor, never in Notion.</li>
+      <li>Everything below “⬇ Your Notion notes” is never touched.</li>
+      <li>A translation shows its English text beside it when the two differ.</li>
+      <li>An edition with no Notion page gets a new one under <code>notion_parent_page_id</code> in settings (or the _French, _German… version for that language). A page Notion says it can't find usually needs sharing with the integration: in Notion ••• → Connections.</li>
+      <li>First sync of a page that existed before Supabase: old headings that clash with the catalog box are renamed “Archived Notion …”. Nothing is deleted.</li>
+    </ul>
+    <h3>What it reads back from Notion</h3>
+    <ul>
+      <li><b>Reviews</b> go into the reviews table. <b>Teasers, FB Posts, Instagram, Tweets, Tweets Hashtags, Audiobook Tweets, Review Tweets, Subscription Box Email, FB Ads, Amazon Ads, Book Bub Ads and Advertising Copy</b> go into marketing copy.</li>
+      <li>First sync of a page: Notion and Supabase are merged, so nothing is lost on either side. After that <b>Notion is the master</b> for these sections: edit them in Notion.</li>
+      <li>If the Notion rows equal what Supabase has, nothing is touched. Review changes are logged in the change log as “Notion sync” (so they can be undone); marketing copy is replaced without a log entry, and the queue line (for example “Teaser: 3 saved”) is the record.</li>
+    </ul>
+    <h3>What queues a book by itself</h3>
+    <ul>
+      <li>Changing anything the Notion box shows queues that book, and every other book it also appears on (other editions of the story, books that recommend a retitled book, other books with the same character, and so on). Only books whose Notion page has been synced at least once are queued; an edit never creates a Notion page; a book already Waiting isn't queued twice.</li>
+      <li>Reviews and marketing copy are not watched (Notion owns them).</li>
+      <li>Every night at 06:23 UTC (2:23 am New York in summer, 1:23 am in winter) every page the catalog created, and every page synced at least once, is queued again. This catches recommendation changes caused by other books.</li>
+    </ul>
+  </details>
+
+  </div>
+  <div class="row"><span class="grow"></span><button id="hclose" class="primary" type="button">Done</button></div>
+</dialog>
+
 <!-- ============ App ============ -->
 <div id="app" class="hidden">
   <header>
     <h1>Catalog Editor</h1>
+    <span class="grow"></span>
+    <span class="who" id="nqueue"></span>
+    <span class="who" id="who"></span>
+    <button id="howdoi" title="Shortcuts and things that are not obvious in the editor, and exactly how the Notion sync works">How do I…</button>
+    <button id="security">Sign-in options</button>
+    <button id="signout">Sign out</button>
+    <span class="brk"></span>
     <span id="status">Loading…</span>
     <button id="linkexit" type="button" class="hidden" title="This view shows only the book and cell the link opened. Click to go back to your usual books and columns.">Show all books &amp; columns</button>
     <span class="grow"></span>
@@ -401,10 +542,6 @@ dialog#ncdlg::backdrop{background:#0006}
     <span class="helptip" tabindex="0" role="note" aria-label="Help: Send shown to Notion" data-tip="Sends all the prearranged columns for each visible row, not just the visible ones.">?</span>
     <button id="storelinks" title="Look up the blank store links of the books shown in the grid (after your filters)">Find store links for shown books</button>
     <button id="payhipfooter" title="Make new Payhip footer code from the catalog">Payhip footer</button>
-    <span class="who" id="nqueue"></span>
-    <span class="who" id="who"></span>
-    <button id="security">Sign-in options</button>
-    <button id="signout">Sign out</button>
   </header>
 
   <aside>
@@ -428,6 +565,7 @@ dialog#ncdlg::backdrop{background:#0006}
           <button id="presetdel" type="button" disabled>Delete view</button>
         </div>
         <label class="chk" title="Shows the title plus every column that has a blank to fill for at least one book shown. Striped cells are empty because the book isn't part of that table (no award, no subtitle, no such format…), so they don't count."><input type="checkbox" id="fcolblank"> Blanks</label>
+        <div class="hint" style="margin-top:2px">This may take a minute to load.</div>
         <input id="colsearch" type="search" placeholder="Find a column…">
         <div class="btns">
           <button id="none" title="Untick everything">Clear</button>
@@ -600,6 +738,7 @@ const HELP = {
   "editions.essential_description":"The story text only: the long synopsis without the award line, series intro or promo line. Use it when you need the plain version.",
   "editions.long_synopsis_award_line":"Award or bestseller line, e.g. USA Today Bestseller! It starts the Long Synopsis, in the same paragraph as the next text (its own paragraph only when the next text is a story title).",
   "editions.long_synopsis_series_intro":"Series intro, e.g. The Dragon Lords of Valdier universe is vast… Its own paragraph after the award line. Not in the Essential Description.",
+  "editions.loglines":"Marketing lines for the book. Unlike the other text columns, a logline is allowed to repeat parts of the other loglines, or text taken from other sources such as the synopsis.",
   "editions.kindle_unlimited":"Whether the eBook is in Kindle Unlimited (KU), which means it is sold only on Amazon.",
   "editions.vellum_link_created":"Has the complete store link been saved in booklinks copy.vellum?",
     "stories.spice":"0 = no romance, 1 = flirting or kissing, 2 = fade to black, 3 = one or two descriptively sexy scenes, 4 = three or more sexy scenes, 5 = a strong sexy focus throughout. Exception: a story with a strong sexy focus, or a polyamorous one, but only one or two explicit scenes is a 4.",
@@ -637,8 +776,8 @@ function valueHelp(c, v){
   const hit = list && list.find(x=>String(x.value)===String(v) && x.note);
   return hit ? v + " = " + hit.note : "";
 }
-function qm(text, label){ return `<span class="qm" role="button" tabindex="0" data-tip="${esc(text)}" aria-label="Help: ${esc(label)}">${esc(label)}</span>`; }
-/* underlined column name: click opens the explanation, a second click or a click elsewhere (or Esc) closes it */
+function qm(text, label){ return `<span class="qm" data-tip="${esc(text)}">${esc(label)}</span>`; }
+/* column name in the sidebar: right-click it and choose "What's this?" to open the explanation; a click elsewhere (or Esc) closes it */
 let qmOpen=null, qmPop=null;
 function qmClose(){ if(qmPop){ qmPop.remove(); qmPop=null; } qmOpen=null; }
 function qmShow(el){
@@ -658,13 +797,10 @@ function qmShow(el){
   qmPop.style.left=x+"px"; qmPop.style.top=y+"px";
 }
 document.addEventListener("click", e=>{
-  const q=e.target.closest(".qm");
-  if(q){ e.preventDefault(); e.stopPropagation(); if(qmOpen===q) qmClose(); else qmShow(q); return; }
   if(qmPop && !e.target.closest(".qmpop")) qmClose();
 }, true);
 document.addEventListener("keydown", e=>{
   if(e.key==="Escape") qmClose();
-  else if((e.key==="Enter"||e.key===" ") && e.target.classList && e.target.classList.contains("qm")){ e.preventDefault(); e.target.click(); }
 });
 window.addEventListener("scroll", qmClose, true);
 async function showColumn(id){
@@ -953,7 +1089,6 @@ function renderColumnList(){
   updateColCount();
 }
 function updateColCount(){ const n = onSet().size; $("#colcount").textContent = n ? n + " ticked" : ""; }
-$("#collist").addEventListener("click", e=>{ if (e.target.closest(".qm")) e.preventDefault(); });   // the underlined name only explains, it must not tick the column
 $("#collist").addEventListener("change", async e=>{
   const id = e.target.dataset.id; if(!id) return;
   const vb = viewSnap(); setColOn(id, e.target.checked); recordView(vb);
@@ -974,7 +1109,40 @@ async function setSection(grp, on){
   recordView(vb);
   await refresh();
 }
+/* right-click a column (sidebar or grid header): Does this go to Notion? Answers for that column and lists everything that does (field_registry.in_notion, the same list the Notion sync uses) */
+function notionYes(c){
+  const t = {promo:c.table, ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", sb:"story_bibles", ml:"marketing_links", info:"editions"}[c.kind];
+  if (!t) return false;
+  const col = c.col || "";
+  return !!((REG[t+"."+col] || {}).in_notion || (c.kind==="info" && (REG["edition_info."+col] || {}).in_notion));
+}
+function showNotion(id){
+  const c = COLMAP[id]; if (!c) return;
+  $("#ntthis").innerHTML = `<b>${esc(c.label)}</b>: ` + (notionYes(c) ? `Yes. It goes to Notion, in the “📚 From the catalog” box at the top of the book's page.` : `No. It is not in the “📚 From the catalog” box in Notion.`);
+  let n = 0, html = "";
+  for (const [g, cs] of groups()){
+    const yes = cs.filter(notionYes); if (!yes.length) continue;
+    n += yes.length;
+    html += `<h4 style="margin:10px 0 4px">${esc(g)}</h4><div>` + yes.map(x=>`<div${x.id===id?' style="font-weight:700"':""}>${esc(x.label)}</div>`).join("") + `</div>`;
+  }
+  $("#nthead").textContent = `Everything that goes to Notion (${n})`;
+  $("#ntlist").innerHTML = html || `<div class="empty">Nothing is marked as going to Notion.</div>`;
+  $("#ntdlg").showModal();
+}
+$("#ntclose").onclick = ()=>$("#ntdlg").close();
+$("#howdoi").onclick = ()=>$("#hdlg").showModal();
+$("#hclose").onclick = ()=>$("#hdlg").close();
 $("#collist").addEventListener("contextmenu", e=>{
+  const lab = e.target.closest("label.col"), q = e.target.closest(".qm"), cid = lab && lab.querySelector("input[data-id]") && lab.querySelector("input[data-id]").dataset.id;
+  if (lab && cid){   // right-click a column name: What's this? (when it has an explanation) and Does this go to Notion?
+    e.preventDefault(); closeCtx(); qmClose();
+    const m = document.createElement("div"); m.className = "ctx";
+    m.innerHTML = (q ? `<button type="button" data-a="what">What's this?</button>` : "") + `<button type="button" data-a="notion">Does this go to Notion?</button>`;
+    m.style.left = Math.min(e.clientX, innerWidth-200)+"px"; m.style.top = Math.min(e.clientY, innerHeight-90)+"px";
+    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); if (b.dataset.a==="notion") showNotion(cid); else qmShow(q); });
+    document.body.appendChild(m); ctxMenu = m;
+    return;
+  }
   const sum = e.target.closest(".grp > summary"); if(!sum) return;
   e.preventDefault(); closeCtx();
   const grp = sum.parentElement;
@@ -1033,13 +1201,14 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   const id = th.dataset.sort;
   const locked = blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
   const m = document.createElement("div"); m.className = "ctx";
-  m.innerHTML = `<button type="button" data-a="filter">Filter…</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "") + (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`
+  m.innerHTML = `<button type="button" data-a="filter">Filter…</button><button type="button" data-a="notion">Does this go to Notion?</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "") + (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`
     + `<button type="button" data-a="freeze">Freeze up to this column</button>` + (frozenN>1 ? `<button type="button" data-a="unfreeze">Unfreeze (first column only)</button>` : "")
     + (colWidths[id] ? `<button type="button" data-a="unsize">Reset this column's width</button>` : "")
     + (Object.keys(colWidths).length ? `<button type="button" data-a="unsizeall">Reset all column widths</button>` : "")
     + (colOrder.length ? `<button type="button" data-a="unorder">Reset column order</button>` : "");
-  m.style.left = Math.min(e.clientX, innerWidth-200)+"px"; m.style.top = Math.min(e.clientY, innerHeight-290)+"px";
+  m.style.left = Math.min(e.clientX, innerWidth-200)+"px"; m.style.top = Math.min(e.clientY, innerHeight-320)+"px";
   m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx();
+    if (b.dataset.a==="notion"){ showNotion(id); return; }
     if (b.dataset.a==="filter"){ ev.stopPropagation(); openFilter(id, th); return; }
     if (b.dataset.a==="unfilter"){ clearFilter(id); return; }
     if (b.dataset.a==="freeze"){ freezeTo(id); return; }
@@ -1690,7 +1859,6 @@ $("#fcolblank").addEventListener("change", async()=>{
   catch(err){ setStatus(err.message,"bad"); }
 });
 $("#gridwrap").addEventListener("click", e=>{
-  if (e.target.closest(".qm")) return;   // the underlined name only explains
   if (swallowClick || e.target.closest(".rsz")) return;   // finishing a resize does not sort
   const th = e.target.closest("th[data-sort]"); if (!th || !pickMode) return;
   const id = th.dataset.sort;
