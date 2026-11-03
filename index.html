@@ -510,7 +510,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…change a Long Synopsis, its order, or a promo line?</summary>
     <ul>
-      <li>Right-click a prose cell (Reasons to Love, loglines, a synopsis or series synopsis) and the top line of the menu says <b>Written by Ai</b> or <b>Written by a human</b>. It is a rule of thumb: Reasons to Love is Ai; loglines are by a human when the book came out more than two years ago, Ai when newer; series synopses are by a human; other synopses are by a human unless three or more paragraphs are a single short sentence each.</li>
+      <li>Right-click a prose cell (Reasons to Love, loglines, a synopsis or series synopsis) and the top line of the menu says <b>Written by Ai</b> or <b>Written by a human</b>. It is a rule of thumb: Reasons to Love is Ai; loglines are by a human when the book came out more than two years ago, Ai when newer; series synopses are by a human; other synopses are by a human unless three or more paragraphs are a single short sentence each. If it is wrong, choose <b>Change to …</b> under it; that is saved in Supabase (settings → editor_prose_authors) and wins over the rule, and <b>Go back to the rule of thumb</b> undoes it. A series synopsis change applies to the whole series.</li>
       <li>Right-click a <b>Long Synopsis (built)</b> cell → <b>Edit</b>. A popup shows its parts side by side, in the order the Long Synopsis uses: award line, series intro, essential synopsis, promo line. Type in the boxes and pick the promo line; the preview at the bottom shows the result. Save changes this book (and the promo line on the books you chose), and Undo reverses it in one step. The Essential Description is also a column of its own.</li>
       <li>The <b>◀ ▶</b> arrows, <b>Show in every Long Synopsis</b> and <b>Next part starts</b> (in the same paragraph or in a new paragraph) set the order and spacing for <b>every</b> book. You are asked before it is saved, and Undo does not reverse it: change it back in the popup.</li>
       <li>“In the same paragraph” still starts a new paragraph when the next text is a story title (a line with no end punctuation). The essential synopsis is always shown.</li>
@@ -1190,7 +1190,7 @@ async function loadAll(){
   appReady = false;
   setStatus("Loading…");
   loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","php","promo","diff","bl"]) data[k]={}; data.one={};
-  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols, affR, cnames] = await Promise.all([
+  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols, affR, cnames, authR] = await Promise.all([
     api("GET","field_registry?select=*").catch(()=>[]),
     api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000").catch(()=>[]),
     getAll("editions","sheet_order.asc.nullslast,file_name.asc"),
@@ -1201,10 +1201,12 @@ async function loadAll(){
     getAll("store_links").catch(()=>[]),
     api("GET","list_columns?select=list_name,table_name,column_name").catch(()=>[]),
     api("GET","store_url_regions?select=store,region,language,base_url,affiliate_param,affiliate_code&active=is.true").catch(()=>[]),
-    api("GET","settings?select=value&key=eq."+COLNAMES_KEY).catch(()=>[])
+    api("GET","settings?select=value&key=eq."+COLNAMES_KEY).catch(()=>[]),
+    api("GET","settings?select=value&key=eq."+AUTHORS_KEY).catch(()=>[])
   ]);
   AFF_REGIONS = affR;
   COLNAMES = parseColNames(cnames);
+  PROSE_AUTHORS = parseColNames(authR);
   LISTCOL = {}; for (const r of lcols) LISTCOL[r.table_name+"."+r.column_name] = r.list_name;
   REG = {}; for (const r of reg) REG[r.table_name+"."+r.column_name] = r;
   REF = {}; for (const r of refs) (REF[r.list_name] = REF[r.list_name] || []).push(r);
@@ -1486,7 +1488,26 @@ $("#showrows").onclick = showAllRows;
    Reasons to Love: AI. Loglines: a human when the book came out more than two years ago, AI when newer.
    Series synopsis: a human. Other synopses: a human, unless three or more paragraphs are one short sentence each (an AI habit). */
 const SYN_FIELDS = new Set(["short_synopsis","medium_synopsis","long_synopsis","essential_description","archived_short_synopsis","archived_long_synopsis"]);
+const AUTHORS_KEY = "editor_prose_authors";   // settings row: {"<column id>|<file name or series>": "ai" | "human"}, set by right-click → Change to …
+let PROSE_AUTHORS = {};
+const authorKey = (ed, c) => c.id + "|" + (c.kind==="ser" ? ed.series : ed.file_name);
 function proseAuthor(ed, c){
+  const rule = proseAuthorRule(ed, c); if (!rule) return "";
+  const own = PROSE_AUTHORS[authorKey(ed, c)];
+  return own==="ai" ? "Written by Ai" : own==="human" ? "Written by a human" : rule;
+}
+async function setProseAuthor(ed, c, who){
+  const k = authorKey(ed, c);
+  try{
+    const all = parseColNames(await api("GET","settings?select=value&key=eq."+AUTHORS_KEY));   // fresh copy, so changes saved elsewhere are kept
+    if (who) all[k] = who; else delete all[k];
+    const rows = await api("POST","settings?on_conflict=key", {key:AUTHORS_KEY, value:JSON.stringify(all)}, {Prefer:"resolution=merge-duplicates,return=representation"});
+    if (!rows || !rows.length) throw new Error("Only owners and editors can change this.");
+    PROSE_AUTHORS = all;
+    setStatus(who ? (who==="ai" ? "Now marked Written by Ai" : "Now marked Written by a human") : "Back to the rule of thumb: " + proseAuthorRule(ed, c), "ok");
+  }catch(e){ setStatus("Not saved: " + e.message, "bad"); }
+}
+function proseAuthorRule(ed, c){
   if (!c || !["ed","est","ser","info"].includes(c.kind)) return "";
   const f = c.col || c.field;
   const isProse = f==="reasons_to_love" || f==="loglines" || f==="series_synopsis" || SYN_FIELDS.has(f);
@@ -1516,10 +1537,10 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     const offNow = offF ? formatOffered(ed, offF) : false;
     let cellUrl = ""; try{ const mu = String(cc ? valueOf(ed, cc) ?? "" : "").match(/https?:\/\/[^\s;,"'<>]+/); if (mu) cellUrl = mu[0]; }catch(_){}
     const m = document.createElement("div"); m.className = "ctx";
-    const who = proseAuthor(ed, cc);
-    m.innerHTML = (who ? `<div class="hint" style="margin:0;padding:4px 10px">${who}</div>` : "") + (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + (offF ? `<button type="button" data-a="offer">Mark ${esc(offF)} as ${offNow ? "not offered" : "offered"} for this book</button>` : "") + `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="promo">Change promo line…</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
+    const who = proseAuthor(ed, cc), whoOwn = who ? PROSE_AUTHORS[authorKey(ed, cc)] : "";
+    m.innerHTML = (who ? `<div class="hint" style="margin:0;padding:4px 10px">${who}</div><button type="button" data-a="who">Change to ${who==="Written by Ai" ? "Written by a human" : "Written by Ai"}</button>` + (whoOwn ? `<button type="button" data-a="whorule">Go back to the rule of thumb</button>` : "") : "") + (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + (offF ? `<button type="button" data-a="offer">Mark ${esc(offF)} as ${offNow ? "not offered" : "offered"} for this book</button>` : "") + `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="promo">Change promo line…</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
     m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
-    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="openurl"){ window.open(cellUrl, "_blank", "noopener"); return; } if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="offer"){ setOffered(ed, offF, !offNow); return; } if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="promo"){ openPromoDlg(ed); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
+    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="who"){ setProseAuthor(ed, cc, who==="Written by Ai" ? "human" : "ai"); return; } if (b.dataset.a==="whorule"){ setProseAuthor(ed, cc, null); return; } if (b.dataset.a==="openurl"){ window.open(cellUrl, "_blank", "noopener"); return; } if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="offer"){ setOffered(ed, offF, !offNow); return; } if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="promo"){ openPromoDlg(ed); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
     document.body.appendChild(m); ctxMenu = m;
     return;
   }
