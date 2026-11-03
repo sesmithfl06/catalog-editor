@@ -503,7 +503,7 @@ dialog#ncdlg::backdrop{background:#0006}
       <li>In the editor: <kbd>Enter</kbd> saves and moves down to the next editable cell; <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line in long text; <kbd>Tab</kbd> saves and moves right; <kbd>Shift</kbd>+<kbd>Tab</kbd> saves and moves left; <kbd>Esc</kbd> cancels; clicking outside the editor saves.</li>
       <li><b>Undo</b> <kbd>⌘</kbd>+<kbd>Z</kbd>; <b>Redo</b> <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (or <kbd>Ctrl</kbd>+<kbd>Y</kbd>). They don't work while you are typing in a box; use the Undo / Redo buttons at the top then.</li>
       <li>Right-click a cell in a Formats column with no format yet → “Add … for this book”; right-click a story bible cell with none → “Add a story bible for this book”.</li>
-      <li>Right-click a column heading (or its name in the column list) → <b>Rename column…</b>. Choose <b>Nickname</b> to show a shorter name (right-click → <b>Show full name</b> shows the original), or <b>Change the name permanently</b>. <b>Back to the original name</b> undoes either. Everyone sees the new name, on any device. Some columns start with a built-in nickname (BN Bk#, Pb pgs, eB $, eB Lib $, U-link, U-link Custom, Store #, ASIN, Apple ID); rename them the same way.</li>
+      <li>Right-click a column heading (or its name in the column list) → <b>Rename column…</b>. Choose <b>Nickname</b> to show a shorter name (right-click → <b>Show full name</b> shows the original), or <b>Change the name permanently</b>. <b>Back to the original name</b> undoes either. Everyone sees the new name, on any device. Many columns start with a built-in short nickname (BN Bk#, Pb $, U-link, Store #…); rename them the same way.</li>
       <li>Right-click a cell that holds a web address (store links, Website book post, affiliate links…) → <b>Open link in new tab</b>.</li>
     </ul>
   </details>
@@ -960,13 +960,33 @@ function placeCol(c){
 }
 // Built-in nicknames: shown unless a saved name (right-click → Rename column…) replaces them. "Back to the original name" saves {plain:true}.
 const DEFAULT_NICKS = {
-  "info:whole_book_number":"BN Bk#", "ed:paperback_pages":"Pb pgs",
-  "fmt:eBook:price_usd":"eB $", "fmt:eBook:library_price_usd":"eB Lib $",
-  "sl:Books2Read|eBook|Custom Link":"U-link Custom", "sl:Books2Read|eBook|Universal Link":"U-link", "slc:Books2Read|eBook|Universal Link":"Store #",
-  "sl:Amazon|eBook|ASIN":"ASIN", "sl:Apple|eBook|ID":"Apple ID"
+  "info:whole_book_number":"BN Bk#", "ed:paperback_pages":"Pb pgs", "ed:paperback_page_size":"Pb size",
+  "fmt:eBook:price_usd":"eB $", "fmt:eBook:library_price_usd":"eB Lib $", "fmt:Audiobook:library_price_usd":"Ab Lib $",
+  "fmt:Audiobook:runtime_minutes":"Ab Runtime", "fmt:Audiobook:narrator":"Narrator", "fmt:Audiobook:narrator_bio":"Narrator bio",
+  "sl:Books2Read|eBook|Custom Link":"U-link Custom", "sl:Books2Read|eBook|Universal Link":"U-link", "sl:Books2Read|eBook|Deactivated Link":"U-link Deactivated",
+  "slc:Books2Read|eBook|Universal Link":"Store #",
+  "sl:Amazon|eBook|ASIN":"ASIN", "sl:Apple|eBook|ID":"Apple ID", "sl:Amazon|Paperback|ASIN":"Pb ASIN", "sl:Amazon|Hardcover|ASIN":"Hc ASIN",
+  "ml:Amazon affiliate link:url":"Amz eB US Affil", "ml:Apple Books affiliate link:url":"Apple Affil", "ml:B&N affiliate link:url":"BN Affil", "ml:Google Play affiliate link:url":"Google Play Affil",
+  "sb:isbn":"SB ISBN", "sb:publication_date":"SB Pub", "sb:word_count":"SB words", "php:Story Bible":"SB $",
+  "info:translation_cache":"Translation Cache", "calc:bestseller_line":"Bestseller line",
+  "ed:end_of_story_promo":"End promo (current)", "ed:new_end_of_story_promo_file_name":"New end promo file", "ed:new_end_of_story_promo_rule":"New end promo rule",
+  "ed:character_sheet_included":"Char sheet", "st:main_genre_differentiated":"Main genre", "ed:vellum_link_created":"Vellum link",
+  "one:edition_release_notes:subscription_publication":"Subsc Pub", "one:edition_release_notes:collection_publication":"Collection Pub"
 };
-const colNameEntry = id => COLNAMES[id] || (DEFAULT_NICKS[id] ? {nick:DEFAULT_NICKS[id]} : null);
-function addCol(c){ placeCol(c); const n = colNameEntry(c.id);
+const FMT_SHORT = {"eBook":"eB", "Paperback":"Pb", "Hardcover":"Hc", "Audiobook":"Ab", "Story Bible":"SB"};
+const STORE_SHORT = {"Barnes & Noble":"BN"};
+const FMT_NICK = {price_usd:"$", isbn:"ISBN", amazon_isbn:"Amz ISBN", bn_isbn:"BN ISBN", publication_date:"Pub"};   // "<Pb> <…>" for every format
+function defaultNick(c){
+  if (DEFAULT_NICKS[c.id]) return DEFAULT_NICKS[c.id];
+  const fs = f => FMT_SHORT[f] || f;
+  if (c.kind==="fmt" && FMT_NICK[c.col]) return fs(c.f) + " " + FMT_NICK[c.col];
+  if (c.kind==="sl" && c.lt==="URL"){ const n = `${STORE_SHORT[c.s]||c.s} ${fs(c.f)} URL`; return n !== c.label ? n : ""; }   // e.g. BN eB URL, Kobo Ab URL
+  if (c.kind==="aff") return `Amz ${fs(c.aff.f)} ${c.aff.region} Affil`;
+  return "";
+}
+const colNameEntry = c => COLNAMES[c.id] || (c.defNick ? {nick:c.defNick} : null);
+const flipBool = v => v==null ? null : !v;   // "<format> offered" shows the opposite of formats.not_offered
+function addCol(c){ placeCol(c); c.defNick = defaultNick(c); const n = colNameEntry(c);
   if (n && n.nick){ c.full = c.label; c.label = n.nick; }   // nickname: shown everywhere in the editor; right-click → Show full name
   else if (n && n.name){ c.orig = c.label; c.label = n.name; }   // permanent new name
   COLS.push(c); COLMAP[c.id] = c; }
@@ -984,7 +1004,7 @@ function buildCatalog(sample){
   const affRegs = [...new Set(AFF_REGIONS.filter(r=>r.store==="Amazon").map(r=>r.region))].sort((a,b)=>(AFF_REGION_ORDER.indexOf(a)+1||99)-(AFF_REGION_ORDER.indexOf(b)+1||99));
   AFF_FORMATS.forEach((f,fi)=>affRegs.forEach((g,gi)=>{ if (f==="eBook" && g==="US") return;
     addCol({id:`aff:Amazon|${f}|${g}`, kind:"aff", aff:{s:"Amazon", f, region:g}, table:"calculated_store_urls", label:`Amazon ${f} ${g} affiliate link`, group:"Affiliate links", order:6000.2 + fi*0.01 + gi*0.0001, ro:true, note:AFF_NOTE}); }));
-  for (const f of sample.formats) for (const c of (FMT_FIELDS[f] || FMT_FIELDS_OTHER)) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
+  for (const f of sample.formats) for (const c of (FMT_FIELDS[f] || FMT_FIELDS_OTHER)) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:c==="not_offered" ? `${f} offered` : `${f} · ${regLabel("formats",c)}`, flip:c==="not_offered", group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
   SB_FIELDS.forEach((c,i)=>addCol({id:"sb:"+c, kind:"sb", col:c, table:"story_bibles", label:`Story Bible · ${regLabel("story_bibles",c)}`, group:SB_GROUP, order:7800+i, ro:false}));
   for (const f of sample.payhipFormats) addCol({id:`php:${f}`, kind:"php", f, col:"price_usd", table:"payhip_products", label:(f==="Story Bible" ? "Story Bible · Price" : `${f} · Payhip price`), group:"Format: "+f, order:7000+regOrder("formats","payhip_price_usd"), ro:true});
   for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
@@ -1236,7 +1256,7 @@ async function saveColName(id, entry){
   $("#rnsave").disabled = $("#rnreset").disabled = true; $("#rnmsg").textContent = "Saving…";
   try{
     const all = parseColNames(await api("GET","settings?select=value&key=eq."+COLNAMES_KEY));   // fresh copy, so names saved elsewhere are kept
-    if (!entry && DEFAULT_NICKS[id]) entry = {plain:true};   // keeps a built-in nickname from coming back
+    if (!entry && COLMAP[id].defNick) entry = {plain:true};   // keeps a built-in nickname from coming back
     if (entry) all[id] = entry; else delete all[id];
     const rows = await api("POST","settings?on_conflict=key", {key:COLNAMES_KEY, value:JSON.stringify(all)}, {Prefer:"resolution=merge-duplicates,return=representation"});
     if (!rows || !rows.length) throw new Error("Only owners and editors can change this.");
@@ -1603,7 +1623,7 @@ function valueOf(ed, c){
     case "diff": r = data.diff[rowKey(ed,c)]; return r ? r.value : null;
     case "diffall": return diffText(ed.file_name);
     case "ml": r = data.ml[rowKey(ed,c)]; return r ? r[c.col] : null;
-    case "fmt": r = data.fmt[rowKey(ed,c)]; return r ? r[c.col] : null;
+    case "fmt": r = data.fmt[rowKey(ed,c)]; return r ? (c.flip ? flipBool(r[c.col]) : r[c.col]) : null;
     case "sb": r = data.sb[ed.file_name]; return r ? r[c.col] : null;
     case "php": return data.php[rowKey(ed,c)] ?? null;
     case "sl": r = data.sl[rowKey(ed,c)]; return r ? r.link_or_id : null;
@@ -2600,6 +2620,7 @@ async function write(ed, c, v){
     }
     case "fmt": {
       const k = rowKey(ed,c), cur = data.fmt[k], f = fn+"&format=eq."+q(c.f);
+      if (c.flip) v = flipBool(v);   // Offered Yes is saved as not_offered = false
       if (!cur && c.f!=="eBook") throw new Error(`This book has no ${c.f}. Right-click → Add ${c.f} first.`);
       if (!cur && v==null) return;
       data.fmt[k] = cur ? await patchOne("formats", f, {[c.col]:v}) : await insertOne("formats", {file_name:ed.file_name, format:c.f, [c.col]:v});
