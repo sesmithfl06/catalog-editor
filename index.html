@@ -943,6 +943,44 @@ function helpFor(c){
   return parts.join("\n\n");
 }
 
+/* ---------- default column order in the grid ---------- */
+// Follows the old Excel sheet (each English text right after its translation) and the saved views (Distributor, Non-English Book):
+// book number for B&N next to the book number, formats and prices after the page count, store links after the genres, then the Vellum link, Payhip and affiliate links.
+// The first columns (Title, Language, Series, Book number, File name, Subtitle) are set by FAVORITES above.
+// "x:*" means every column whose id starts with x: (in their usual order). A column not listed stays right after the column it used to follow.
+const DEFAULT_ORDER = [
+  "info:whole_book_number","info:series_and_book_number","est:title","est:subtitle","ed:story_id","st:story_id","ed:sheet_order",
+  "ser:series_synopsis","est:series_synopsis","ser:series_url","ser:series_note",
+  "ed:tagline","info:long_synopsis","est:long_synopsis","ed:archived_long_synopsis","ed:essential_description",
+  "ed:medium_synopsis","est:medium_synopsis","ed:short_synopsis","est:short_synopsis","ed:archived_short_synopsis",
+  "ed:reasons_to_love","ed:loglines","est:loglines","one:edition_awards:award","one:edition_awards:badge",
+  "st:main_plot","st:subplots","one:projects:plot",
+  "info:publisher","info:author","info:author_bio","ed:translator","ed:proofreader",
+  "ed:publication_date","est:publication_date","one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","ed:anthology_only","diff:all",
+  "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience",
+  "ed:word_count","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","st:connected_universe",
+  "fmt:eBook:price_usd","fmt:eBook:library_price_usd","fmt:eBook:isbn","fmt:eBook:*","php:eBook",
+  "fmt:Paperback:*","php:Paperback","fmt:Hardcover:*","php:Hardcover","fmt:Audiobook:*","php:Audiobook","fmt:*","php:*",
+  "ed:keywords","est:keywords","ed:seo","st:tags","st:display_tags","st:main_genre_differentiated",
+  "ed:excerpts","est:excerpts","list:reviews","est:reviews","list:copy",
+  "ed:end_of_story_promo","est:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule",
+  "info:translation_cache","calc:bestseller_line",
+  "ed:bisac","ed:thema","ed:copyright_page_genres","est:copyright_page_genres","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres",
+  "ed:kindle_unlimited","ed:ai_texts","ed:ai_images","ed:ai_translations",
+  "sl:Books2Read|eBook|Universal Link","sl:Books2Read|eBook|Custom Link","sl:Amazon|eBook|ASIN","sl:Apple|eBook|ID","sl:Barnes & Noble|eBook|URL","sl:Google Play|eBook|URL","sl:Kobo|eBook|URL",
+  "slc:Books2Read|eBook|Universal Link","ed:vellum_link_created","sl:Payhip|*","sl:*",
+  "ml:Amazon affiliate link:url","ml:Apple Books affiliate link:url","aff:*","ml:*",
+  "sb:*","php:Story Bible","list:bookclub","list:*","est:*"
+];
+function applyDefaultOrder(){
+  const old = COLS.slice().sort((a,b)=>a.order-b.order || a.label.localeCompare(b.label));
+  const slot = c => { let i = DEFAULT_ORDER.indexOf(c.id); if (i>=0) return i;
+    i = DEFAULT_ORDER.findIndex(p => p.endsWith("*") && c.id.startsWith(p.slice(0,-1))); return i; };
+  let last = -1;
+  const keyed = old.map((c,pos)=>{ const i = slot(c); if (i>=0) last = i; return {c, k: i>=0 ? i : last+0.5, pos}; });
+  keyed.sort((a,b)=>a.k-b.k || a.pos-b.pos).forEach((x,n)=>{ x.c.order = n+1; });
+}
+
 /* ---------- sidebar groups (what a person looks for) ---------- */
 // Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
 const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Translations"];
@@ -1036,6 +1074,7 @@ function buildCatalog(sample){
     const inInfo = !!REG["edition_info."+c];
     addCol({id:"info:"+c, kind:"info", col:c, table:"edition_info", label:{whole_book_number:"Book # with no decimals (B&N)", long_synopsis:"Long Synopsis (built)", translation_cache:"Translation Cache (used to assist marketing translations)"}[c]||regLabel(inInfo?"edition_info":"editions",c), group:"Worked out (read-only)", order:inInfo ? regOrder("edition_info",c) : 9900, ro:!(c==="translation_cache" || c==="long_synopsis"), note:c==="translation_cache" ? "One cache per language, shared by every book in that language. Edit it only on rare occasions to add a new English line followed by its translation on the next line; the change applies to all books in this language." : undefined});
   }
+  applyDefaultOrder();
   // Columns made with New column: in the section chosen then, right after the column chosen then (oldest first, so one can follow another)
   const made = COLS.filter(c=>regType(c)).map(c=>[c, REG[c.table+"."+c.col]]).sort((a,b)=>a[1].id-b[1].id);
   for (const [c, r] of made){
@@ -1484,7 +1523,7 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     if (b.dataset.a==="unfreeze"){ frozenN = 1; renderGrid(); return; }
     if (b.dataset.a==="unsize"){ delete colWidths[id]; renderGrid(); return; }
     if (b.dataset.a==="unsizeall"){ colWidths = {}; renderGrid(); return; }
-    if (b.dataset.a==="unorder"){ colOrder = []; renderGrid(); setStatus("Columns back in the order from the Supabase column list","ok"); return; }
+    if (b.dataset.a==="unorder"){ colOrder = []; renderGrid(); setStatus("Columns back in the default order","ok"); return; }
     b.dataset.a==="end" ? hideColumnsFrom(id) : hideColumn(id); });
   document.body.appendChild(m); ctxMenu = m;
 });
@@ -2083,7 +2122,7 @@ function renderGrid(){
   layoutCss();
 }
 /* ---------- column layout: widths, order and frozen columns (saved with a view) ----------
-   colOrder: the column ids in the order you dragged them to (empty = the order from the Supabase column list).
+   colOrder: the column ids in the order you dragged them to (empty = the default order, DEFAULT_ORDER).
    Columns not in colOrder keep their normal place. colWidths: id -> pixels. frozenN: how many columns on the left stay put. */
 let colOrder = [], colWidths = {}, frozenN = 1;
 function applyColOrder(cols){
