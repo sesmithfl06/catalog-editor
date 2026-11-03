@@ -510,6 +510,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…change a Long Synopsis, its order, or a promo line?</summary>
     <ul>
+      <li>Right-click a prose cell (Reasons to Love, loglines, a synopsis or series synopsis) and the top line of the menu says <b>Written by Ai</b> or <b>Written by a human</b>. It is a rule of thumb: Reasons to Love is Ai; loglines are by a human when the book came out more than two years ago, Ai when newer; series synopses are by a human; other synopses are by a human unless three or more paragraphs are a single short sentence each.</li>
       <li>Right-click a <b>Long Synopsis (built)</b> cell → <b>Edit</b>. A popup shows its parts side by side, in the order the Long Synopsis uses: award line, series intro, essential synopsis, promo line. Type in the boxes and pick the promo line; the preview at the bottom shows the result. Save changes this book (and the promo line on the books you chose), and Undo reverses it in one step. The Essential Description is also a column of its own.</li>
       <li>The <b>◀ ▶</b> arrows, <b>Show in every Long Synopsis</b> and <b>Next part starts</b> (in the same paragraph or in a new paragraph) set the order and spacing for <b>every</b> book. You are asked before it is saved, and Undo does not reverse it: change it back in the popup.</li>
       <li>“In the same paragraph” still starts a new paragraph when the next text is a story title (a line with no end punctuation). The essential synopsis is always shown.</li>
@@ -1481,6 +1482,27 @@ function hideRow(fn){ const vb = viewSnap(); hiddenRows.add(fn); recordView(vb);
 function hideRowsFrom(ri){ const vb = viewSnap(); viewRows.slice(ri).forEach(ed=>hiddenRows.add(ed.file_name)); recordView(vb); renderGrid(); }
 function showAllRows(){ const vb = viewSnap(); hiddenRows.clear(); recordView(vb); renderGrid(); }
 $("#showrows").onclick = showAllRows;
+/* Right-click on a prose cell shows who most likely wrote it (a rule of thumb, not stored anywhere):
+   Reasons to Love: AI. Loglines: a human when the book came out more than two years ago, AI when newer.
+   Series synopsis: a human. Other synopses: a human, unless three or more paragraphs are one short sentence each (an AI habit). */
+const SYN_FIELDS = new Set(["short_synopsis","medium_synopsis","long_synopsis","essential_description","archived_short_synopsis","archived_long_synopsis"]);
+function proseAuthor(ed, c){
+  if (!c || !["ed","est","ser","info"].includes(c.kind)) return "";
+  const f = c.col || c.field;
+  const isProse = f==="reasons_to_love" || f==="loglines" || f==="series_synopsis" || SYN_FIELDS.has(f);
+  if (!isProse) return "";
+  let t = ""; try{ t = String(valueOf(ed, c) ?? "").trim(); }catch(_){}
+  if (!t) return "";
+  if (f==="reasons_to_love") return "Written by Ai";
+  if (f==="series_synopsis") return "Written by a human";
+  if (f==="loglines"){
+    const d = String(ed.publication_date||"").slice(0,10), cut = new Date(); cut.setFullYear(cut.getFullYear()-2);
+    return d && d < cut.toISOString().slice(0,10) ? "Written by a human" : "Written by Ai";
+  }
+  if (c.id==="info:long_synopsis") t = String(ed.essential_description||"").trim() || t;   // the award line and promo line are short on purpose; judge the story text
+  const shortOnes = t.split(/\n+/).map(x=>x.trim()).filter(x=>x && /[.!?…]["”’]?$/.test(x) && x.split(/\s+/).length <= 12).length;
+  return shortOnes >= 3 ? "Written by Ai" : "Written by a human";
+}
 $("#gridwrap").addEventListener("contextmenu", e=>{
   const td = e.target.closest("td[data-r]");
   if (td){
@@ -1494,7 +1516,8 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     const offNow = offF ? formatOffered(ed, offF) : false;
     let cellUrl = ""; try{ const mu = String(cc ? valueOf(ed, cc) ?? "" : "").match(/https?:\/\/[^\s;,"'<>]+/); if (mu) cellUrl = mu[0]; }catch(_){}
     const m = document.createElement("div"); m.className = "ctx";
-    m.innerHTML = (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + (offF ? `<button type="button" data-a="offer">Mark ${esc(offF)} as ${offNow ? "not offered" : "offered"} for this book</button>` : "") + `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="promo">Change promo line…</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
+    const who = proseAuthor(ed, cc);
+    m.innerHTML = (who ? `<div class="hint" style="margin:0;padding:4px 10px">${who}</div>` : "") + (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + (offF ? `<button type="button" data-a="offer">Mark ${esc(offF)} as ${offNow ? "not offered" : "offered"} for this book</button>` : "") + `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="promo">Change promo line…</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
     m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
     m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="openurl"){ window.open(cellUrl, "_blank", "noopener"); return; } if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="offer"){ setOffered(ed, offF, !offNow); return; } if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="promo"){ openPromoDlg(ed); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
     document.body.appendChild(m); ctxMenu = m;
