@@ -755,13 +755,15 @@ const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","bad
 // Which fields each format uses. eBook and paperback share the book's Publication date (editions); hardcover and audiobook keep their own.
 // The story bible is a companion book with its own row in story_bibles (SB_FIELDS below), not a format.
 // Payhip prices are not here: they come from payhip_products (read-only "Payhip … price" columns).
+// formats.not_offered has no column: right-click any cell of that format → Mark … as offered / not offered.
 const FMT_FIELDS = {
-  "eBook":       ["not_offered","price_usd","library_price_usd","isbn"],
-  "Paperback":   ["not_offered","price_usd","isbn","amazon_isbn","bn_isbn"],
-  "Hardcover":   ["not_offered","price_usd","isbn","amazon_isbn","bn_isbn","publication_date"],
-  "Audiobook":   ["not_offered","price_usd","library_price_usd","isbn","publication_date","narrator","narrator_bio","runtime_minutes"]
+  "eBook":       ["price_usd","library_price_usd","isbn"],
+  "Paperback":   ["price_usd","isbn","amazon_isbn","bn_isbn"],
+  "Hardcover":   ["price_usd","isbn","amazon_isbn","bn_isbn","publication_date"],
+  "Audiobook":   ["price_usd","library_price_usd","isbn","publication_date","narrator","narrator_bio","runtime_minutes"]
 };
-const FMT_FIELDS_OTHER = ["not_offered","price_usd","isbn","publication_date"];
+const FMT_FIELDS_OTHER = ["price_usd","isbn","publication_date"];
+let FMT_NAMES = new Set(Object.keys(FMT_FIELDS));   // every format in the formats table (filled in when the columns are built)
 // Book columns (editions) that belong to one format: they get a line when the book doesn't have or doesn't offer that format
 // (e.g. paperback pages on a book under 20,000 words, which has no paperback).
 const ED_FMT = {paperback_pages:"Paperback", paperback_page_size:"Paperback"};
@@ -773,6 +775,14 @@ function ebookOffered(ed){
   if (r) return r.not_offered !== true;
   return !isCollection(ed) && !ed.anthology_only;
 }
+// Is this format offered for the book? eBook: see above. Other formats: the book has a formats row that isn't marked Not offered.
+function formatOffered(ed, f){
+  if (f==="eBook") return ebookOffered(ed);
+  const r = data.fmt[ed.file_name+"|"+f]; return !!r && r.not_offered !== true;
+}
+// The format a column belongs to: format cells, that format's store links, store count, Payhip price and affiliate links,
+// and book columns kept for one format (paperback pages). null for every other column.
+function colFormat(c){ return c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="php" || c.kind==="sl" || c.kind==="slc") ? c.f : c.kind==="ed" ? (ED_FMT[c.col] || null) : null; }
 // One-book differences kept in edition_differences (one row per book and field). The editor shows them merged in one
 // "Edition differences" column; right-click → Edit opens a list where each difference is added, changed or removed.
 // Fields marked own:true replace the usual value (story, series or author) for this book only.
@@ -985,7 +995,6 @@ function defaultNick(c){
   return "";
 }
 const colNameEntry = c => COLNAMES[c.id] || (c.defNick ? {nick:c.defNick} : null);
-const flipBool = v => v==null ? null : !v;   // "<format> offered" shows the opposite of formats.not_offered
 function addCol(c){ placeCol(c); c.defNick = defaultNick(c); const n = colNameEntry(c);
   if (n && n.nick){ c.full = c.label; c.label = n.nick; }   // nickname: shown everywhere in the editor; right-click → Show full name
   else if (n && n.name){ c.orig = c.label; c.label = n.name; }   // permanent new name
@@ -1004,7 +1013,8 @@ function buildCatalog(sample){
   const affRegs = [...new Set(AFF_REGIONS.filter(r=>r.store==="Amazon").map(r=>r.region))].sort((a,b)=>(AFF_REGION_ORDER.indexOf(a)+1||99)-(AFF_REGION_ORDER.indexOf(b)+1||99));
   AFF_FORMATS.forEach((f,fi)=>affRegs.forEach((g,gi)=>{ if (f==="eBook" && g==="US") return;
     addCol({id:`aff:Amazon|${f}|${g}`, kind:"aff", aff:{s:"Amazon", f, region:g}, table:"calculated_store_urls", label:`Amazon ${f} ${g} affiliate link`, group:"Affiliate links", order:6000.2 + fi*0.01 + gi*0.0001, ro:true, note:AFF_NOTE}); }));
-  for (const f of sample.formats) for (const c of (FMT_FIELDS[f] || FMT_FIELDS_OTHER)) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:c==="not_offered" ? `${f} offered` : `${f} · ${regLabel("formats",c)}`, flip:c==="not_offered", group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
+  FMT_NAMES = new Set([...Object.keys(FMT_FIELDS), ...sample.formats.filter(f=>f!=="Story Bible")]);
+  for (const f of sample.formats) for (const c of (FMT_FIELDS[f] || FMT_FIELDS_OTHER)) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
   SB_FIELDS.forEach((c,i)=>addCol({id:"sb:"+c, kind:"sb", col:c, table:"story_bibles", label:`Story Bible · ${regLabel("story_bibles",c)}`, group:SB_GROUP, order:7800+i, ro:false}));
   for (const f of sample.payhipFormats) addCol({id:`php:${f}`, kind:"php", f, col:"price_usd", table:"payhip_products", label:(f==="Story Bible" ? "Story Bible · Price" : `${f} · Payhip price`), group:"Format: "+f, order:7000+regOrder("formats","payhip_price_usd"), ro:true});
   for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
@@ -1166,7 +1176,7 @@ async function loadAll(){
     formats:uniq(fmts,"format").sort((a,b)=>fmtOrder.indexOf(a)-fmtOrder.indexOf(b)),
     slKeys:[...new Set(slK.map(r=>`${r.store}|${r.format}|${r.link_type}`))].sort(),
     payhipFormats:[...new Set(slK.filter(r=>r.store==="Payhip" && payhipCode(r)).map(r=>r.format))].sort((a,b)=>(fmtOrder.indexOf(a)+1||99)-(fmtOrder.indexOf(b)+1||99))});
-  await ensureLoaded([{kind:"sb"}]);
+  await ensureLoaded([{kind:"sb"}, {kind:"fmt"}]);   // lines on format, store link and story bible cells need both, whatever columns are shown
   fillFilters();
   await loadPresetsDb();
   renderColumnList();
@@ -1441,11 +1451,13 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     const canEd = td.classList.contains("edit"), cc = viewCols[+td.dataset.c];
     const addF = cc && cc.kind==="fmt" && !data.fmt[rowKey(ed,cc)] ? cc.f : null;
     const addSB = !!(cc && cc.kind==="sb" && !data.sb[ed.file_name]);
+    const offF = cc && !addF && colFormat(cc) && FMT_NAMES.has(colFormat(cc)) && (colFormat(cc)==="eBook" || data.fmt[ed.file_name+"|"+colFormat(cc)]) ? colFormat(cc) : null;
+    const offNow = offF ? formatOffered(ed, offF) : false;
     let cellUrl = ""; try{ const mu = String(cc ? valueOf(ed, cc) ?? "" : "").match(/https?:\/\/[^\s;,"'<>]+/); if (mu) cellUrl = mu[0]; }catch(_){}
     const m = document.createElement("div"); m.className = "ctx";
-    m.innerHTML = (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="promo">Change promo line…</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
+    m.innerHTML = (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + (offF ? `<button type="button" data-a="offer">Mark ${esc(offF)} as ${offNow ? "not offered" : "offered"} for this book</button>` : "") + `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button><button type="button" data-a="promo">Change promo line…</button><button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
     m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
-    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="openurl"){ window.open(cellUrl, "_blank", "noopener"); return; } if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="promo"){ openPromoDlg(ed); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
+    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="openurl"){ window.open(cellUrl, "_blank", "noopener"); return; } if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="offer"){ setOffered(ed, offF, !offNow); return; } if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="promo"){ openPromoDlg(ed); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
     document.body.appendChild(m); ctxMenu = m;
     return;
   }
@@ -1623,7 +1635,7 @@ function valueOf(ed, c){
     case "diff": r = data.diff[rowKey(ed,c)]; return r ? r.value : null;
     case "diffall": return diffText(ed.file_name);
     case "ml": r = data.ml[rowKey(ed,c)]; return r ? r[c.col] : null;
-    case "fmt": r = data.fmt[rowKey(ed,c)]; return r ? (c.flip ? flipBool(r[c.col]) : r[c.col]) : null;
+    case "fmt": r = data.fmt[rowKey(ed,c)]; return r ? r[c.col] : null;
     case "sb": r = data.sb[ed.file_name]; return r ? r[c.col] : null;
     case "php": return data.php[rowKey(ed,c)] ?? null;
     case "sl": r = data.sl[rowKey(ed,c)]; return r ? r.link_or_id : null;
@@ -1648,20 +1660,23 @@ function canEdit(ed, c){
   if (c.kind==="sb") return !!data.sb[ed.file_name];      // only books that have a story bible; add one with right-click
   return true;
 }
-// A format cell (or that format's store link / Payhip price) for a format the book doesn't have, or doesn't offer.
+// A cell gets a line when its format isn't offered for the book (no formats row, or marked Not offered; for the eBook see ebookOffered).
+// When the format is offered, an empty cell is a blank to fill, whether or not its store link / formats row exists yet.
 // The same for story bible cells (and story bible store links / Payhip price) on a book without a story bible.
 function formatMissing(ed, c){
-  if (c.kind==="sb" || ((c.kind==="php" || c.kind==="sl") && c.f==="Story Bible")) return loaded.has("sb") && !data.sb[ed.file_name];
-  const f = c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="php" || c.kind==="sl" || c.kind==="slc") ? c.f : c.kind==="ed" ? ED_FMT[c.col] : null;
-  if (f==="eBook"){
-    if (c.col==="not_offered") return false;
-    const store = c.aff ? c.aff.s : c.s;   // Kindle Unlimited books are only sold on Amazon, so other eBook stores get a line
+  if (c.kind==="sb" || ((c.kind==="php" || c.kind==="sl" || c.kind==="slc") && c.f==="Story Bible")) return loaded.has("sb") && !data.sb[ed.file_name];
+  const f = colFormat(c);
+  if (!f || !FMT_NAMES.has(f) || !loaded.has("fmt")) return false;
+  if (f==="eBook"){   // Kindle Unlimited books are only sold on Amazon, so other eBook stores get a line
+    const store = c.aff ? c.aff.s : c.s;
     if (store && store!=="Amazon" && ed.kindle_unlimited===true) return true;
-    return !ebookOffered(ed);
   }
-  if (!f || !FMT_FIELDS[f] || !loaded.has("fmt")) return false;
-  const r = data.fmt[ed.file_name+"|"+f];
-  return !r || (r.not_offered === true && c.col !== "not_offered");
+  return !formatOffered(ed, f);
+}
+// The column belongs to a format (or the story bible) that this book offers: its empty cells are blanks, even with no row yet.
+function offeredHere(ed, c){
+  if (c.f==="Story Bible") return !!data.sb[ed.file_name];
+  const f = colFormat(c); return !!f && FMT_NAMES.has(f) && loaded.has("fmt") && formatOffered(ed, f);
 }
 // Columns kept as lists in Supabase (one item per line when editing; shown with ; between items)
 const ARRAY_COLS = new Set(["stories.tags","stories.display_tags","editions.keywords","editions.bisac","editions.thema","editions.bowker_genres","editions.bn_genres","editions.kobo_genres","editions.apple_genres","editions.amazon_genres"]);
@@ -1681,7 +1696,6 @@ function typeOf(c){
   const vals = data.editions.map(ed=>valueOf(ed,c)).filter(v=>v!=null);
   if (vals.length && vals.every(v=>typeof v==="boolean")) return "bool";
   if (vals.length && vals.every(v=>typeof v==="number")) return "num";
-  if (c.col==="not_offered") return "bool";
   return "text";
 }
 const show = v => v==null ? "" : (typeof v==="boolean" ? (v?"Yes":"No") : Array.isArray(v) ? v.join("; ") : String(v));
@@ -1807,7 +1821,7 @@ function searchRows(L, S, q){
 // Does the book have a row in this column's table? No row = the book isn't part of that table
 // (e.g. no award, no subtitle, no release note, no edition difference), so the empty cell is nothing to fill.
 function hasRow(ed, c){
-  if (c.aff) return !!affRegion(ed, c.aff) && !!data.sl[`${ed.file_name}|${c.aff.s}|${c.aff.f}|${c.aff.s==="Amazon" ? "ASIN" : "ID"}`];   // needs the store's ID row; Amazon Italy only applies to Italian editions
+  if (c.aff) return !!affRegion(ed, c.aff) && (offeredHere(ed,c) || !!data.sl[`${ed.file_name}|${c.aff.s}|${c.aff.f}|${c.aff.s==="Amazon" ? "ASIN" : "ID"}`]);   // Amazon Italy only applies to Italian editions
   switch(c.kind){
     case "st": return !!data.stories[ed.story_id];
     case "one": return !!(data.one[c.t]||{})[ed.file_name];
@@ -1815,11 +1829,11 @@ function hasRow(ed, c){
     case "diff": return !!data.diff[rowKey(ed,c)];
     case "diffall": return diffRows(ed.file_name).length > 0;
     case "ml": return !!data.ml[rowKey(ed,c)];
-    case "fmt": return !!data.fmt[rowKey(ed,c)] || (c.f==="eBook" && ebookOffered(ed));
+    case "fmt": return !!data.fmt[rowKey(ed,c)] || offeredHere(ed,c);
     case "sb": return !!data.sb[ed.file_name];
-    case "sl": case "slc": return !!data.sl[rowKey(ed,c)] || (c.f==="eBook" && ebookOffered(ed));
+    case "sl": case "slc": return !!data.sl[rowKey(ed,c)] || offeredHere(ed,c);
     case "ser": return !!data.ser[rowKey(ed,c)];
-    case "php": return Object.prototype.hasOwnProperty.call(data.php, rowKey(ed,c));
+    case "php": return Object.prototype.hasOwnProperty.call(data.php, rowKey(ed,c)) || offeredHere(ed,c);
     default: return true;
   }
 }
@@ -2558,6 +2572,16 @@ async function addFormat(ed, f){
   try{ data.fmt[ed.file_name+"|"+f] = await insertOne("formats", {file_name:ed.file_name, format:f}); renderGrid(); setStatus(`Added ${f} for ${ed.title||ed.file_name}`,"ok"); }
   catch(err){ setStatus("Not added: " + friendly(err), "bad"); }
 }
+// Right-click → Mark <format> as offered / not offered: sets formats.not_offered (makes the eBook row if the book has none yet).
+async function setOffered(ed, f, yes){
+  const name = ed.title||ed.file_name, k = ed.file_name+"|"+f, cur = data.fmt[k];
+  if (!confirm(`Mark ${f} as ${yes ? "offered" : "not offered"} for "${name}"?\n\n${yes ? `Its empty ${f} cells become blanks to fill.` : `Its ${f} cells get a line and are left out of Blanks. Nothing already filled in is removed.`}`)) return;
+  try{
+    data.fmt[k] = cur ? await patchOne("formats", `file_name=eq.${q(ed.file_name)}&format=eq.${q(f)}`, {not_offered:!yes})
+                      : await insertOne("formats", {file_name:ed.file_name, format:f, not_offered:!yes});
+    renderGrid(); setStatus(`${f} marked as ${yes ? "offered" : "not offered"} for ${name}`, "ok");
+  } catch(err){ setStatus("Not changed: " + friendly(err), "bad"); }
+}
 async function addStoryBible(ed){
   if (!confirm(`Add a story bible for "${ed.title||ed.file_name}"?\n\nThis creates an empty story bible row in Supabase so you can fill in its ISBN, publication date and so on. Undo does not remove it.`)) return;
   try{ data.sb[ed.file_name] = await insertOne("story_bibles?select="+SB_SELECT, {file_name:ed.file_name}); renderGrid(); setStatus(`Added a story bible for ${ed.title||ed.file_name}`,"ok"); }
@@ -2620,7 +2644,6 @@ async function write(ed, c, v){
     }
     case "fmt": {
       const k = rowKey(ed,c), cur = data.fmt[k], f = fn+"&format=eq."+q(c.f);
-      if (c.flip) v = flipBool(v);   // Offered Yes is saved as not_offered = false
       if (!cur && c.f!=="eBook") throw new Error(`This book has no ${c.f}. Right-click → Add ${c.f} first.`);
       if (!cur && v==null) return;
       data.fmt[k] = cur ? await patchOne("formats", f, {[c.col]:v}) : await insertOne("formats", {file_name:ed.file_name, format:c.f, [c.col]:v});
