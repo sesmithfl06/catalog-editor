@@ -1005,7 +1005,7 @@ const GROUP_ITEMS = {
   "Series": ["ser:series_synopsis","ser:series_url","ser:series_note"],
   "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","ed:excerpts","tsr:Teaser","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
-  "Story Bible (companion book)": ["php:Story Bible","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
+  "Story Bible (companion book)": ["sl:Payhip|Story Bible|URL","php:Story Bible","sl:BookFunnel|Story Bible|URL","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
   "Links": [],
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations","info:translation_cache","calc:bestseller_line"]
 };
@@ -3271,7 +3271,7 @@ const slSameTitle = (a,b) => { const x = slNorm(a), y = slNorm(b); return !!x &&
 // What can be filled with no lookup: {value, sure, why}
 function slWorkedOut(b, products){
   if (b.store==="Payhip"){
-    const want = b.format==="Paperback" ? /\(pa/i : /\(eb/i;
+    const want = b.format==="Paperback" ? /\(pa/i : b.format==="Story Bible" ? /bible/i : /\(eb/i;
     const hits = products.filter(p=>p.status==="Live" && slSameTitle(b.title, String(p.name||"").split(/[:(]/)[0]) && want.test(p.name||""));
     if (hits.length===1) return {value:`https://payhip.com/b/${hits[0].code}`, sure:false, why:`Payhip product “${hits[0].name}”, check it`};
   }

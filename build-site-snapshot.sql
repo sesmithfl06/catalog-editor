@@ -6,6 +6,7 @@
 --     and from its release day when that is empty (it used to use the subscription day before the release day),
 --     so a book put up early only for its link is not recommended before it is out.
 --  2. Two views the public key could read (print_id_check, store_link_blanks) now follow the reader's own rights.
+--     "Find store links for shown books" also lists a blank Payhip story bible link for each book that has a story bible.
 --  3. site_snapshot: ONE row of JSON with only what the website shows. Anyone can read it; nobody can change it.
 --     Every other table stays signed-in only.
 --  4. Triggers on the tables the snapshot uses only set a "needs rebuild" mark (saving stays instant).
@@ -228,7 +229,39 @@ create or replace view public.also_like with (security_invoker = true) as
 
 -- ============ 2. the two views the public key could read ============
 alter view public.print_id_check set (security_invoker = true);
-alter view public.store_link_blanks set (security_invoker = true);
+
+-- store_link_blanks (the list behind "Find store links for shown books"): now follows the reader's own rights,
+-- and also lists a blank Payhip story bible link for every book that has a story bible.
+create or replace view public.store_link_blanks with (security_invoker = true) as
+ SELECT g.file_name,
+    g.title,
+    g.language,
+    x.store,
+    x.format,
+    x.link_type,
+    ( SELECT "substring"(f.isbn, '97[89][0-9]{10}'::text) AS "substring"
+           FROM formats f
+          WHERE f.file_name = g.file_name AND f.format = 'eBook'::text
+         LIMIT 1) AS ebook_isbn,
+    "substring"(COALESCE(g.paperback_isbn, ''::text), '97[89][0-9]{10}'::text) AS paperback_isbn
+   FROM store_gaps g
+     CROSS JOIN LATERAL ( VALUES ('Amazon'::text,'eBook'::text,'ASIN'::text,g.amazon_ebook_asin,NOT g.below_wide_minimum), ('Apple'::text,'eBook'::text,'ID'::text,g.apple_id,NOT g.in_kindle_unlimited AND NOT g.below_wide_minimum), ('Barnes & Noble'::text,'eBook'::text,'URL'::text,g.bn_ebook_url,NOT g.in_kindle_unlimited AND NOT g.below_wide_minimum), ('Kobo'::text,'eBook'::text,'URL'::text,g.kobo_ebook_url,NOT g.in_kindle_unlimited AND NOT g.below_wide_minimum), ('Google Play'::text,'eBook'::text,'URL'::text,g.google_play_url,NOT g.in_kindle_unlimited AND NOT g.below_wide_minimum), ('Payhip'::text,'eBook'::text,'URL'::text,g.payhip_ebook_url,NOT g.in_kindle_unlimited), ('Books2Read'::text,'eBook'::text,'Universal Link'::text,g.books2read_link,NOT g.in_kindle_unlimited AND NOT g.below_wide_minimum), ('Amazon'::text,'Paperback'::text,'ASIN'::text,g.amazon_paperback_asin,g.has_paperback), ('Barnes & Noble'::text,'Paperback'::text,'URL'::text,g.bn_paperback_url,g.has_paperback), ('Payhip'::text,'Paperback'::text,'URL'::text,g.payhip_paperback_url,g.has_paperback)) x(store, format, link_type, val, applies)
+  WHERE (g.release_status = ANY (ARRAY['published'::text, 'upcoming'::text])) AND x.applies AND needs_value(x.val) AND is_expected(g.language, x.store, x.format, x.link_type)
+UNION ALL
+ SELECT g.file_name,
+    g.title,
+    g.language,
+    'Payhip'::text AS store,
+    'Story Bible'::text AS format,
+    'URL'::text AS link_type,
+    NULL::text AS ebook_isbn,
+    NULL::text AS paperback_isbn
+   FROM store_gaps g
+     JOIN story_bibles sb ON sb.file_name = g.file_name
+  WHERE (g.release_status = ANY (ARRAY['published'::text, 'upcoming'::text])) AND is_expected(g.language, 'Payhip'::text, 'Story Bible'::text, 'URL'::text)
+    AND NOT EXISTS ( SELECT 1 FROM store_links l
+                      WHERE l.file_name = g.file_name AND l.store = 'Payhip'::text AND l.format = 'Story Bible'::text
+                        AND l.link_type = 'URL'::text AND NOT needs_value(l.link_or_id));
 
 -- ============ 3. the snapshot ============
 create table if not exists public.site_snapshot (
