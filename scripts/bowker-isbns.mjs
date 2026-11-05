@@ -63,15 +63,26 @@ async function clickIfVisible(loc){
 
 async function settle(page){ await page.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {}); }
 
+/* Cloudflare's "Just a moment..." page usually clears itself after a few seconds, so wait for it
+   (up to 60 seconds) before giving up. Only a robot check that is actually showing counts: normal
+   Cloudflare pages also load its challenge-platform script, which is not a check. */
+const WAIT_RE = /just a moment|attention required|checking your browser|un instant/i;
 async function checkForChallenge(page){
-  const html = await page.content();
-  if (/recaptcha|hcaptcha|turnstile|cf-challenge|challenge-platform/i.test(html))
-    fail(`Bowker shows a robot check (CAPTCHA) on "${await page.title()}", so it can't be signed in to automatically.`);
+  for (let s = 0; s < 60 && WAIT_RE.test(await page.title().catch(() => "")); s++) {
+    if (s === 0) log(`Bowker shows "${await page.title()}" (Cloudflare check). Waiting for it to clear...`);
+    await page.waitForTimeout(1000);
+  }
+  await settle(page);
+  const title = await page.title().catch(() => "");
+  const box = page.locator('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="turnstile"], .cf-turnstile, #challenge-form');
+  if (WAIT_RE.test(title) || await box.first().isVisible().catch(() => false))
+    fail(`Bowker shows a robot check (CAPTCHA) on "${title}" that did not clear within 60 seconds, so it can't be signed in to automatically.`);
 }
 
 async function signIn(page){
   await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
   await settle(page);
+  await checkForChallenge(page);
   await clickIfVisible(page.getByRole("button", { name: /accept( all)?( cookies)?|i agree|agree/i }));
   const pw = () => page.locator('input[type="password"]:visible');
   if (!(await pw().count())) {
