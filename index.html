@@ -538,7 +538,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…choose, hide, move and freeze columns?</summary>
     <ul>
-      <li>Tick columns in the sidebar. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”.</li>
+      <li>Tick columns in the sidebar. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”. In that dialog's list, right-click an item → <b>Don't go to Notion</b>.</li>
       <li>Right-click a column heading → Does this go to Notion?, Clear filter, <b>Hide</b> (Hide column, Hide from here to end), <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, <b>Reset</b> (this column's width, all column widths, column order). Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
       <li>Drag a heading to move the column (a blue edge shows where it lands). Drag the right edge of a heading to resize; double-click that edge to reset the width.</li>
       <li><b>Show full text</b> (above the grid) shows long cells in full; otherwise only the first line shows.</li>
@@ -1414,7 +1414,7 @@ function showNotion(id){
   for (const [g, cs] of groups()){
     const ys = cs.filter(notionYes); if (!ys.length) continue;
     n += ys.length;
-    html += `<h4 style="margin:10px 0 4px">${esc(g)}</h4><div>` + ys.map(x=>`<div${x.id===id?' style="font-weight:700"':""}>${esc(x.label)}</div>`).join("") + `</div>`;
+    html += `<h4 style="margin:10px 0 4px">${esc(g)}</h4><div>` + ys.map(x=>`<div data-col="${esc(x.id)}" title="Right-click: Don't go to Notion"${x.id===id?' style="font-weight:700"':""}>${esc(x.label)}</div>`).join("") + `</div>`;
   }
   $("#nthead").textContent = `Everything that goes to Notion (${n})`;
   $("#ntlist").innerHTML = html || `<div class="empty">Nothing is marked as going to Notion.</div>`;
@@ -1422,10 +1422,11 @@ function showNotion(id){
 }
 // Send to Notion / Stop sending to Notion: changes field_registry.in_notion (adds the row when the sync's field has none yet),
 // and on Send makes sure edits to that column queue the book for Notion (notion_watch). Pages change at each book's next sync.
-$("#nttoggle").onclick = async ()=>{
-  const c = COLMAP[ntCol], k = notionKey(c); if (!k || k==="shared" || k==="story") return;
-  const on = !notionYes(c), [t, col] = k.split("."), tg = $("#nttoggle");
-  tg.disabled = true; $("#ntmsg").textContent = "Saving…";
+// Used by the dialog's button and by right-click → Don't go to Notion on an item in its list.
+async function setNotion(id, on){
+  const c = COLMAP[id], k = notionKey(c); if (!k || k==="shared" || k==="story") return;
+  const [t, col] = k.split(".");
+  $("#ntmsg").textContent = "Saving…";
   try{
     let r = notionReg(k);
     if (r){
@@ -1439,13 +1440,28 @@ $("#nttoggle").onclick = async ()=>{
     if (on && c.kind !== "info" && c.kind !== "php")   // worked-out columns (long synopsis, series + book number, Payhip price) have no table column to watch
       await api("POST", "notion_watch?on_conflict=table_name,column_name", {table_name:t, column_name:col, note:"Added from the Catalog Editor"}, {Prefer:"resolution=ignore-duplicates,return=minimal"}).catch(()=>{});
     showNotion(ntCol);
-    $("#ntmsg").textContent = on ? "Now sent to Notion. Each book's “📚 From Supabase” box shows it after the book's next sync (the nightly refresh does every synced page)." : "No longer sent to Notion. Each book's “📚 From Supabase” box drops it at the book's next sync (the nightly refresh does every synced page).";
+    $("#ntmsg").textContent = (id===ntCol ? "" : c.label + ": ") + (on ? "Now sent to Notion. Each book's “📚 From Supabase” box shows it after the book's next sync (the nightly refresh does every synced page)." : "No longer sent to Notion. Each book's “📚 From Supabase” box drops it at the book's next sync (the nightly refresh does every synced page).");
     setStatus(`${c.label}: ${on ? "now sent to Notion" : "no longer sent to Notion"}`, "ok");
   }catch(e){
-    tg.disabled = false;
+    $("#nttoggle").disabled = false;
     $("#ntmsg").textContent = "Not saved: " + e.message;
   }
-};
+}
+$("#nttoggle").onclick = ()=>{ const c = COLMAP[ntCol]; if (!c) return; $("#nttoggle").disabled = true; setNotion(ntCol, !notionYes(c)); };
+// right-click an item in the dialog's list → Don't go to Notion (the menu sits inside the dialog so it shows on top of it)
+$("#ntlist").addEventListener("contextmenu", e=>{
+  const it = e.target.closest("[data-col]"); if (!it) return;
+  e.preventDefault(); closeCtx();
+  const id = it.dataset.col, c = COLMAP[id], k = notionKey(c);
+  const m = document.createElement("div"); m.className = "ctx";
+  m.innerHTML = (k==="shared" || k==="story")
+    ? `<button type="button" disabled title="${k==="shared" ? "Shared items sync both ways and always go" : "Story details always go"}">Always goes to Notion (${k==="shared" ? "Shared section" : "Story details"})</button>`
+    : `<button type="button" data-a="off">Don't go to Notion</button>`;
+  m.style.position = "fixed";
+  m.style.left = Math.min(e.clientX, innerWidth-260)+"px"; m.style.top = Math.min(e.clientY, innerHeight-60)+"px";
+  m.addEventListener("click", ev=>{ const b = ev.target.closest("button[data-a]"); if (!b) return; ev.stopPropagation(); closeCtx(); setNotion(id, false); });
+  $("#ntdlg").appendChild(m); ctxMenu = m;
+});
 $("#ntclose").onclick = ()=>$("#ntdlg").close();
 $("#howdoi").onclick = ()=>$("#hdlg").showModal();
 $("#hclose").onclick = ()=>$("#hdlg").close();
