@@ -3271,7 +3271,7 @@ const slSameTitle = (a,b) => { const x = slNorm(a), y = slNorm(b); return !!x &&
 // What can be filled with no lookup: {value, sure, why}
 function slWorkedOut(b, products){
   if (b.store==="Payhip"){
-    const want = b.format==="Paperback" ? /\(pa/i : b.format==="Story Bible" ? /bible/i : /\(eb/i;
+    const want = b.format==="Paperback" ? /\(pa/i : b.format==="Story Bible" ? /bible/i : b.format==="Audiobook" ? /\(au/i : b.format==="Bundle" ? /bundle/i : /\(eb/i;
     const hits = products.filter(p=>p.status==="Live" && slSameTitle(b.title, String(p.name||"").split(/[:(]/)[0]) && want.test(p.name||""));
     if (hits.length===1) return {value:`https://payhip.com/b/${hits[0].code}`, sure:false, why:`Payhip product “${hits[0].name}”, check it`};
   }

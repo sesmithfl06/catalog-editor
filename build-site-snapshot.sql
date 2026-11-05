@@ -6,7 +6,7 @@
 --     and from its release day when that is empty (it used to use the subscription day before the release day),
 --     so a book put up early only for its link is not recommended before it is out.
 --  2. Two views the public key could read (print_id_check, store_link_blanks) now follow the reader's own rights.
---     "Find store links for shown books" also lists a blank Payhip story bible link for each book that has a story bible.
+--     "Find store links for shown books" also lists blank Payhip story bible, audiobook and bundle links.
 --  3. site_snapshot: ONE row of JSON with only what the website shows. Anyone can read it; nobody can change it.
 --     Every other table stays signed-in only.
 --  4. Triggers on the tables the snapshot uses only set a "needs rebuild" mark (saving stays instant).
@@ -231,7 +231,8 @@ create or replace view public.also_like with (security_invoker = true) as
 alter view public.print_id_check set (security_invoker = true);
 
 -- store_link_blanks (the list behind "Find store links for shown books"): now follows the reader's own rights,
--- and also lists a blank Payhip story bible link for every book that has a story bible.
+-- and also lists a blank Payhip story bible link for every book that has a story bible, a blank Payhip audiobook
+-- link for every book whose audiobook is offered, and a blank Payhip bundle link for every book that has a story bible.
 create or replace view public.store_link_blanks with (security_invoker = true) as
  SELECT g.file_name,
     g.title,
@@ -261,6 +262,41 @@ UNION ALL
   WHERE (g.release_status = ANY (ARRAY['published'::text, 'upcoming'::text])) AND is_expected(g.language, 'Payhip'::text, 'Story Bible'::text, 'URL'::text)
     AND NOT EXISTS ( SELECT 1 FROM store_links l
                       WHERE l.file_name = g.file_name AND l.store = 'Payhip'::text AND l.format = 'Story Bible'::text
+                        AND l.link_type = 'URL'::text AND NOT needs_value(l.link_or_id))
+UNION ALL
+ -- a Payhip audiobook link for every book whose audiobook is offered
+ SELECT g.file_name,
+    g.title,
+    g.language,
+    'Payhip'::text AS store,
+    'Audiobook'::text AS format,
+    'URL'::text AS link_type,
+    NULL::text AS ebook_isbn,
+    NULL::text AS paperback_isbn
+   FROM store_gaps g
+     JOIN formats f ON f.file_name = g.file_name AND f.format = 'Audiobook'::text AND NOT COALESCE(f.not_offered, false)
+  WHERE (g.release_status = ANY (ARRAY['published'::text, 'upcoming'::text])) AND is_expected(g.language, 'Payhip'::text, 'Audiobook'::text, 'URL'::text)
+    AND NOT EXISTS ( SELECT 1 FROM store_links l
+                      WHERE l.file_name = g.file_name AND l.store = 'Payhip'::text AND l.format = 'Audiobook'::text
+                        AND l.link_type = 'URL'::text AND NOT needs_value(l.link_or_id))
+UNION ALL
+ -- a Payhip bundle link for every book that has a story bible (the bundle is the eBook with its bible)
+ SELECT g.file_name,
+    g.title,
+    g.language,
+    'Payhip'::text AS store,
+    'Bundle'::text AS format,
+    'URL'::text AS link_type,
+    NULL::text AS ebook_isbn,
+    NULL::text AS paperback_isbn
+   FROM store_gaps g
+  WHERE (g.release_status = ANY (ARRAY['published'::text, 'upcoming'::text])) AND is_expected(g.language, 'Payhip'::text, 'Bundle'::text, 'URL'::text)
+    AND ( EXISTS ( SELECT 1 FROM story_bibles sb WHERE sb.file_name = g.file_name)
+          OR EXISTS ( SELECT 1 FROM store_links l
+                       WHERE l.file_name = g.file_name AND l.store = 'Payhip'::text AND l.format = 'Story Bible'::text
+                         AND l.link_type = 'URL'::text AND NOT needs_value(l.link_or_id)) )
+    AND NOT EXISTS ( SELECT 1 FROM store_links l
+                      WHERE l.file_name = g.file_name AND l.store = 'Payhip'::text AND l.format = 'Bundle'::text
                         AND l.link_type = 'URL'::text AND NOT needs_value(l.link_or_id));
 
 -- ============ 3. the snapshot ============
