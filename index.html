@@ -359,7 +359,7 @@ dialog#ncdlg::backdrop{background:#0006}
 <!-- ============ Find store links ============ -->
 <dialog id="sldlg">
   <h2>Find store links for shown books</h2>
-  <p class="hint">Press Search, open the right book, copy its address and paste it in the box (for Apple and Amazon the ID is taken out of the link for you). Type n/a for a store the book isn't on.</p>
+  <p class="hint">Apple and Google Play are looked up for you: a match on the eBook ISBN is saved on its own, a match on the title only is filled in for you to check. For the rest, press Search, open the right book, copy its address and paste it in the box (for Apple and Amazon the ID is taken out of the link for you). Type n/a for a store the book isn't on.</p>
   <div class="row"><span class="hint" id="slmsg"></span></div>
   <div id="sllist"><div class="empty">Looking up…</div></div>
   <div class="row"><span class="grow"></span><button id="slsaveall" class="primary" type="button" disabled>Save all</button><button id="slclose" type="button">Done</button></div>
@@ -604,7 +604,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <button id="export" title="Download a CSV file (opens in Excel): what you see now, or everything">Export</button>
     <button id="notionShown" title="Sync the books shown in the grid (after your filters) to Notion">Send shown to Notion</button>
     <span class="helptip" tabindex="0" role="note" aria-label="Help: Send shown to Notion" data-tip="Sends all prearranged columns to Notion for each visible row.">?</span>
-    <button id="storelinks" title="List the blank store links of the books shown in the grid (after your filters), with a Search link for each store">Find store links for shown books</button>
+    <button id="storelinks" title="List the blank store links of the books shown in the grid (after your filters). Apple and Google Play are looked up for you; the other stores get a Search link">Find store links for shown books</button>
   </header>
 
   <aside>
@@ -1218,6 +1218,7 @@ async function loadAll(){
   queueCount();
   startLive();
   appReady = true;
+  slAutoRecent();
   await runPendingJump();   // a link that opened this tab jumps now, after sign-in and loading
 }
 
@@ -2646,6 +2647,7 @@ async function saveCell(ed, c, v, old, td, record){
     td && (td.classList.remove("saving"), td.classList.add("saved"));
     setStatus(`Saved ${c.label} for ${ed.title||ed.file_name}`, "ok");
     updateCell(ed, c);
+    slAutoAfterSave(ed, c);
     return true;
   }catch(err){
     if (await offerAdd(err)) return saveCell(ed, c, v, old, td, record);
@@ -3220,11 +3222,15 @@ $("#ncgo").onclick = async ()=>{
   }catch(err){ msg("Not added: " + friendly(err)); b.disabled = false; }
 };
 
-/* ---------- Find store links for shown books (search helper) ----------
+/* ---------- Find store links for shown books (search helper + automatic Apple / Google Play lookups) ----------
    Lists the blank store links of the books shown in the grid (after filters), from the view store_link_blanks.
-   Nothing is saved on its own: Amazon and B&N give each new paperback their own number, and B&N gives each eBook
-   its own EAN (2940…), so B&N and Amazon paperbacks are searched by title. Prefilled to check: a Payhip link that matches one Live Payhip product.
-   Everything else has a Search link that opens the store's search in the browser; paste the link and Save.
+   Apple (iTunes Search API, read as JSONP) and Google Play (Google Books API) let a web page look books up, and the
+   lookup runs from this browser, so it isn't blocked the way Supabase's servers were. A match on the eBook ISBN by
+   S.E. Smith is saved on its own; a title-only match is filled in to check. Kobo, B&N, Amazon, Books2Read and Payhip
+   don't let another site read their pages, so they keep a Search link. Amazon and B&N give each new paperback their
+   own number, and B&N gives each eBook its own EAN (2940…), so B&N and Amazon paperbacks are searched by title.
+   The same lookups also run on their own in the background (slAuto…): for books added in the last SL_RECENT_DAYS days
+   when the editor opens, and for a book a few seconds after one of its store links or its eBook ISBN is saved.
    Pasted links are tidied: Apple and Amazon keep just the ID/ASIN, Google Play and Kobo lose tracking bits. */
 const SL_CC = { English:"us", French:"fr", German:"de", Italian:"it", Spanish:"es" };
 const SL_LANG = { English:"en", French:"fr", German:"de", Italian:"it", Spanish:"es" };
@@ -3262,6 +3268,7 @@ function slSearch(b){
     case "Google Play": return `https://play.google.com/store/search?q=${e(isbn || t)}&c=books`;
     case "Barnes & Noble": return `https://www.barnesandnoble.com/s/${e(t)}`;   // B&N gives its own EAN (2940…), so search by title
     case "Books2Read": return "https://books2read.com/";
+    case "Payhip": return `https://www.google.com/search?q=${e(`site:payhip.com "${b.title}" S.E. Smith`)}`;   // Payhip has no search of its own
     default: return "";
   }
 }
@@ -3285,6 +3292,107 @@ async function slSave(b, v){
   if (!(await saveCell(ed, c, v, old, null, true))) throw new Error($("#status").textContent.replace(/^Not saved: /,""));
   slChanged++;
 }
+/* Apple and Google Play lookups, from this browser */
+let slLookWhy = "";
+const slKey = b => `${b.file_name}|${b.store}|${b.format}|${b.link_type}`;
+const slIsSmith = s => /s\.?\s*e\.?\s*smith/i.test(s||"");
+const slCanLook = b => b.format==="eBook" && (b.store==="Apple" || b.store==="Google Play");
+let slJsonpN = 0;
+function slJsonp(url){   // the iTunes Search API doesn't let other sites read it, but it answers as JSONP
+  return new Promise((ok, bad)=>{
+    const cb = "slJsonp" + (++slJsonpN) + "_" + Date.now(), sc = document.createElement("script");
+    const done = ()=>{ delete window[cb]; sc.remove(); clearTimeout(t); };
+    const t = setTimeout(()=>{ done(); bad(new Error("no answer")); }, 12000);
+    window[cb] = j=>{ done(); ok(j); };
+    sc.onerror = ()=>{ done(); bad(new Error("blocked")); };
+    sc.src = url + (url.includes("?") ? "&" : "?") + "callback=" + cb;
+    document.head.appendChild(sc);
+  });
+}
+async function slApple(b){
+  const cc = SL_CC[b.language]||"us";
+  if (b.ebook_isbn){
+    const j = await slJsonp(`https://itunes.apple.com/lookup?isbn=${b.ebook_isbn}&country=${cc}`);
+    const hit = (j.results||[]).find(r=>r.trackId);
+    if (hit && slIsSmith(hit.artistName)) return {value:String(hit.trackId), sure:slSameTitle(b.title, hit.trackName), why:`Apple, by eBook ISBN: “${hit.trackName}”`};
+  }
+  const j = await slJsonp(`https://itunes.apple.com/search?term=${encodeURIComponent(b.title + " S.E. Smith")}&media=ebook&entity=ebook&country=${cc}&limit=15`);
+  const hits = (j.results||[]).filter(r=>slIsSmith(r.artistName) && slSameTitle(b.title, r.trackName));
+  if (hits.length===1) return {value:String(hits[0].trackId), sure:false, why:`Apple, by title only: “${hits[0].trackName}”, check it`};
+  slLookWhy = hits.length ? `Apple has ${hits.length} books with this title` : "Not on Apple yet";
+  return null;
+}
+async function slGoogle(b){
+  const qs = [...(b.ebook_isbn ? [`isbn:${b.ebook_isbn}`] : []), `intitle:"${b.title}" inauthor:Smith`];
+  for (const [i, q] of qs.entries()){
+    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&country=US&maxResults=20`);
+    if (!r.ok) throw new Error("Google Books answered " + r.status);
+    const j = await r.json();
+    const items = (j.items||[]).filter(it=>(it.volumeInfo?.authors||[]).some(slIsSmith) && slSameTitle(b.title, it.volumeInfo?.title||""));
+    const sale = items.filter(it=>it.saleInfo?.saleability==="FOR_SALE"), pick = sale.length ? sale : items;
+    if (pick.length===1){
+      const it = pick[0], byIsbn = i===0 && !!b.ebook_isbn;
+      return {value:`https://play.google.com/store/books/details?id=${it.id}`, sure: byIsbn && it.saleInfo?.saleability==="FOR_SALE",
+        why:`Google Play, by ${byIsbn ? "eBook ISBN" : "title only"}: “${it.volumeInfo?.title}”` + (byIsbn && it.saleInfo?.saleability==="FOR_SALE" ? "" : ", check it")};
+    }
+    if (pick.length > 1){ slLookWhy = `Google has ${pick.length} books with this title`; return null; }
+  }
+  slLookWhy = "Not on Google Play yet";
+  return null;
+}
+// {value, sure, why} or null (slLookWhy says why)
+async function slLook(b){
+  slLookWhy = "";
+  try{ return b.store==="Apple" ? await slApple(b) : b.store==="Google Play" ? await slGoogle(b) : null; }
+  catch(err){ slLookWhy = `${b.store} lookup failed (${err.message})`; return null; }
+}
+
+/* Automatic lookups in the background: books added recently (when the editor opens) and a book whose
+   store links or eBook ISBN were just saved. Only ISBN matches are saved (and can be undone with Undo);
+   each link is saved at most once per visit, so a link you clear or undo isn't put back. */
+const SL_RECENT_DAYS = 60;
+const slAutoDone = new Set(), slAutoAsked = new Map(), slAutoWait = new Map();
+let slAutoQueue = [], slAutoRunning = false;
+function slAutoAfterSave(ed, c){
+  if (!(c.kind==="sl" || c.id==="fmt:eBook:isbn") || slAutoDone.has(rowKey(ed,c))) return;   // its own saves don't start another round
+  clearTimeout(slAutoWait.get(ed.file_name));
+  slAutoWait.set(ed.file_name, setTimeout(()=>{ slAutoWait.delete(ed.file_name); slAutoAsked.delete(ed.file_name); slAutoFind([ed.file_name]); }, 3000));
+}
+function slAutoRecent(){
+  const since = Date.now() - SL_RECENT_DAYS*864e5;
+  const files = data.editions.filter(e=>e.created_at && Date.parse(e.created_at) >= since).map(e=>e.file_name);
+  if (files.length) slAutoFind(files);
+}
+async function slAutoFind(files){
+  files = files.filter(f=>!slAutoAsked.has(f) || Date.now() - slAutoAsked.get(f) > 6e5);   // the same book at most every 10 minutes
+  files.forEach(f=>slAutoAsked.set(f, Date.now()));
+  slAutoQueue.push(...files);
+  if (slAutoRunning) return;
+  slAutoRunning = true;
+  const saved = [], toCheck = [];
+  try{
+    while (slAutoQueue.length){
+      const batch = [...new Set(slAutoQueue.splice(0))];
+      let blanks = [];
+      try{ blanks = (await slIn("store_link_blanks?select=*&limit=5000", batch)).filter(slCanLook); }catch(_){ return; }
+      for (const b of blanks){
+        if (slAutoDone.has(slKey(b))) continue;
+        const f = await slLook(b);
+        if (!f) continue;
+        if (!f.sure){ toCheck.push(`${b.store} for ${b.title}`); continue; }
+        slAutoDone.add(slKey(b));
+        const ed = data.editions.find(e=>e.file_name===b.file_name); if (!ed) continue;
+        const k = slKey(b), old = data.sl[k] ? data.sl[k].link_or_id : null;
+        if (await saveCell(ed, slCol(b), f.value, old, null, true)) saved.push(`${b.store} for ${b.title}`);
+      }
+    }
+  }finally{
+    slAutoRunning = false;
+    if (saved.length || toCheck.length)
+      setStatus((saved.length ? `Found by eBook ISBN and saved: ${saved.join(", ")}. ` : "") +
+        (toCheck.length ? `Matched by title only, check in “Find store links for shown books”: ${toCheck.join(", ")}.` : ""), "ok");
+  }
+}
 function slRender(){
   if (!slRows.length){ $("#sllist").innerHTML = `<div class="empty">${slBusy ? "Looking up…" : "No blank store links left for the books shown (books marked not released are not checked)."}</div>`; $("#slsaveall").disabled = true; return; }
   $("#slsaveall").disabled = false;
@@ -3294,7 +3402,7 @@ function slRender(){
       return `<tr data-i="${i}">
         <td>${esc(b.title||b.file_name)}<div class="ev">${esc(b.file_name)}</div></td>
         <td>${esc(b.store)}<div class="ev">${esc(b.format)} · ${esc(b.link_type)}</div></td>
-        <td>${s ? `<a href="${esc(s)}" target="_blank" rel="noopener">${b.store==="Books2Read" ? "Open Books2Read" : "Search"}</a>` : `<span class="ev">${b.store==="Payhip" ? "Payhip → Products" : ""}</span>`}</td>
+        <td>${s ? `<a href="${esc(s)}" target="_blank" rel="noopener">${b.store==="Books2Read" ? "Open Books2Read" : "Search"}</a>` : ""}</td>
         <td class="val"><input type="text" value="${esc(b.value||"")}" placeholder="${b.link_type==="URL" || b.link_type==="Universal Link" ? "Paste the store page link" : "Paste the store page link or the " + esc(b.link_type)}">${b.why ? `<div class="ev">${esc(b.why)}</div>` : ""}</td>
         <td class="acts"><button type="button" class="primary" data-a="save">Save</button></td>
       </tr>`;
@@ -3312,8 +3420,19 @@ async function slRun(){
     slMsg("Checking which shown books have blank store links…");
     const blanks = await slIn("store_link_blanks?select=*&order=file_name,store,format&limit=5000", shown);
     const products = blanks.some(b=>b.store==="Payhip") ? (await api("GET","payhip_products?select=code,name,status") || []) : [];
+    const look = blanks.filter(slCanLook);
+    for (const [n, b] of look.entries()){
+      slMsg(`Looking up ${b.store} for ${b.title} (${n+1} of ${look.length})…`);
+      const f = await slLook(b);
+      if (f && f.sure && !slAutoDone.has(slKey(b))){
+        slAutoDone.add(slKey(b));
+        try{ await slSave(b, f.value); auto++; b.saved = true; continue; }catch(err){ b.why = "Not saved: " + friendly(err); }
+      }
+      if (f){ b.value = f.value; b.why = b.why || f.why; } else b.why = b.why || slLookWhy;
+    }
     for (const b of blanks){
-      const w = slWorkedOut(b, products);
+      if (b.saved) continue;
+      const w = b.value ? null : slWorkedOut(b, products);
       if (w && w.sure){
         try{ slMsg(`Saving ${b.store} ${b.format} for ${b.title}…`); await slSave(b, w.value); auto++; continue; }catch(err){ b.why = "Not saved: " + friendly(err); }
       }
@@ -3322,7 +3441,7 @@ async function slRun(){
     }
   }catch(err){ slMsg(friendly(err)); return; }
   finally{ slBusy = false; btn.disabled = false; slRender(); }
-  slMsg(`${shown.length} book(s) shown. ` + (auto ? `${auto} Amazon paperback ASIN(s) worked out from the ISBN and saved. ` : "") +
+  slMsg(`${shown.length} book(s) shown. ` + (auto ? `${auto} link(s) found on Apple or Google Play by the eBook ISBN and saved. ` : "") +
     (slRows.length ? `${slRows.length} blank link(s) below: press Search, open the right book, copy its link from the address bar, paste it here, then Save or Save all.` : "No blank store links left (books marked not released are not checked)."));
 }
 async function slSaveRow(tr){
