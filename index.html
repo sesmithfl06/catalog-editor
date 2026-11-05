@@ -1736,7 +1736,7 @@ function valueOf(ed, c){
     case "sl": r = data.sl[rowKey(ed,c)]; return r ? r.link_or_id : null;
     case "slc": r = data.sl[rowKey(ed,c)]; return r ? r.store_count : null;
     case "ser": r = data.ser[rowKey(ed,c)]; return r ? r[c.col] : null;
-    case "info": r = data.info[ed.file_name]; return r ? r[c.col] : null;
+    case "info": r = data.info[ed.file_name]; if (c.col==="publisher") return (r && r.publisher) || "Montana Publishing"; return r ? r[c.col] : null;   // the publisher is always Montana Publishing
     case "calc":
       if (c.col==="bestseller_line"){
         r = (data.bl||{})[ed.language]; return r && r.bestseller_line ? r.bestseller_line : null;   // one line per language, from bestseller_lines
