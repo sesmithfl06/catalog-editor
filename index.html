@@ -418,7 +418,7 @@ dialog#ncdlg::backdrop{background:#0006}
 <dialog id="nfdlg">
   <h2>Books Notion could not sync</h2>
   <div id="nflist"></div>
-  <div class="row"><button id="nfretry" class="primary" type="button">Try these again</button><span class="hint" id="nfmsg"></span><span class="grow"></span><button id="nfclose" type="button">Done</button></div>
+  <div class="row"><button id="nfretry" class="primary" type="button">Try these again</button><button id="nfdismissall" type="button">Dismiss all</button><span class="hint" id="nfmsg"></span><span class="grow"></span><button id="nfclose" type="button">Done</button></div>
 </dialog>
 
 <!-- ============ Edition differences ============ -->
@@ -569,7 +569,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <ul>
       <li><b>Send shown to Notion</b> sends the books shown in the grid after your filters (one click), with <i>all</i> the Notion columns for each, not only the columns you can see.</li>
       <li>Each book is added to the queue unless it is already Waiting or Working. Then the sync starts. If it can't start right away, the every-minute schedule starts it.</li>
-      <li>The top bar shows “N waiting for Notion · N failed”. Click the red “failed” to see the reason for each book and press “Try these again”. You can close the page; the sync carries on.</li>
+      <li>The top bar shows “N waiting for Notion · N failed”. Click the red “failed” to see the reason for each book and press “Try these again”, or “Dismiss” to clear a line without sending the book. You can close the page; the sync carries on.</li>
     </ul>
     <h3>How the sync runs (Supabase Edge Function notion-sync)</h3>
     <ul>
@@ -3124,8 +3124,8 @@ $("#notionShown").onclick = e=>sendToNotion(visibleRows().map(ed=>ed.file_name),
 $("#nqueue").onclick = ()=>{
   if (!nqFailed.length) return;
   const titles = {}; (data.editions||[]).forEach(e=>{ titles[e.file_name] = e.title; });
-  $("#nflist").innerHTML = "<ul>" + nqFailed.map(r=>`<li><b>${esc(titles[r.file_name]||r.file_name)}</b> <span class="hint">${esc(r.file_name)}</span><br>${esc(r.message||"No reason given.")}</li>`).join("") + "</ul>";
-  $("#nfmsg").textContent = ""; $("#nfretry").disabled = false;
+  $("#nflist").innerHTML = "<ul>" + nqFailed.map(r=>`<li><b>${esc(titles[r.file_name]||r.file_name)}</b> <span class="hint">${esc(r.file_name)}</span><br>${esc(r.message||"No reason given.")} <button type="button" class="nfdismiss" data-id="${r.id}">Dismiss</button></li>`).join("") + "</ul>";
+  $("#nfmsg").textContent = ""; $("#nfretry").disabled = false; $("#nfdismissall").disabled = false;
   $("#nfdlg").showModal();
 };
 $("#nfretry").onclick = async e=>{
@@ -3136,6 +3136,24 @@ $("#nfretry").onclick = async e=>{
     try{ await startNotionSync(); }catch(_){ /* the schedule starts it within a minute */ }
     $("#nfdlg").close(); setStatus(`${ids.length} book(s) sent to Notion again.`, "ok"); queueCount();
   }catch(err){ $("#nfmsg").textContent = friendly(err); b.disabled = false; }
+};
+// Dismiss: the failed line is marked Done (not synced), so it leaves the "failed" count; the book is not sent again.
+async function nqDismiss(ids){
+  for (let i=0; i<ids.length; i+=200) await api("PATCH", `notion_sync_queue?id=in.(${ids.slice(i,i+200).join(",")})`, {status:"Done", message:"Dismissed in the Catalog Editor (not synced)", done_at:new Date().toISOString()}, {Prefer:"return=minimal"});
+  nqFailed = nqFailed.filter(r=>!ids.includes(r.id));
+}
+$("#nflist").onclick = async e=>{
+  const b = e.target.closest(".nfdismiss"); if (!b) return;
+  b.disabled = true;
+  try{
+    await nqDismiss([+b.dataset.id]); b.closest("li").remove(); queueCount();
+    if (!nqFailed.length){ $("#nfdlg").close(); setStatus("Failed Notion line dismissed.", "ok"); }
+  }catch(err){ $("#nfmsg").textContent = friendly(err); b.disabled = false; }
+};
+$("#nfdismissall").onclick = async e=>{
+  const b = e.currentTarget; b.disabled = true;
+  try{ const n = nqFailed.length; await nqDismiss(nqFailed.map(r=>r.id)); $("#nfdlg").close(); setStatus(`${n} failed Notion line(s) dismissed.`, "ok"); queueCount(); }
+  catch(err){ $("#nfmsg").textContent = friendly(err); b.disabled = false; }
 };
 $("#nfclose").onclick = ()=>$("#nfdlg").close();
 
