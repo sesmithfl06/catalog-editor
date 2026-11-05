@@ -270,7 +270,7 @@ begin
     with
     ed as (
       select ef.file_name, ef.sheet_order, ef.language, ef.title, ef.series, ef.number_in_series,
-             ef.paperback_pages, ef.paperback_page_size, ef.spice, ef.explicit_content, ef.word_count,
+             ef.paperback_pages, ef.paperback_page_size, ef.rating, ef.word_count,
              ef.simplified_award, ef.display_tags, ef.anthology_only,
              coalesce(ef.payhip_publication, ef.subscription_publication, ef.publication_date) as day
         from public.editions_full ef
@@ -343,18 +343,13 @@ begin
                     or lower(coalesce(au.narrator, '')) in ('', 'none', 'n/a', 'na', '-') then null
                   else jsonb_build_array(au.runtime, au.narrator)
                 end,
-          -- badges: awards, Quick Escape, Steamy / Family Friendly
+          -- badges: awards, Quick Escape, and the rating ("Rated G" / "Rated T" / "Rated M" / "Rated E")
           'b', nullif(
                  coalesce((select jsonb_agg(btrim(a.x) order by a.ord)
                              from unnest(string_to_array(coalesce(ed.simplified_award, ''), '!')) with ordinality a(x, ord)
                             where btrim(a.x) <> ''), '[]'::jsonb)
                  || case when ed.word_count is not null and ed.word_count < 40000 then '["Quick Escape"]'::jsonb else '[]'::jsonb end
-                 || case
-                      when ed.spice is not null then case when ed.spice >= 3 then '["Steamy"]'::jsonb else '["Family Friendly"]'::jsonb end
-                      when lower(btrim(coalesce(ed.explicit_content, ''))) = 'yes' then '["Steamy"]'::jsonb
-                      when lower(btrim(coalesce(ed.explicit_content, ''))) = 'no' then '["Family Friendly"]'::jsonb
-                      else '[]'::jsonb
-                    end,
+                 || case when ed.rating in ('G', 'T', 'M', 'E') then jsonb_build_array('Rated ' || ed.rating) else '[]'::jsonb end,
                  '[]'::jsonb),
           -- tags
           'tg', (select jsonb_agg(q.t order by q.ord)
