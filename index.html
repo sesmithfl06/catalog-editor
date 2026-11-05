@@ -508,6 +508,14 @@ dialog#ncdlg::backdrop{background:#0006}
     </ul>
   </details>
 
+  <details><summary>…remove a tag from Tags and Display tags?</summary>
+    <ul>
+      <li><b>Tags</b> is every tag the story has. <b>Display tags</b> is the smaller set of those that is shown on Payhip to tell S.E. Smith books apart. They are not duplicates, and the editions of a story (EN, FR, DE, IT) share both.</li>
+      <li>Every display tag must also be in Tags. So remove the tag from <b>Display tags</b> first and save, then remove it from <b>Tags</b> and save. Doing Tags first is refused with “Display tags must also be in Tags: …”.</li>
+      <li>To add a tag, do it the other way round: add it to <b>Tags</b> first, then to Display tags. A tag that isn't in Tag Vocab yet asks if you want to add it.</li>
+    </ul>
+  </details>
+
   <details><summary>…change a Long Synopsis, its order, or a promo line?</summary>
     <ul>
       <li>Right-click a prose cell (Reasons to Love, loglines, a synopsis or series synopsis) and the top line of the menu says <b>Written by Ai</b> or <b>Written by a human</b>. It is a rule of thumb: Reasons to Love is Ai; loglines are by a human when the book came out more than two years ago, Ai when newer; series synopses are by a human; other synopses are by a human unless three or more paragraphs are a single short sentence each. If it is wrong, choose <b>Change to …</b> under it; that is saved in Supabase (settings → editor_prose_authors) and wins over the rule, and <b>Go back to the rule of thumb</b> undoes it. A series synopsis change applies to the whole series.</li>
