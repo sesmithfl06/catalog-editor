@@ -728,9 +728,13 @@ function claims(tok){ try{ return JSON.parse(atob(tok.split(".")[1].replace(/-/g
 // Same rule as the database (public.strong_sign_in): a passkey, or password/email plus the authenticator code.
 const WEAK = new Set(["password","otp","magiclink","email","email/signup","recovery","invite","sms","email_change","token_refresh","anonymous"]);
 function isStrong(c){ return c.aal === "aal2" || (c.amr||[]).some(m => !WEAK.has(String((m && m.method) || m).toLowerCase())); }
+// Whether the last request carried a sign-in. A tab whose sign-in ended (for example after signing in
+// again in another tab) sends none, and Supabase then reports "0 rows", which used to read as "no permission".
+let lastHadSignIn = true;
 async function headers(extra){
   const h = {"apikey": cfg.key, "Content-Type":"application/json"};
   const t = await accessToken();
+  lastHadSignIn = !!t;
   if (t) h["Authorization"] = "Bearer " + t;
   return Object.assign(h, extra||{});
 }
@@ -2643,7 +2647,7 @@ function friendly(err){
   const m = err.message||String(err);
   if (err.status===401 || /JWT|token/i.test(m)) return "your sign-in expired — reload the page and sign in again.";
   if (/promo_lines_language_promo_line_key/i.test(m)) return "that wording is already another promo line. Pick it in Promo Line instead.";
-  if (/row-level security|permission|0 rows/i.test(m)) return "you don't have permission to change this.";
+  if (/row-level security|permission|0 rows/i.test(m)) return lastHadSignIn ? "you don't have permission to change this." : "this tab isn't signed in any more — reload the page and sign in again.";
   return m;
 }
 const PATCH = {"Prefer":"return=representation"};
