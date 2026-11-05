@@ -1002,8 +1002,8 @@ const GROUP_ITEMS = {
     "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:essential_description","ed:archived_short_synopsis","ed:archived_long_synopsis",
     "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience","st:main_genre_differentiated",
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
-    "diff:all","one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication",
-    "list:authors_note","info:author","info:publisher","info:author_bio","ed:sheet_order","ed:story_id","st:story_id"],
+    "diff:all","one:edition_release_notes:subscription_publication","info:publisher","one:edition_release_notes:collection_publication",
+    "list:authors_note","info:author","info:author_bio","ed:sheet_order","ed:story_id","st:story_id"],
   "Story": ["st:main_plot","st:subplots","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
   "Series": ["ser:series_synopsis","ser:series_url","ser:series_note"],
   "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","ed:excerpts","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
@@ -1375,7 +1375,7 @@ async function setSection(grp, on){
    notionKey gives the field_registry row the sync checks for an editor column ("all" = the sync always sends it, no setting). */
 const NOTION_PLACES = {
   editions: ["language","title","series_and_book_number","file_name","publication_date","anthology_only","word_count","paperback_pages","paperback_page_size",
-             "kindle_unlimited","translator","proofreader","copyright_page_genres","keywords","seo","long_synopsis","reasons_to_love","loglines","excerpts"],
+             "kindle_unlimited","translator","proofreader","copyright_page_genres","keywords","seo","long_synopsis","reasons_to_love","loglines","excerpts","publisher"],
   stories: ["tags","rating","audience","main_plot","subplots"],
   formats: ["price_usd","library_price_usd","payhip_price_usd","isbn","amazon_isbn","bn_isbn","narrator","narrator_bio","runtime"],
   series: ["series_url"], edition_awards: ["award"], edition_release_notes: ["subscription_publication","collection_publication"]
