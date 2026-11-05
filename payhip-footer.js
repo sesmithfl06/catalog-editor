@@ -5,7 +5,7 @@
    badges, tags, series, release days, the Connected World picks) come from one public row in Supabase,
    site_snapshot, which the database rebuilds within a minute of any change.  They are kept in this
    browser and used at once; a copy more than an hour old is renewed in the background.  The footer
-   asks again straight away, and waits for the answer, when the page is a Payhip product the held copy
+   asks again straight away, and waits up to 1.5 seconds for the answer, when the page is a Payhip product the held copy
    does not know (a book published since), or when the address ends in ?fresh.  If Supabase does not
    answer in time the footer starts with what it holds, or with what is written into it. */
 (function () {
@@ -16,7 +16,7 @@
   var HELD = "sesnap:1";
   var RENEW_AFTER = 3600000;
   var ASK_GAP = 60000;
-  var LONGEST_WAIT = 3000;
+  var LONGEST_WAIT = 1500;
 
   var PARTS = [
 function () {
@@ -38,7 +38,7 @@ function () {
        moved on every build: the first page view after a paste throws away what
        the old code stored and reads the store fresh, so a fix is on screen the
        moment it is in the store rather than when a reader's week runs out. */
-    cacheVersion: "b2026-11-05d",
+    cacheVersion: "b2026-11-05e",
     clean: (text) => (text || "").replace(/\s+/g, " ").trim(),
     flatten: (text) => (text || "").replace(/[\u2018\u2019\u02BC`]/g, "'").toLowerCase(),
     normalize: (text) => (text || "")
@@ -8581,6 +8581,17 @@ function () {
       return (book.p || []).some(function (product) { return product[1] === code; });
     });
   };
+
+  /* Open the connection to Supabase now, so the snapshot question does not also pay for it. */
+  try {
+    var hint = document.createElement("link");
+    hint.rel = "preconnect";
+    hint.href = "https://qurcnkeqxfqqfnygkpmd.supabase.co";
+    hint.crossOrigin = "anonymous";
+    (document.head || document.documentElement).appendChild(hint);
+  } catch (error) {
+    /* Only a head start; the question is asked either way. */
+  }
 
   var held = read();
   var code = pageCode();
