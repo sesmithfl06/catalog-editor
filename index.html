@@ -582,7 +582,10 @@ dialog#ncdlg::backdrop{background:#0006}
     <ul>
       <li><b>📚 From Supabase</b> (a box at the top): every field marked as going to Notion (right-click any column → “Does this go to Notion?” lists them, and its <b>Send to Notion</b> / <b>Stop sending to Notion</b> button changes it). Blank fields (empty, n/a, n/d) are left out. A translation shows its English beside a field when the two differ. The box is rebuilt at every sync: edit these in the Catalog Editor. If someone changes a “Label: value” line inside the box in Notion, that field moves to the Shared section (“Other shared details”), its new value is saved here, and from then on it syncs both ways for that book. Any other line changed inside the box is kept in the Shared section under “Changed in Notion”.</li>
       <li><b>🔄 Shared with Supabase</b>: Loglines, Excerpts, Teasers, Awards, Links (series page, SES Store = Payhip links, BookFunnel, store links, cover image and alt text, website book post and the other marketing links), Reviews and every kind of marketing copy. It syncs <b>both ways</b>: a change made in Notion is saved here, a change made here shows there; additions from both sides are kept; when both sides changed the same link, Notion's wins. A new “Label: link” line adds a new marketing link; a new heading adds a new kind of marketing copy. Saves from Notion are logged in the change log as “Notion sync”, so they can be undone.</li>
-      <li><b>📝 Notion only</b>: never copied here. At each sync, anything there that repeats the box or the Shared section is removed, and so is every empty “Label:” line. Old-system sections (Loglines, Teasers, Awards, buy links, Website, BookFunnel, Book Cover, Reviews, “Archived Notion …”) are merged into the Shared section once, so nothing appears twice on a page; old template lines such as “Title:”, “Release Date:”, “Keywords:” or “Digital Price:” are removed on the page's first sync with this layout.</li>
+      <li><b>📝 Notion only</b>: never copied here. At each sync, anything there that repeats the box or the Shared section is removed, so nothing appears twice on a page. Old-system sections (Loglines, Teasers, Awards, buy links, Website, BookFunnel, Book Cover, Reviews, “Archived Notion …”) are merged into the Shared section.</li>
+      <li><b>Clearing out the old system</b> happens only once per page, at its first sync with this layout: lines with nothing after the “:”, empty list items, leftover dividers and the old template lines (“Title:”, “Release Date:”, “Keywords:”, “Digital Price:” …) are removed. After that, an empty line or a “Label:” someone types in Notion only is left alone.</li>
+      <li><b>Long Synopsis</b> goes to Notion. It is put together in Supabase from Award line + Series intro + Essential synopsis + Promo line, and the sync sends the finished text (under its own heading in the box). Notion doesn't put it back together: change its parts here. An edit made to it in Notion is kept under “Changed in Notion” in the Shared section. Other worked-out columns (Series & book number, Book # with no decimals, Author, Publisher) work the same way.</li>
+      <li><b>Can't go to Notion</b> (right-click the column → Does this go to Notion? says why): Min Age (send Rating), Promo line (it is inside Long Synopsis), affiliate links (worked out from the store links, which go), the English text kept on translations (shown beside each translated field automatically), Edition differences, Books2Read store count, award badge, Bestselling author line, Translation Cache, and the story lists Pet names &amp; invented words, Pronunciations, Scene image prompts and Author's Note.</li>
       <li>An edition with no Notion page gets a new one: English books in SES Books, other languages in SES Books → the language page (French, German…), named “English Title - Language”, placed under the book's series heading after the books with lower numbers (a new series gets its own heading, in alphabetical order). A page with that name that is already there is used instead. A page Notion says it can't find usually needs sharing with the integration: in Notion ••• → Connections.</li>
     </ul>
     <h3>What queues a book by itself</h3>
@@ -1386,7 +1389,23 @@ function notionKey(c){
   return "";
 }
 // the registry row for a key: an edition column counts under editions.* or edition_info.* (the sync reads both)
-function notionReg(k){ const [t, col] = k.split("."); return REG[k] || (t==="editions" ? REG["edition_info."+col] : null); }
+// Why a column can't go to Notion, or how a worked-out column reaches it (shown in the Does this go to Notion? dialog)
+function notionWhy(c){
+  if (c.kind==="info" && c.col==="long_synopsis") return " Long Synopsis is put together in Supabase from its parts (Award line + Series intro + Essential synopsis + Promo line). The sync sends the finished text, so the Notion page shows it in full under its own heading in the box. Notion doesn't put it back together: change one of its parts here. If someone edits it in Notion, the edit is kept under “Changed in Notion” in the Shared section, because it can't be split back into its parts.";
+  if (c.kind==="info") return " It is worked out in Supabase, so the sync sends the finished value. Change it through the columns it comes from; an edit made to it in Notion is kept under “Changed in Notion” in the Shared section.";
+  if (c.kind==="promo") return " The promo line is part of Long Synopsis, which goes to Notion.";
+  if (c.kind==="calc" && c.col==="min_age") return " Min Age is worked out from Rating; send Rating instead.";
+  if (c.kind==="calc") return " It is read from another Supabase table (bestseller_lines), and the Notion page has no place for it.";
+  if (c.kind==="aff") return " Affiliate links are worked out from the store IDs; the store links themselves go, in the Shared section.";
+  if (c.kind==="est") return " English text on a translation is shown automatically beside the translated field in the box.";
+  if (c.kind==="diff" || c.kind==="diffall") return " The Notion page has no place for edition differences.";
+  if (c.kind==="slc") return " The Books2Read store count is only used here; the Books2Read link goes, in the Shared section.";
+  if (c.kind==="one" && c.t==="edition_awards") return " The award badge (an image) has no place on the Notion page; the award text goes, in the Shared section.";
+  if (c.col==="translation_cache") return " It is only used inside the Catalog Editor.";
+  return " The Notion page has no place for it.";
+}
+function notionRegs(k){ const [t, col] = k.split("."); return [REG[k], t==="editions" ? REG["edition_info."+col] : null].filter(Boolean); }
+function notionReg(k){ const rs = notionRegs(k); return rs.find(r=>r.in_notion) || rs[0] || null; }
 function notionYes(c){ const k = notionKey(c); return k==="shared" || k==="story" || !!(k && (notionReg(k)||{}).in_notion); }
 // what else changes with this column (one setting covers every format, every store link)
 function notionShared(c){
@@ -1402,9 +1421,9 @@ function showNotion(id){
   const k = notionKey(c), yes = notionYes(c);
   $("#ntthis").innerHTML = `<b>${esc(c.label)}</b>: ` + (k==="shared" ? `Yes, always. It is in the “🔄 Shared with Supabase” section of the book's Notion page, which syncs both ways: a change made there is saved here, and a change made here shows there. There is no setting to stop it.`
     : k==="story" ? `Yes, always. It is under Story details in the “📚 From Supabase” box of the book's Notion page.`
-    : !k ? `No. This column is worked out from other columns (or only used inside the Catalog Editor), so the Notion sync shows the columns it comes from instead.`
-    : yes ? `Yes. It goes to Notion, in the “📚 From Supabase” box at the top of the book's page.` + esc(notionShared(c))
-    : `No. It is not in the “📚 From Supabase” box in Notion. Press Send to Notion to add it.` + esc(notionShared(c)));
+    : !k ? `No.` + esc(notionWhy(c))
+    : yes ? `Yes. It goes to Notion, in the “📚 From Supabase” box at the top of the book's page.` + esc(notionShared(c)) + (c.kind==="info" ? esc(notionWhy(c)) : "")
+    : `No. It is not in the “📚 From Supabase” box in Notion. Press Send to Notion to add it.` + esc(notionShared(c)) + (c.kind==="info" ? esc(notionWhy(c)) : ""));
   const tg = $("#nttoggle");
   tg.hidden = !k || k==="shared" || k==="story";
   tg.disabled = false;
@@ -1428,11 +1447,13 @@ async function setNotion(id, on){
   const [t, col] = k.split(".");
   $("#ntmsg").textContent = "Saving…";
   try{
-    let r = notionReg(k);
-    if (r){
-      const rows = await api("PATCH", `field_registry?id=eq.${r.id}`, {in_notion:on}, {Prefer:"return=representation"});
-      if (!rows || !rows.length) throw new Error("Only owners and editors can change this.");
-      REG[rows[0].table_name+"."+rows[0].column_name] = rows[0];
+    const rs = on ? [notionReg(k)].filter(Boolean) : notionRegs(k);   // stopping: every row for the column (editions.* and edition_info.*)
+    if (rs.length){
+      for (const r of rs){
+        const rows = await api("PATCH", `field_registry?id=eq.${r.id}`, {in_notion:on}, {Prefer:"return=representation"});
+        if (!rows || !rows.length) throw new Error("Only owners and editors can change this.");
+        REG[rows[0].table_name+"."+rows[0].column_name] = rows[0];
+      }
     } else {
       const rows = await api("POST", "field_registry", {table_name:t, column_name:col, label:origLabel(c), in_notion:on}, {Prefer:"return=representation"});   // Supabase numbers the row itself
       REG[k] = rows[0];
