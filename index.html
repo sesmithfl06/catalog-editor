@@ -689,7 +689,7 @@ const DEFAULT_KEY = "sb_publishable_SCKdsKDMAWp8htqoVF7VPA_TN9A5KOU";
 const FAVORITES = ["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name","info:long_synopsis","st:rating","ed:word_count"];
 // Always shown first, never counted for "blanks".
 const KEY_COLS = new Set(["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name"]);
-const LONG_HINT = /synopsis|description|loglines|reasons|excerpt|review|plot|bio|keywords|promo|tags|notes|tagline|seo|text|characters|species|technology|language|rare|bookclub|scene/i;
+const LONG_HINT = /synopsis|description|loglines|reasons|excerpt|teaser|review|plot|bio|keywords|promo|tags|notes|tagline|seo|text|characters|species|technology|language|rare|bookclub|scene/i;
 
 /* ---------- small storage helpers (never required) ---------- */
 const store = {
@@ -744,11 +744,11 @@ async function api(method, path, body, extra){
   }
   return j;
 }
-async function getAll(table, order){
+async function getAll(table, order){   // table may carry a filter: "marketing_copy?copy_type=eq.Teaser"
   let out = [], from = 0;
-  const step = 1000;
+  const step = 1000, [t, filter] = table.split("?");
   for(;;){
-    const rows = await api("GET", `${table}?select=*${order?"&order="+order:""}&limit=${step}&offset=${from}`);
+    const rows = await api("GET", `${t}?select=*${filter?"&"+filter:""}${order?"&order="+order:""}&limit=${step}&offset=${from}`);
     out = out.concat(rows||[]);
     if (!rows || rows.length < step) break;
     from += step;
@@ -835,7 +835,7 @@ const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id","audio_f
 const SKIP_ST = new Set(["created_at","updated_at","english_title"]);   // Supabase's automatic row stamps; the editor does not show them (same as Editions). english_title always matches the English edition's title (shown with "Add the corresponding English book"); it stays in Supabase.
 let COLS = [], COLMAP = {};
 let REG = {};   // field_registry by "table.column"
-const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sb:{}, sl:{}, ser:{}, info:{}, lists:{}, php:{}, promo:{}, diff:{}};
+const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sb:{}, sl:{}, ser:{}, info:{}, lists:{}, php:{}, promo:{}, diff:{}, tsr:{}};
 const loaded = new Set();
 
 function regLabel(table, col){ const r = REG[table+"."+col]; return r ? (r.label||col) : col.replace(/_/g," ").replace(/^./,c=>c.toUpperCase()); }
@@ -878,7 +878,7 @@ const HELP = {
   "info.series_and_book_number":"Worked out: the series, the word for 'Book' in the book's language (Book, Tome, Buch, Volume, Libro) and the book number. For a different label on one book, add it in edition_differences (field series_and_book_number).",
   "info.whole_book_number":"Worked out: the book number as a whole number with no decimal, because Barnes & Noble does not accept decimals.",
   "list.reviews":"Reviews of the book. Edit them in Notion.",
-  "list.copy":"Marketing copy for the book. Edit it in Notion.",
+  "list.copy":"Marketing copy for the book (teasers have their own column, Teasers). Edit it in Notion.",
 };
 const ML_HELP = {
   "Giphy (Facebook & Twitter)":"Giphy link used for sharing the animated cover on Facebook and Twitter."
@@ -890,6 +890,7 @@ function ownHelp(c){
   if (c.kind==="ml") return ML_HELP[c.lt] || "";
   if (c.kind==="est") return "The English text kept next to the translation, so you can compare them.";
   if (c.kind==="diffall") return "Everything that is different for this one book, merged: extra or omitted stories, not released reason, paperback price note, audiobook parts, and this book's own author bio, series synopsis, series URL, rating and so on. Right-click → Edit to add, change or remove one.";
+  if (c.kind==="tsr") return "Teasers: a couple of lines (300 characters or less) used as marketing snippets, kept in Supabase as marketing_copy rows of type Teaser. Each teaser starts with its own line “Teaser 1”, “Teaser 2”…; to add one, type a new “Teaser N” line and the teaser under it. A longer passage (several paragraphs) is an excerpt: put it in Excerpts.";
   if (c.kind==="php") return "Price on Payhip, read from Payhip products (payhip_products) by matching the book's Payhip link. Change it there, not here.";
   let h = HELP[({ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", sb:"story_bibles", info:"info", list:"list"}[c.kind]) + "." + col] || "";
   return h;
@@ -971,7 +972,7 @@ const DEFAULT_ORDER = [
   "fmt:eBook:price_usd","fmt:eBook:library_price_usd","fmt:eBook:isbn","fmt:eBook:*","php:eBook",
   "fmt:Paperback:*","php:Paperback","fmt:Hardcover:*","php:Hardcover","fmt:Audiobook:*","php:Audiobook","fmt:*","php:*",
   "ed:keywords","est:keywords","ed:seo","st:tags","st:display_tags","st:main_genre_differentiated",
-  "ed:excerpts","est:excerpts","list:reviews","est:reviews","list:copy",
+  "ed:excerpts","est:excerpts","tsr:Teaser","list:reviews","est:reviews","list:copy",
   "ed:end_of_story_promo","est:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule",
   "info:translation_cache","calc:bestseller_line",
   "ed:bisac","ed:thema","ed:copyright_page_genres","est:copyright_page_genres","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres",
@@ -1002,13 +1003,13 @@ const GROUP_ITEMS = {
     "list:authors_note","info:author","info:author_bio","ed:sheet_order","ed:story_id","st:story_id"],
   "Story": ["st:main_plot","st:subplots","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
   "Series": ["ser:series_synopsis","ser:series_url","ser:series_note"],
-  "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","ed:excerpts","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
+  "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","ed:excerpts","tsr:Teaser","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
   "Story Bible (companion book)": ["php:Story Bible","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
   "Links": [],
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations","info:translation_cache","calc:bestseller_line"]
 };
-const KIND_GROUP = {calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
+const KIND_GROUP = {tsr:"Marketing", calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
 const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
 function placeCol(c){
   for (const g of GROUP_ORDER){ const i = GROUP_ITEMS[g].indexOf(c.id); if (i>=0){ c.group = g; c.so = i; return; } }
@@ -1074,6 +1075,8 @@ function buildCatalog(sample){
     ["technology","Technology"],["language","Pet names & invented words"],["rare","Rare details"],["bookclub","Book club questions"],
     ["reviews","Reviews (edit in Notion)"],["copy","Marketing copy (edit in Notion)"],["pron","Pronunciations"],["scenes","Scene image prompts"],["authors_note","Author's Note"]];
   LISTS.forEach(([k,l],i)=>addCol({id:"list:"+k, kind:"list", col:k, table:"story details", label:l, group:"Story", order:9800+i, ro:true}));
+  // Teasers: marketing_copy rows of type Teaser (editable here, one "Teaser N" line before each)
+  addCol({id:"tsr:Teaser", kind:"tsr", col:"teasers", table:"marketing_copy", label:"Teasers", group:"Marketing", order:regOrder("editions","excerpts") + 0.5, ro:false});
   // Min Age: worked out from Rating (read-only), sits next to Age Max
   addCol({id:"calc:min_age", kind:"calc", col:"min_age", table:"stories", label:"Min Age", group:"Book Basics", order:regOrder("stories","age_max")-0.5, ro:true, note:"Worked out from Rating: G = 10, T = 13, M = 17, E = 18. Change the Rating to change it."});
   // Bestselling author line in the edition's language: read from the Supabase table bestseller_lines (one line per language)
@@ -1101,7 +1104,7 @@ function warnDuplicateLabels(){
 }
 
 /* ---------- loading ---------- */
-function needTable(c){ if (c.kind==="aff") return "ml"; if (c.kind==="ed" && ED_FMT[c.col]) return "fmt"; if (c.kind==="calc" && c.col==="bestseller_line") return "bl"; return {promo:"promo", st:"stories", one:"one:"+c.t, est:"est", diff:"diff", diffall:"diff", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", slc:"sl", ser:"ser", info:"info", php:"php", calc:"stories", list:"list:"+c.col}[c.kind]; }
+function needTable(c){ if (c.kind==="aff") return "ml"; if (c.kind==="ed" && ED_FMT[c.col]) return "fmt"; if (c.kind==="calc" && c.col==="bestseller_line") return "bl"; return {tsr:"tsr", promo:"promo", st:"stories", one:"one:"+c.t, est:"est", diff:"diff", diffall:"diff", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", slc:"sl", ser:"ser", info:"info", php:"php", calc:"stories", list:"list:"+c.col}[c.kind]; }
 // The Payhip product code is the last part of the book's Payhip link (payhip.com/b/<code>).
 const payhipCode = l => { const m = /\/b\/([^\/?#]+)/.exec((l && (l.link_or_id || l.reader_link)) || ""); return m ? m[1] : null; };
 async function ensureLoaded(cols){
@@ -1117,6 +1120,7 @@ async function ensureLoaded(cols){
     else if (n==="sb"){ data.sb = {}; for (const r of await api("GET","story_bibles?select="+SB_SELECT+"&limit=5000")) data.sb[r.file_name]=r; }
     else if (n==="sl"){ for (const r of await getAll("store_links")) data.sl[`${r.file_name}|${r.store}|${r.format}|${r.link_type}`]=r; }
     else if (n==="ser"){ for (const r of await getAll("series")) data.ser[r.series+"|"+r.language]=r; }
+    else if (n==="tsr"){ data.tsr = {}; for (const r of await getAll("marketing_copy?copy_type=eq.Teaser", "file_name.asc,sort_order.asc,id.asc")) data.tsr[r.id]=r; }
     else if (n==="php"){
       const price = {}; for (const r of await getAll("payhip_products")) price[r.code] = r.price_usd;
       for (const l of Object.values(data.sl)){ if (l.store!=="Payhip") continue; const code = payhipCode(l); if (code && price[code]!=null) data.php[l.file_name+"|"+l.format] = price[code]; }
@@ -1160,7 +1164,7 @@ async function ensureLoaded(cols){
         for (const r of await getAll("reviews","file_name.asc,sort_order.asc")) push(r.file_name, "“" + r.review_text + "”" + (r.reviewer||r.source ? " — " + [r.source, r.reviewer].filter(Boolean).join(", ") : ""));
         for (const f in out) out[f] = out[f].join("\n\n");
       } else if (k==="copy"){
-        for (const r of await getAll("marketing_copy","file_name.asc,copy_type.asc,sort_order.asc")) push(r.file_name, "[" + r.copy_type + "] " + r.copy_text);
+        for (const r of await getAll("marketing_copy","file_name.asc,copy_type.asc,sort_order.asc")) if (r.copy_type!=="Teaser") push(r.file_name, "[" + r.copy_type + "] " + r.copy_text);   // teasers have their own column
         for (const f in out) out[f] = out[f].join("\n\n");
       } else if (k==="pron"){
         // pronunciations belong to characters and words, shown on the books those characters are in
@@ -1197,7 +1201,7 @@ async function loadAll(){
   for (const k in condTypes) delete condTypes[k];
   appReady = false;
   setStatus("Loading…");
-  loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","php","promo","diff","bl"]) data[k]={}; data.one={};
+  loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","php","promo","diff","bl","tsr"]) data[k]={}; data.one={};
   const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols, affR, cnames, authR] = await Promise.all([
     api("GET","field_registry?select=*").catch(()=>[]),
     api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000").catch(()=>[]),
@@ -1375,7 +1379,7 @@ const NOTION_SHARED_ED = new Set(["loglines","excerpts"]);
 const NOTION_STORY_LISTS = new Set(["main_characters","all_characters","char_settings","char_rels","species","technology","rare","bookclub"]);
 function notionKey(c){
   if (!c) return "";
-  if (c.kind==="ml" || c.kind==="sl") return "shared";
+  if (c.kind==="ml" || c.kind==="sl" || c.kind==="tsr") return "shared";
   if (c.kind==="list") return (c.col==="reviews" || c.col==="copy") ? "shared" : NOTION_STORY_LISTS.has(c.col) ? "story" : "";
   if ((c.kind==="ed" || c.kind==="info") && NOTION_SHARED_ED.has(c.col)) return "shared";
   if (c.kind==="one" && c.t==="edition_awards") return c.col==="award" ? "shared" : "";
@@ -1783,7 +1787,20 @@ function valueOf(ed, c){
       r = data.stories[ed.story_id]; return r ? ({G:10,T:13,M:17,E:18}[r.rating] ?? null) : null;   // Min Age, worked out from the story's Rating
     case "promo": r = data.promo[ed.promo_line_id]; return r ? r.promo_line : null;
     case "list": return (data.lists[c.col]||{})[ed.file_name] || null;
+    case "tsr": return teaserText(ed.file_name);
   }
+}
+// Teasers (marketing_copy rows of type Teaser): shown and edited as one text, each teaser after its own "Teaser N" line (as on the Notion page)
+const TEASER_MAX = 300;
+const TEASER_LABEL = /^\s*\**\s*teasers?\s*#?\s*\d+\s*:?\s*\**\s*$/i;
+const teaserRows = fn => Object.values(data.tsr).filter(r=>r.file_name===fn).sort((a,b)=>(a.sort_order ?? 1e9) - (b.sort_order ?? 1e9) || a.id - b.id);
+function teaserText(fn){ const rows = teaserRows(fn); return rows.length ? rows.map((r,i)=>`Teaser ${i+1}\n${r.copy_text}`).join("\n\n") : null; }
+function splitTeasers(text){
+  const items = []; let cur = [];
+  const flush = () => { const t = cur.join("\n").trim(); if (t) items.push(t); cur = []; };
+  for (const l of String(text ?? "").split("\n")){ if (TEASER_LABEL.test(l)) flush(); else cur.push(l); }
+  flush();
+  return items;
 }
 function canEdit(ed, c){
   if (c.ro) return false;
@@ -2801,6 +2818,19 @@ async function write(ed, c, v){
       return;
     }
     case "ser": { const k = rowKey(ed,c); data.ser[k] = await patchOne("series", `series=eq.${q(ed.series)}&language=eq.${q(ed.language)}`, {[c.col]:v}); return; }
+    case "tsr": {
+      // the teasers in the order typed: row 1 gets the first, and so on; new ones are added, leftover rows are deleted
+      const items = splitTeasers(v), cur = teaserRows(ed.file_name);
+      const long = items.findIndex(t=>t.length > TEASER_MAX);
+      if (long >= 0) throw new Error(`Teaser ${long+1} is ${items[long].length} characters. A teaser is ${TEASER_MAX} characters or less; put a longer passage in Excerpts.`);
+      for (let i = 0; i < items.length; i++){
+        const r = cur[i];
+        if (!r){ const n = await insertOne("marketing_copy", {file_name:ed.file_name, copy_type:"Teaser", sort_order:i+1, copy_text:items[i]}); data.tsr[n.id] = n; }
+        else if (r.copy_text !== items[i] || r.sort_order !== i+1) data.tsr[r.id] = await patchOne("marketing_copy", "id=eq."+r.id, {copy_text:items[i], sort_order:i+1});
+      }
+      for (const r of cur.slice(items.length)){ await delWhere("marketing_copy", "id=eq."+r.id); delete data.tsr[r.id]; }
+      return;
+    }
   }
   throw new Error("This column can't be edited here.");
 }
@@ -3039,6 +3069,11 @@ function liveApply(p){
     case "edition_subtitles": case "edition_awards": case "edition_release_notes": case "projects":
       if (data.one[t]) liveMap(data.one[t], ev, n, o, r=>r.file_name); break;
     case "notion_sync_queue": queueCountSoon(); return;
+    case "marketing_copy":
+      if (!loaded.has("tsr")) return;
+      if (o.id != null) delete data.tsr[o.id];
+      if (n && n.copy_type === "Teaser") data.tsr[n.id] = n; else if (n) delete data.tsr[n.id];
+      break;
     case "english_source_text": if (loaded.has("est")) liveMap(data.est, ev, n, o, r=>r.file_name+"|"+r.field); break;
     case "edition_differences": if (loaded.has("diff")) liveMap(data.diff, ev, n, o, r=>r.file_name+"|"+r.field); break;
     case "marketing_links": if (loaded.has("ml")) liveMap(data.ml, ev, n, o, r=>r.file_name+"|"+r.link_type); break;
