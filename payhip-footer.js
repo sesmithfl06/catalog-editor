@@ -38,7 +38,7 @@ function () {
        moved on every build: the first page view after a paste throws away what
        the old code stored and reads the store fresh, so a fix is on screen the
        moment it is in the store rather than when a reader's week runs out. */
-    cacheVersion: "b2026-11-05b",
+    cacheVersion: "b2026-11-05d",
     clean: (text) => (text || "").replace(/\s+/g, " ").trim(),
     flatten: (text) => (text || "").replace(/[\u2018\u2019\u02BC`]/g, "'").toLowerCase(),
     normalize: (text) => (text || "")
@@ -2128,10 +2128,13 @@ function () {
   /* Whether the page being read is a story bible rather than a story. It changes
      what sits below the line in the picker, and gives every other row a way to
      its own page. */
-  const currentIsBible = /story\s*bible|companion\s*guide/i.test(
-    window.se.nameWithoutContents(document.querySelector("h1")?.dataset.seRawName
-      || document.querySelector("h1")?.textContent || "")
-  );
+  const pageName = window.se.nameWithoutContents(document.querySelector("h1")?.dataset.seRawName
+    || document.querySelector("h1")?.textContent || "");
+  /* A bundle that holds the story bible ("Bundle: eBook, Story Bible") is a
+     bundle, not a bible: its page offers the bible under Related Products like
+     the eBook's does. */
+  const currentIsBible = /story\s*bible|companion\s*guide/i.test(pageName)
+    && !/\bbundle\b|box\s*set/i.test(pageName);
 
   const normalize = (text) => (text || "")
     .toLowerCase()
@@ -2364,10 +2367,52 @@ function () {
        The page script writes the subtitle with a comma before "Book"; the
        product name has none, so the commas come back out. */
     const longest = subtitle ? `${head.join(" ")}: ${subtitle.replace(/,/g, "")}` : "";
+    /* The story's bible and bundle are asked for by name too: five answers go
+       quickly when a story has an eBook, an audiobook, a paperback, a hardcover
+       and a pack all carrying the same words, and the two that are not another
+       way to read it are the ones left out. */
     return [...new Set([
       longest,
-      ...[4, 3, 2].map((count) => head.slice(0, count).join(" "))
+      ...[4, 3, 2].map((count) => head.slice(0, count).join(" ")),
+      `${story} Story Bible`,
+      `${story} Bundle`
     ].filter(Boolean))];
+  };
+  /* Products the catalogue knows for this very book, found by the Payhip code
+     on this page. The store's search never answers with a product that is
+     hidden or unlisted, and a book is usually put up that way before its
+     release; the catalogue's own list of the book's products is what lets its
+     bible and bundle still join the panel. A product it holds under a name the
+     list cut short is given a name that says what it is. */
+  const catalogSiblings = () => {
+    const books = (window.seSnapshot && window.seSnapshot.books) || [];
+    const book = books.find((entry) => (entry.p || []).some((product) => product[1] === currentKey));
+    if (!book) return [];
+    return book.p
+      .filter((product) => product[1] && !["Archived", "Draft"].includes(product[4]))
+      .map(([format, code, name, price]) => {
+        const whole = name && !/(\.\.\.|\u2026)\s*$/.test(name);
+        const made = `${book.t}: ${book.s || ""}${book.s && book.n ? ` Book ${book.n}` : ""} (${format})`
+          .replace(/:\s+\(/, " (");
+        return {
+          key: code,
+          name: window.se.tidyName(whole ? name : made, code),
+          price: String(Number.parseFloat(price) || 0),
+          canonicalUrl: `/b/${code}`,
+          seFromCatalog: true
+        };
+      });
+  };
+  /* The same story in the same series, however the words around the series are
+     put: "A Dragon Lords of Valdier Adventure (eBook)" and "A Dragon Lords of
+     Valdier (Story Bible)" are one book's products. */
+  const seriesOfName = (name) => {
+    const split = window.se.splitName(name || "");
+    return window.se.bookKey(window.se.seriesIn(split.series));
+  };
+  const sameStoryAndSeries = (nameA, nameB) => {
+    const story = storyTitle(nameA);
+    return !!story && story === storyTitle(nameB) && seriesOfName(nameA) === seriesOfName(nameB);
   };
   /* Every phrase is asked, and the matches are pooled. The narrow phrase gets
      the editions past the five-result cap; the short one still catches an
@@ -2377,13 +2422,18 @@ function () {
     const pinned = pinnedGroup();
     const found = new Map();
     const pool = new Map();
+    const catalog = catalogSiblings();
     let self = null;
     /* Asked all at once rather than one after another: each answer takes about
        a fifth of a second, and waiting on them in turn is what kept the panel
        from appearing. */
     const answers = await Promise.all(searchPhrases().map((phrase) => searchStore(phrase)));
+    /* The page's own product as the store knows it; as the catalogue knows it
+       when the store's search cannot show it. */
+    self = answers.flat().find((item) => item.key === currentKey)
+      || catalog.find((item) => item.key === currentKey)
+      || null;
     for (const items of answers) {
-      self = self || items.find((item) => item.key === currentKey);
       if (!self) continue;
       items.forEach((item) => {
         if (!pool.has(item.key)) pool.set(item.key, item);
@@ -2396,6 +2446,13 @@ function () {
         if (keep) found.set(item.key, item);
       });
     }
+    /* What the catalogue holds for this book joins it, the store's own copy of
+       a product preferred where the search did show it. */
+    if (self && !pinned) {
+      catalog.forEach((item) => {
+        if (!found.has(item.key)) found.set(item.key, pool.get(item.key) || item);
+      });
+    }
     /* A story bible or digital pack is named too differently from the editions
        to pass the word-match above, so everything carrying the same story AND
        the same series joins them. The series is what keeps the French
@@ -2406,7 +2463,8 @@ function () {
         pool.forEach((item) => {
           if (found.has(item.key)) return;
           if (SKIP_FREE && Number.parseFloat(item.price) === 0) return;
-          if (window.se.bookKeysFor(item.name)[0] === selfKey) found.set(item.key, item);
+          if (window.se.bookKeysFor(item.name)[0] === selfKey
+            || sameStoryAndSeries(self.name, item.name)) found.set(item.key, item);
         });
       }
       return [...found.values()];

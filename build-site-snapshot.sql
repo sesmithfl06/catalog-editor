@@ -276,14 +276,14 @@ begin
         from public.editions_full ef
        where ef.not_released_reason is null
     ),
-    -- Payhip products linked to each book: [format, code, product name]
+    -- Payhip products linked to each book: [format, code, product name, price, status]
     pr as (
       select x.file_name,
-             jsonb_agg(jsonb_build_array(x.format, x.code, x.name) order by x.format, x.code) as products
+             jsonb_agg(jsonb_build_array(x.format, x.code, x.name, x.price_usd, x.status) order by x.format, x.code) as products
         from (
           select distinct l.file_name, l.format,
                  substring(l.link_or_id from '/b/([A-Za-z0-9]+)') as code,
-                 p.name
+                 p.name, p.price_usd, p.status
             from public.store_links l
             left join public.payhip_products p on p.code = substring(l.link_or_id from '/b/([A-Za-z0-9]+)')
            where l.store = 'Payhip' and l.link_or_id ~ '/b/([A-Za-z0-9]+)'
