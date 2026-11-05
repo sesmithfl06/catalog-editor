@@ -360,9 +360,6 @@ dialog#ncdlg::backdrop{background:#0006}
 <dialog id="sldlg">
   <h2>Find store links for shown books</h2>
   <p class="hint">Press Search, open the right book, copy its address and paste it in the box (for Apple and Amazon the ID is taken out of the link for you). Type n/a for a store the book isn't on.</p>
-  <label>Payhip product list (.md, optional): refreshes the Payhip product names, prices and which are live, hidden or unlisted. Do this first after adding products in Payhip.
-    <input id="slprod" type="file" accept=".md,.txt,text/markdown,text/plain"></label>
-  <div class="row"><button id="slprodgo" type="button">Update Payhip products</button></div>
   <div class="row"><span class="hint" id="slmsg"></span></div>
   <div id="sllist"><div class="empty">Looking up…</div></div>
   <div class="row"><span class="grow"></span><button id="slsaveall" class="primary" type="button" disabled>Save all</button><button id="slclose" type="button">Done</button></div>
@@ -750,7 +747,7 @@ const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","bad
   projects:["plot"]};
 // Which fields each format uses. eBook and paperback share the book's Publication date (editions); hardcover and audiobook keep their own.
 // The story bible is a companion book with its own row in story_bibles (SB_FIELDS below), not a format.
-// Payhip prices are not here: they come from payhip_products (read-only "Payhip … price" columns).
+// Each format has its own Price ($) here, typed in the editor. The story bible price is story_bibles.price_usd.
 // formats.not_offered has no column: right-click any cell of that format → Mark … as offered / not offered.
 const FMT_FIELDS = {
   "eBook":       ["price_usd","library_price_usd","isbn"],
@@ -776,9 +773,9 @@ function formatOffered(ed, f){
   if (f==="eBook") return ebookOffered(ed);
   const r = data.fmt[ed.file_name+"|"+f]; return !!r && r.not_offered !== true;
 }
-// The format a column belongs to: format cells, that format's store links, store count, Payhip price and affiliate links,
+// The format a column belongs to: format cells, that format's store links, store count and affiliate links,
 // and book columns kept for one format (paperback pages). null for every other column.
-function colFormat(c){ return c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="php" || c.kind==="sl" || c.kind==="slc") ? c.f : c.kind==="ed" ? (ED_FMT[c.col] || null) : null; }
+function colFormat(c){ return c.aff ? c.aff.f : (c.kind==="fmt" || c.kind==="sl" || c.kind==="slc") ? c.f : c.kind==="ed" ? (ED_FMT[c.col] || null) : null; }
 // One-book differences kept in edition_differences (one row per book and field). The editor shows them merged in one
 // "Edition differences" column; right-click → Edit opens a list where each difference is added, changed or removed.
 // Fields marked own:true replace the usual value (story, series or author) for this book only.
@@ -811,7 +808,7 @@ function diffText(file){
     return `${diffLabel(r.field)}: ${v.length>60 ? v.slice(0,60)+"…" : v}${n}`; }).join("; ");
 }
 const SB_GROUP = "Story Bible (companion book)";
-const SB_FIELDS = ["isbn","publication_date","word_count"];
+const SB_FIELDS = ["isbn","publication_date","word_count","price_usd"];
 const SB_SELECT = "id,file_name," + SB_FIELDS.join(",");   // never the bible text itself (bible_md), which is large
 // Column ids that changed with the October 2026 data changes, so saved views and links still find them.
 const RENAMED = {"ed:long_synopsis_lead_in":["info:long_synopsis"], "ed:long_synopsis_closing_line":["info:long_synopsis"], "promo:text":["info:long_synopsis"], "ed:long_synopsis_award_line":["info:long_synopsis"], "ed:long_synopsis_series_intro":["info:long_synopsis"], "promo:line":["info:long_synopsis"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"], "info:english_title":["st:english_title"], "ser:reading_note":["ser:series_note"], "sb:price_usd":["php:Story Bible"], "one:edition_release_notes:not_released_reason":["diff:all"], "diff:extra_stories":["diff:all"], "diff:omitted_stories":["diff:all"], "diff:not_released_reason":["diff:all"], "diff:paperback_price_note":["diff:all"], "diff:audio_release_dates":["diff:all"]};
@@ -822,7 +819,7 @@ const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id","audio_f
 const SKIP_ST = new Set(["created_at","updated_at","english_title"]);   // Supabase's automatic row stamps; the editor does not show them (same as Editions). english_title always matches the English edition's title (shown with "Add the corresponding English book"); it stays in Supabase.
 let COLS = [], COLMAP = {};
 let REG = {};   // field_registry by "table.column"
-const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sb:{}, sl:{}, ser:{}, info:{}, lists:{}, php:{}, promo:{}, diff:{}, tsr:{}};
+const data = {editions:[], stories:{}, one:{}, est:{}, ml:{}, fmt:{}, sb:{}, sl:{}, ser:{}, info:{}, lists:{}, promo:{}, diff:{}, tsr:{}};
 const loaded = new Set();
 
 function regLabel(table, col){ const r = REG[table+"."+col]; return r ? (r.label||col) : col.replace(/_/g," ").replace(/^./,c=>c.toUpperCase()); }
@@ -878,7 +875,6 @@ function ownHelp(c){
   if (c.kind==="est") return "The English text kept next to the translation, so you can compare them.";
   if (c.kind==="diffall") return "Everything that is different for this one book, merged: extra or omitted stories, not released reason, paperback price note, audiobook parts, and this book's own author bio, series synopsis, series URL, rating and so on. Right-click → Edit to add, change or remove one.";
   if (c.kind==="tsr") return "Teasers: a couple of lines (300 characters or less) used as marketing snippets, kept in Supabase as marketing_copy rows of type Teaser. Each teaser starts with its own line “Teaser 1”, “Teaser 2”…; to add one, type a new “Teaser N” line and the teaser under it. A longer passage (several paragraphs) is an excerpt: put it in Excerpts.";
-  if (c.kind==="php") return "Price on Payhip, read from Payhip products (payhip_products) by matching the book's Payhip link. Change it there, not here.";
   let h = HELP[({ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", sb:"story_bibles", info:"info", list:"list"}[c.kind]) + "." + col] || "";
   return h;
 }
@@ -956,8 +952,8 @@ const DEFAULT_ORDER = [
   "ed:publication_date","est:publication_date","one:edition_release_notes:subscription_publication","one:edition_release_notes:collection_publication","ed:anthology_only","diff:all",
   "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience",
   "ed:word_count","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","st:connected_universe",
-  "fmt:eBook:price_usd","fmt:eBook:library_price_usd","fmt:eBook:isbn","fmt:eBook:*","php:eBook",
-  "fmt:Paperback:*","php:Paperback","fmt:Hardcover:*","php:Hardcover","fmt:Audiobook:*","php:Audiobook","fmt:*","php:*",
+  "fmt:eBook:price_usd","fmt:eBook:library_price_usd","fmt:eBook:isbn","fmt:eBook:*",
+  "fmt:Paperback:*","fmt:Hardcover:*","fmt:Audiobook:*","fmt:*",
   "ed:keywords","est:keywords","ed:seo","st:tags","st:display_tags","st:main_genre_differentiated",
   "ed:excerpts","est:excerpts","tsr:Teaser","list:reviews","est:reviews","list:copy",
   "ed:end_of_story_promo","est:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule",
@@ -967,7 +963,7 @@ const DEFAULT_ORDER = [
   "sl:Books2Read|eBook|Universal Link","sl:Books2Read|eBook|Custom Link","sl:Amazon|eBook|ASIN","sl:Apple|eBook|ID","sl:Barnes & Noble|eBook|URL","sl:Google Play|eBook|URL","sl:Kobo|eBook|URL",
   "slc:Books2Read|eBook|Universal Link","ed:vellum_link_created","sl:Payhip|*","sl:*",
   "ml:Amazon affiliate link:url","ml:Apple Books affiliate link:url","aff:*","ml:*",
-  "sb:*","php:Story Bible","list:bookclub","list:*","est:*"
+  "sb:*","list:bookclub","list:*","est:*"
 ];
 function applyDefaultOrder(){
   const old = COLS.slice().sort((a,b)=>a.order-b.order || a.label.localeCompare(b.label));
@@ -992,16 +988,16 @@ const GROUP_ITEMS = {
   "Series": ["ser:series_synopsis","ser:series_url","ser:series_note"],
   "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","ed:excerpts","tsr:Teaser","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
-  "Story Bible (companion book)": ["sl:Payhip|Story Bible|URL","php:Story Bible","sl:BookFunnel|Story Bible|URL","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
+  "Story Bible (companion book)": ["sl:Payhip|Story Bible|URL","sb:price_usd","sl:BookFunnel|Story Bible|URL","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
   "Links": [],
   "Translations": ["ed:translator","ed:proofreader","ed:ai_translations","info:translation_cache","calc:bestseller_line"]
 };
-const KIND_GROUP = {tsr:"Marketing", calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, php:"Distribution", sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
+const KIND_GROUP = {tsr:"Marketing", calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
 const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
 function placeCol(c){
   for (const g of GROUP_ORDER){ const i = GROUP_ITEMS[g].indexOf(c.id); if (i>=0){ c.group = g; c.so = i; return; } }
-  c.group = (c.f==="Story Bible" && c.kind==="php") ? SB_GROUP : (KIND_GROUP[c.kind] || "Book Basics");   // any column not listed above lands with its kind
-  c.so = 1000 + ((c.kind==="fmt" || c.kind==="php") ? (FORMAT_RANK[c.f]??9)*1000 + c.order : (c.kind==="ml" || c.kind==="aff") ? 5000 + c.order : c.order);
+  c.group = KIND_GROUP[c.kind] || "Book Basics";   // any column not listed above lands with its kind
+  c.so = 1000 + ((c.kind==="fmt") ? (FORMAT_RANK[c.f]??9)*1000 + c.order : (c.kind==="ml" || c.kind==="aff") ? 5000 + c.order : c.order);
 }
 // Built-in nicknames: shown unless a saved name (right-click → Rename column…) replaces them. "Back to the original name" saves {plain:true}.
 const DEFAULT_NICKS = {
@@ -1012,7 +1008,7 @@ const DEFAULT_NICKS = {
   "slc:Books2Read|eBook|Universal Link":"Store #",
   "sl:Amazon|eBook|ASIN":"ASIN", "sl:Apple|eBook|ID":"Apple ID", "sl:Amazon|Paperback|ASIN":"Pb ASIN", "sl:Amazon|Hardcover|ASIN":"Hc ASIN",
   "ml:Amazon affiliate link:url":"Amz eB US Affil", "ml:Apple Books affiliate link:url":"Apple Affil", "ml:B&N affiliate link:url":"BN Affil", "ml:Google Play affiliate link:url":"Google Play Affil",
-  "sb:isbn":"SB ISBN", "sb:publication_date":"SB Pub", "sb:word_count":"SB words", "php:Story Bible":"SB $",
+  "sb:isbn":"SB ISBN", "sb:publication_date":"SB Pub", "sb:word_count":"SB words", "sb:price_usd":"SB $",
   "info:translation_cache":"Translation Cache", "calc:bestseller_line":"Bestseller line",
   "ed:end_of_story_promo":"End promo (current)", "ed:new_end_of_story_promo_file_name":"New end promo file", "ed:new_end_of_story_promo_rule":"New end promo rule",
   "ed:character_sheet_included":"Char sheet", "st:main_genre_differentiated":"Main genre", "ed:vellum_link_created":"Vellum link",
@@ -1051,7 +1047,6 @@ function buildCatalog(sample){
   FMT_NAMES = new Set([...Object.keys(FMT_FIELDS), ...sample.formats.filter(f=>f!=="Story Bible")]);
   for (const f of sample.formats) for (const c of (FMT_FIELDS[f] || FMT_FIELDS_OTHER)) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
   SB_FIELDS.forEach((c,i)=>addCol({id:"sb:"+c, kind:"sb", col:c, table:"story_bibles", label:`Story Bible · ${regLabel("story_bibles",c)}`, group:SB_GROUP, order:7800+i, ro:false}));
-  for (const f of sample.payhipFormats) addCol({id:`php:${f}`, kind:"php", f, col:"price_usd", table:"payhip_products", label:(f==="Story Bible" ? "Story Bible · Price" : `${f} · Payhip price`), group:"Format: "+f, order:7000+regOrder("formats","payhip_price_usd"), ro:true});
   for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
   if (sample.slKeys.includes("Books2Read|eBook|Universal Link")) addCol({id:"slc:Books2Read|eBook|Universal Link", kind:"slc", s:"Books2Read", f:"eBook", lt:"Universal Link", col:"store_count", table:"store_links", label:"Books2Read store count", group:"Store links: Books2Read", order:8000.5, ro:false});
   addCol({id:"diff:all", kind:"diffall", table:"edition_differences", label:"Edition differences", group:"Edition differences", order:regOrder("editions","anthology_only") + 0.5, ro:false});
@@ -1091,7 +1086,7 @@ function warnDuplicateLabels(){
 }
 
 /* ---------- loading ---------- */
-function needTable(c){ if (c.kind==="aff") return "ml"; if (c.kind==="ed" && ED_FMT[c.col]) return "fmt"; if (c.kind==="calc" && c.col==="bestseller_line") return "bl"; return {tsr:"tsr", promo:"promo", st:"stories", one:"one:"+c.t, est:"est", diff:"diff", diffall:"diff", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", slc:"sl", ser:"ser", info:"info", php:"php", calc:"stories", list:"list:"+c.col}[c.kind]; }
+function needTable(c){ if (c.kind==="aff") return "ml"; if (c.kind==="ed" && ED_FMT[c.col]) return "fmt"; if (c.kind==="calc" && c.col==="bestseller_line") return "bl"; return {tsr:"tsr", promo:"promo", st:"stories", one:"one:"+c.t, est:"est", diff:"diff", diffall:"diff", ml:"ml", fmt:"fmt", sb:"sb", sl:"sl", slc:"sl", ser:"ser", info:"info", calc:"stories", list:"list:"+c.col}[c.kind]; }
 // The Payhip product code is the last part of the book's Payhip link (payhip.com/b/<code>).
 const payhipCode = l => { const m = /\/b\/([^\/?#]+)/.exec((l && (l.link_or_id || l.reader_link)) || ""); return m ? m[1] : null; };
 async function ensureLoaded(cols){
@@ -1108,10 +1103,6 @@ async function ensureLoaded(cols){
     else if (n==="sl"){ for (const r of await getAll("store_links")) data.sl[`${r.file_name}|${r.store}|${r.format}|${r.link_type}`]=r; }
     else if (n==="ser"){ for (const r of await getAll("series")) data.ser[r.series+"|"+r.language]=r; }
     else if (n==="tsr"){ data.tsr = {}; for (const r of await getAll("marketing_copy?copy_type=eq.Teaser", "file_name.asc,sort_order.asc,id.asc")) data.tsr[r.id]=r; }
-    else if (n==="php"){
-      const price = {}; for (const r of await getAll("payhip_products")) price[r.code] = r.price_usd;
-      for (const l of Object.values(data.sl)){ if (l.store!=="Payhip") continue; const code = payhipCode(l); if (code && price[code]!=null) data.php[l.file_name+"|"+l.format] = price[code]; }
-    }
     else if (n.startsWith("list:")){
       const k = n.slice(5), out = {}, push = (fn, t)=>{ (out[fn] = out[fn] || []).push(t); };
       if (k==="main_characters" || k==="all_characters"){
@@ -1188,7 +1179,7 @@ async function loadAll(){
   for (const k in condTypes) delete condTypes[k];
   appReady = false;
   setStatus("Loading…");
-  loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","php","promo","diff","bl","tsr"]) data[k]={}; data.one={};
+  loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","promo","diff","bl","tsr"]) data[k]={}; data.one={};
   const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols, affR, cnames, authR] = await Promise.all([
     api("GET","field_registry?select=*").catch(()=>[]),
     api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000").catch(()=>[]),
@@ -1215,8 +1206,7 @@ async function loadAll(){
   const fmtOrder = ["eBook","Paperback","Hardcover","Audiobook","Story Bible"];
   buildCatalog({editions:eds, storyCols:Object.keys((storyOne||[])[0]||{}), estFields:uniq(estF,"field"), mlTypes:uniq(mlT,"link_type"),
     formats:uniq(fmts,"format").sort((a,b)=>fmtOrder.indexOf(a)-fmtOrder.indexOf(b)),
-    slKeys:[...new Set(slK.map(r=>`${r.store}|${r.format}|${r.link_type}`))].sort(),
-    payhipFormats:[...new Set(slK.filter(r=>r.store==="Payhip" && payhipCode(r)).map(r=>r.format))].sort((a,b)=>(fmtOrder.indexOf(a)+1||99)-(fmtOrder.indexOf(b)+1||99))});
+    slKeys:[...new Set(slK.map(r=>`${r.store}|${r.format}|${r.link_type}`))].sort()});
   await ensureLoaded([{kind:"sb"}, {kind:"fmt"}]);   // lines on format, store link and story bible cells need both, whatever columns are shown
   fillFilters();
   await loadPresetsDb();
@@ -1375,7 +1365,6 @@ function notionKey(c){
   if (c.kind==="st") return "stories."+c.col;
   if (c.kind==="one") return c.t+"."+c.col;
   if (c.kind==="fmt") return "formats."+(c.col==="runtime_minutes" ? "runtime" : c.col);
-  if (c.kind==="php") return "payhip_products.price_usd";
   if (c.kind==="sb") return "story_bibles."+c.col;
   return "";
 }
@@ -1401,7 +1390,7 @@ function notionYes(c){ const k = notionKey(c); return k==="shared" || k==="story
 // what else changes with this column (one setting covers every format, every store link)
 function notionShared(c){
   if (c.kind==="sl") return " This setting covers every store link.";
-  if (c.kind==="fmt" || c.kind==="php") return " This setting covers every format.";
+  if (c.kind==="fmt") return " This setting covers every format.";
   if (c.kind==="ser") return " This setting covers every series.";
   return "";
 }
@@ -1449,7 +1438,7 @@ async function setNotion(id, on){
       const rows = await api("POST", "field_registry", {table_name:t, column_name:col, label:origLabel(c), in_notion:on}, {Prefer:"return=representation"});   // Supabase numbers the row itself
       REG[k] = rows[0];
     }
-    if (on && c.kind !== "info" && c.kind !== "php")   // worked-out columns (long synopsis, series + book number, Payhip price) have no table column to watch
+    if (on && c.kind !== "info")   // worked-out columns (long synopsis, series + book number) have no table column to watch
       await api("POST", "notion_watch?on_conflict=table_name,column_name", {table_name:t, column_name:col, note:"Added from the Catalog Editor"}, {Prefer:"resolution=ignore-duplicates,return=minimal"}).catch(()=>{});
     showNotion(ntCol);
     $("#ntmsg").textContent = (id===ntCol ? "" : c.label + ": ") + (on ? "Now sent to Notion. Each book's “📚 From Supabase” box shows it after the book's next sync (the nightly refresh does every synced page)." : "No longer sent to Notion. Each book's “📚 From Supabase” box drops it at the book's next sync (the nightly refresh does every synced page).");
@@ -1743,7 +1732,7 @@ function rowKey(ed, c){
   switch(c.kind){
     case "est": case "diff": return ed.file_name+"|"+c.field;
     case "ml": return ed.file_name+"|"+c.lt;
-    case "fmt": case "php": return ed.file_name+"|"+c.f;
+    case "fmt": return ed.file_name+"|"+c.f;
     case "sb": return ed.file_name;
     case "sl": case "slc": return `${ed.file_name}|${c.s}|${c.f}|${c.lt}`;
     case "ser": return ed.series+"|"+ed.language;
@@ -1762,7 +1751,6 @@ function valueOf(ed, c){
     case "ml": r = data.ml[rowKey(ed,c)]; return r ? r[c.col] : null;
     case "fmt": r = data.fmt[rowKey(ed,c)]; return r ? r[c.col] : null;
     case "sb": r = data.sb[ed.file_name]; return r ? r[c.col] : null;
-    case "php": return data.php[rowKey(ed,c)] ?? null;
     case "sl": r = data.sl[rowKey(ed,c)]; return r ? r.link_or_id : null;
     case "slc": r = data.sl[rowKey(ed,c)]; return r ? r.store_count : null;
     case "ser": r = data.ser[rowKey(ed,c)]; return r ? r[c.col] : null;
@@ -1800,9 +1788,9 @@ function canEdit(ed, c){
 }
 // A cell gets a line when its format isn't offered for the book (no formats row, or marked Not offered; for the eBook see ebookOffered).
 // When the format is offered, an empty cell is a blank to fill, whether or not its store link / formats row exists yet.
-// The same for story bible cells (and story bible store links / Payhip price) on a book without a story bible.
+// The same for story bible cells (and story bible store links and price) on a book without a story bible.
 function formatMissing(ed, c){
-  if (c.kind==="sb" || ((c.kind==="php" || c.kind==="sl" || c.kind==="slc") && c.f==="Story Bible")) return loaded.has("sb") && !data.sb[ed.file_name];
+  if (c.kind==="sb" || ((c.kind==="sl" || c.kind==="slc") && c.f==="Story Bible")) return loaded.has("sb") && !data.sb[ed.file_name];
   const f = colFormat(c);
   if (!f || !FMT_NAMES.has(f) || !loaded.has("fmt")) return false;
   if (f==="eBook"){   // Kindle Unlimited books are only sold on Amazon, so other eBook stores get a line
@@ -1971,7 +1959,6 @@ function hasRow(ed, c){
     case "sb": return !!data.sb[ed.file_name];
     case "sl": case "slc": return !!data.sl[rowKey(ed,c)] || offeredHere(ed,c);
     case "ser": return !!data.ser[rowKey(ed,c)];
-    case "php": return Object.prototype.hasOwnProperty.call(data.php, rowKey(ed,c)) || offeredHere(ed,c);
     default: return true;
   }
 }
@@ -3369,41 +3356,6 @@ $("#sllist").addEventListener("keydown", async ev=>{
   ev.preventDefault(); const tr = ev.target.closest("tr");
   if (tr.querySelector("input").value.trim() && await slSaveRow(tr)){ slPrune(); slMsg("Saved."); }
 });
-
-/* ---------- Payhip product list (in Find store links) ----------
-   The list exported from Payhip (the Products page saved as .md) refreshes payhip_products: each product's name,
-   price and status (Live, Hidden, Unlisted, Draft). A product no longer in the list is marked Archived. The footer
-   and the price columns read from it; reload the page to see new prices in the grid. */
-function readPayhipProducts(md){
-  const rows = [];
-  for (const it of md.split(/\n(?=- \[(?!Edit)[^\]]*\]\(https:\/\/payhip\.com\/b\/)/)){
-    const m = /^- \[([^\]]*)\]\(https:\/\/payhip\.com\/b\/([A-Za-z0-9]+)\)/.exec(it.trim());
-    if (!m) continue;
-    const line = /\n\s*((?:(?:Hidden|Unlisted|Draft|Archived)\s*)+)\n/.exec(it);
-    const words = line ? line[1].trim().split(/\s+/) : [];
-    const st = ["Archived","Draft","Hidden","Unlisted"].find(w=>words.includes(w));
-    const v = /\*\*\$([\d,.]+)\*\* price/.exec(it);
-    rows.push({code:m[2], name:m[1], status:st || "Live", price_usd: v ? parseFloat(v[1].replace(/,/g,"")) : null});
-  }
-  return rows;
-}
-$("#slprodgo").onclick = async e=>{
-  const f = $("#slprod").files[0];
-  if (!f){ slMsg("Choose the Payhip product list file first."); return; }
-  const b = e.currentTarget; b.disabled = true; slMsg("Reading the Payhip product list…");
-  try{
-    const rows = readPayhipProducts(await f.text());
-    if (!rows.length){ slMsg("No products found in that file."); return; }
-    await api("POST", "payhip_products?on_conflict=code", rows, {Prefer:"resolution=merge-duplicates,return=minimal"});
-    const have = new Set(rows.map(r=>r.code));
-    const gone = (await getAll("payhip_products")).map(r=>r.code).filter(c=>!have.has(c));
-    for (let i=0; i<gone.length; i+=80) await api("PATCH", "payhip_products?code=in.(" + gone.slice(i,i+80).join(",") + ")", {status:"Archived"}, {Prefer:"return=minimal"});
-    const live = rows.filter(r=>r.status==="Live").length;
-    slMsg(`Payhip products: ${rows.length} read (${live} live, ${rows.length - live} hidden/unlisted/draft)` + (gone.length ? `, ${gone.length} no longer listed (marked Archived)` : "") + ". Close this and press Find store links again to use the new list.");
-    $("#slprod").value = "";
-  }catch(err){ slMsg(friendly(err)); }
-  finally{ b.disabled = false; }
-};
 
 /* ---------- export to CSV (shown = the grid as it looks now; all = every column and every book) ---------- */
 function csvCell(v){ const t = show(v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g,'""') + '"' : t; }
