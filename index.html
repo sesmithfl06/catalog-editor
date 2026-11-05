@@ -359,7 +359,7 @@ dialog#ncdlg::backdrop{background:#0006}
 <!-- ============ Find store links ============ -->
 <dialog id="sldlg">
   <h2>Find store links for shown books</h2>
-  <p class="hint">Apple and Google Play are looked up for you: a match on the eBook ISBN is saved on its own, a match on the title only is filled in for you to check. For the rest, press Search, open the right book, copy its address and paste it in the box (for Apple and Amazon the ID is taken out of the link for you). Type n/a for a store the book isn't on.</p>
+  <p class="hint">Apple and Google Play are looked up for you: a match on the eBook ISBN is saved on its own, a match on the title only is filled in for you to check. For the rest, press Search, open the right book, copy its address and paste it in the box (for Apple and Amazon the ID is taken out of the link for you). The list covers every format: eBook, paperback, hardcover (when offered), audiobook (when offered) and story bible. Type n/a for a store the book isn't on.</p>
   <div class="row"><span class="hint" id="slmsg"></span></div>
   <div id="sllist"><div class="empty">Looking up…</div></div>
   <div class="row"><span class="grow"></span><button id="slsaveall" class="primary" type="button" disabled>Save all</button><button id="slclose" type="button">Done</button></div>
@@ -3251,7 +3251,7 @@ const slSameTitle = (a,b) => { const x = slNorm(a), y = slNorm(b); return !!x &&
 // What can be filled with no lookup: {value, sure, why}
 function slWorkedOut(b, products){
   if (b.store==="Payhip"){
-    const want = b.format==="Paperback" ? /\(pa/i : b.format==="Story Bible" ? /bible/i : b.format==="Audiobook" ? /\(au/i : b.format==="Bundle" ? /bundle/i : /\(eb/i;
+    const want = b.format==="Paperback" ? /\(pa/i : b.format==="Hardcover" ? /\(ha/i : b.format==="Story Bible" ? /bible/i : b.format==="Audiobook" ? /\(au/i : b.format==="Bundle" ? /bundle/i : /\(eb/i;
     const hits = products.filter(p=>p.status==="Live" && slSameTitle(b.title, String(p.name||"").split(/[:(]/)[0]) && want.test(p.name||""));
     if (hits.length===1) return {value:`https://payhip.com/b/${hits[0].code}`, sure:false, why:`Payhip product “${hits[0].name}”, check it`};
   }
@@ -3262,13 +3262,15 @@ function slSearch(b){
   const isbn = b.format==="Paperback" ? b.paperback_isbn : b.ebook_isbn;
   const t = `${b.title} S.E. Smith`, cc = SL_CC[b.language]||"us", lang = SL_LANG[b.language]||"en", e = encodeURIComponent;
   switch (b.store){
-    case "Amazon": return `https://www.${SL_AMZ[b.language]||"amazon.com"}/s?k=${e(b.format==="eBook" ? (isbn || t) : t)}` + (b.format==="eBook" ? "&i=digital-text" : "&i=stripbooks");   // paperbacks: Amazon gives its own number, so search by title
-    case "Apple": return `https://www.google.com/search?q=${e(`site:books.apple.com "${b.title}" S.E. Smith`)}`;
+    case "Amazon": return `https://www.${SL_AMZ[b.language]||"amazon.com"}/s?k=${e(b.format==="eBook" ? (isbn || t) : t)}` + (b.format==="eBook" ? "&i=digital-text" : "&i=stripbooks");   // paperbacks and hardcovers: Amazon gives its own number, so search by title
+    case "Apple": return `https://www.google.com/search?q=${e(`site:books.apple.com "${b.title}" S.E. Smith` + (b.format==="Audiobook" ? " audiobook" : ""))}`;
+    case "Audible": return `https://www.audible.com/search?keywords=${e(t)}`;
+    case "Downpour": return `https://www.downpour.com/catalogsearch/result/?q=${e(t)}`;
     case "Kobo": return `https://www.kobo.com/${cc}/${lang}/search?query=${e(isbn || t)}`;
     case "Google Play": return `https://play.google.com/store/search?q=${e(isbn || t)}&c=books`;
     case "Barnes & Noble": return `https://www.barnesandnoble.com/s/${e(t)}`;   // B&N gives its own EAN (2940…), so search by title
     case "Books2Read": return "https://books2read.com/";
-    case "Payhip": return `https://www.google.com/search?q=${e(`site:payhip.com "${b.title}" S.E. Smith`)}`;   // Payhip has no search of its own
+    case "Payhip": return `https://www.google.com/search?q=${e(`site:payhip.com "${b.title}" S.E. Smith` + (b.format==="eBook" ? "" : " " + b.format))}`;   // Payhip has no search of its own
     default: return "";
   }
 }
