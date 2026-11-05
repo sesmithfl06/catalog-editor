@@ -3222,7 +3222,7 @@ async function slSave(b, v){
   slChanged++;
 }
 function slRender(){
-  if (!slRows.length){ $("#sllist").innerHTML = `<div class="empty">${slBusy ? "Looking up…" : "No blank store links left for the books shown."}</div>`; $("#slsaveall").disabled = true; return; }
+  if (!slRows.length){ $("#sllist").innerHTML = `<div class="empty">${slBusy ? "Looking up…" : "No blank store links left for the books shown (books marked not released are not checked)."}</div>`; $("#slsaveall").disabled = true; return; }
   $("#slsaveall").disabled = false;
   $("#sllist").innerHTML = `<table><thead><tr><th>Book</th><th>Store</th><th>Look it up</th><th>Paste the link or ID</th><th></th></tr></thead><tbody>` +
     slRows.map((b,i)=>{
@@ -3259,7 +3259,7 @@ async function slRun(){
   }catch(err){ slMsg(friendly(err)); return; }
   finally{ slBusy = false; btn.disabled = false; slRender(); }
   slMsg(`${shown.length} book(s) shown. ` + (auto ? `${auto} Amazon paperback ASIN(s) worked out from the ISBN and saved. ` : "") +
-    (slRows.length ? `${slRows.length} blank link(s) below: press Search, open the right book, copy its link from the address bar, paste it here, then Save or Save all.` : "No blank store links left."));
+    (slRows.length ? `${slRows.length} blank link(s) below: press Search, open the right book, copy its link from the address bar, paste it here, then Save or Save all.` : "No blank store links left (books marked not released are not checked)."));
 }
 async function slSaveRow(tr){
   const i = Number(tr.dataset.i), b = slRows[i], v = slTidy(b, tr.querySelector("input").value);
