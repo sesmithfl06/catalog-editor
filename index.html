@@ -567,7 +567,7 @@ dialog#ncdlg::backdrop{background:#0006}
   <details><summary>…send books to Notion, and what exactly happens?</summary>
     <h3>Sending</h3>
     <ul>
-      <li><b>Send shown to Notion</b> needs two clicks: the first turns the button into “Click again to send N” for 4 seconds, the second sends. It sends the books shown in the grid after your filters, with <i>all</i> the Notion columns for each, not only the columns you can see.</li>
+      <li><b>Send shown to Notion</b> sends the books shown in the grid after your filters (one click), with <i>all</i> the Notion columns for each, not only the columns you can see.</li>
       <li>Each book is added to the queue unless it is already Waiting or Working. Then the sync starts. If it can't start right away, the every-minute schedule starts it.</li>
       <li>The top bar shows “N waiting for Notion · N failed”. Click the red “failed” to see the reason for each book and press “Try these again”. You can close the page; the sync carries on.</li>
     </ul>
@@ -578,24 +578,17 @@ dialog#ncdlg::backdrop{background:#0006}
       <li>Only owners and editors can start it from the editor; the schedule uses a secret kept in Supabase Vault. The Notion token is in Vault too (name <code>notion_token</code>).</li>
       <li>A queue line goes Waiting → Working → Done (or Failed, with the reason). Done lines are deleted after 30 days.</li>
     </ul>
-    <h3>What it writes to Notion</h3>
+    <h3>What a book's Notion page looks like</h3>
     <ul>
-      <li>A “📚 From the catalog” box at the <b>top</b> of the edition's Notion page: every field marked as going to Notion (right-click any column → “Does this go to Notion?” lists them, and its <b>Send to Notion</b> / <b>Stop sending to Notion</b> button changes it; the change shows on each page at its next sync, and the nightly refresh does every synced page). Blank fields (empty, n/a, n/d) are left out. The box is <b>replaced at every sync</b>, so edit those things in the Catalog Editor, never in Notion.</li>
-      <li>Everything below “⬇ Your Notion notes” is never touched.</li>
-      <li>A translation shows its English text beside it when the two differ.</li>
-      <li>An edition with no Notion page gets a new one under <code>notion_parent_page_id</code> in settings (or the _French, _German… version for that language). A page Notion says it can't find usually needs sharing with the integration: in Notion ••• → Connections.</li>
-      <li>First sync of a page that existed before Supabase: old headings that clash with the catalog box are renamed “Archived Notion …”. Nothing is deleted.</li>
-    </ul>
-    <h3>What it reads back from Notion</h3>
-    <ul>
-      <li><b>Reviews</b> go into the reviews table. <b>Teasers, FB Posts, Instagram, Tweets, Tweets Hashtags, Audiobook Tweets, Review Tweets, Subscription Box Email, FB Ads, Amazon Ads, Book Bub Ads and Advertising Copy</b> go into marketing copy.</li>
-      <li>First sync of a page: Notion and Supabase are merged, so nothing is lost on either side. After that <b>Notion is the master</b> for these sections: edit them in Notion.</li>
-      <li>If the Notion rows equal what Supabase has, nothing is touched. Review changes are logged in the change log as “Notion sync” (so they can be undone); marketing copy is replaced without a log entry, and the queue line (for example “Teaser: 3 saved”) is the record.</li>
+      <li><b>📚 From Supabase</b> (a box at the top): every field marked as going to Notion (right-click any column → “Does this go to Notion?” lists them, and its <b>Send to Notion</b> / <b>Stop sending to Notion</b> button changes it). Blank fields (empty, n/a, n/d) are left out. A translation shows its English beside a field when the two differ. The box is rebuilt at every sync: edit these in the Catalog Editor. If someone changes a “Label: value” line inside the box in Notion, that field moves to the Shared section (“Other shared details”), its new value is saved here, and from then on it syncs both ways for that book. Any other line changed inside the box is kept in the Shared section under “Changed in Notion”.</li>
+      <li><b>🔄 Shared with Supabase</b>: Loglines, Excerpts, Teasers, Awards, Links (series page, SES Store = Payhip links, BookFunnel, store links, cover image and alt text, website book post and the other marketing links), Reviews and every kind of marketing copy. It syncs <b>both ways</b>: a change made in Notion is saved here, a change made here shows there; additions from both sides are kept; when both sides changed the same link, Notion's wins. A new “Label: link” line adds a new marketing link; a new heading adds a new kind of marketing copy. Saves from Notion are logged in the change log as “Notion sync”, so they can be undone.</li>
+      <li><b>📝 Notion only</b>: never copied here. At each sync, anything there that repeats the box or the Shared section is removed, and so is every empty “Label:” line. Old-system sections (Loglines, Teasers, Awards, buy links, Website, BookFunnel, Book Cover, Reviews, “Archived Notion …”) are merged into the Shared section once, so nothing appears twice on a page; old template lines such as “Title:”, “Release Date:”, “Keywords:” or “Digital Price:” are removed on the page's first sync with this layout.</li>
+      <li>An edition with no Notion page gets a new one: English books in SES Books, other languages in SES Books → the language page (French, German…), named “English Title - Language”, placed under the book's series heading after the books with lower numbers (a new series gets its own heading, in alphabetical order). A page with that name that is already there is used instead. A page Notion says it can't find usually needs sharing with the integration: in Notion ••• → Connections.</li>
     </ul>
     <h3>What queues a book by itself</h3>
     <ul>
       <li>Changing anything the Notion box shows queues that book, and every other book it also appears on (other editions of the story, books that recommend a retitled book, other books with the same character, and so on). Only books whose Notion page has been synced at least once are queued; an edit never creates a Notion page; a book already Waiting isn't queued twice.</li>
-      <li>Reviews and marketing copy are not watched (Notion owns them).</li>
+      <li>Reviews and marketing copy are not watched (they are edited in Notion); the nightly refresh carries them over.</li>
       <li>Every night at 06:23 UTC (2:23 am New York in summer, 1:23 am in winter) every page the catalog created, and every page synced at least once, is queued again. This catches recommendation changes caused by other books.</li>
     </ul>
   </details>
@@ -1371,24 +1364,30 @@ async function setSection(grp, on){
 }
 /* right-click a column (sidebar or grid header): Does this go to Notion? Answers for that column, lists everything that does,
    and has a button to start or stop sending it. The answer comes from field_registry.in_notion, the same list the Notion sync uses.
-   The sync (Supabase edge function notion-sync) only has a place for the fields below; any other column can't be sent from here.
-   notionKey gives the field_registry row the sync checks for an editor column ("all" = the sync always sends it, no setting). */
-const NOTION_PLACES = {
-  editions: ["language","title","series_and_book_number","file_name","publication_date","anthology_only","word_count","paperback_pages","paperback_page_size",
-             "kindle_unlimited","translator","proofreader","copyright_page_genres","keywords","seo","long_synopsis","reasons_to_love","loglines","excerpts","publisher"],
-  stories: ["tags","rating","audience","main_plot","subplots"],
-  formats: ["price_usd","library_price_usd","payhip_price_usd","isbn","amazon_isbn","bn_isbn","narrator","narrator_bio","runtime"],
-  series: ["series_url"], edition_awards: ["award"], edition_release_notes: ["subscription_publication","collection_publication"]
-};
+   Each book's Notion page has three parts: the "📚 From Supabase" box (fields with a setting), the "🔄 Shared with Supabase"
+   section (two-way: loglines, excerpts, teasers, awards, links, reviews, marketing copy; always sent, no setting) and
+   "📝 Notion only". notionKey gives the field_registry row the sync checks for an editor column; "shared" and "story" have no
+   setting; "" means the sync has no place for it (worked-out columns that combine other columns). */
+const NOTION_SHARED_ED = new Set(["loglines","excerpts"]);
+const NOTION_STORY_LISTS = new Set(["main_characters","all_characters","char_settings","char_rels","species","technology","rare","bookclub"]);
 function notionKey(c){
   if (!c) return "";
-  if (c.kind==="ml") return "all";
-  if (c.kind==="sl") return "store_links.link_or_id";
-  let t = {ed:"editions", info:"editions", st:"stories", ser:"series", fmt:"formats", one:c.t, php:"formats"}[c.kind];
-  let col = c.kind==="php" ? "payhip_price_usd" : c.col==="runtime_minutes" ? "runtime" : c.col;
-  return t && (NOTION_PLACES[t]||[]).includes(col) ? t+"."+col : "";
+  if (c.kind==="ml" || c.kind==="sl") return "shared";
+  if (c.kind==="list") return (c.col==="reviews" || c.col==="copy") ? "shared" : NOTION_STORY_LISTS.has(c.col) ? "story" : "";
+  if ((c.kind==="ed" || c.kind==="info") && NOTION_SHARED_ED.has(c.col)) return "shared";
+  if (c.kind==="one" && c.t==="edition_awards") return c.col==="award" ? "shared" : "";
+  if (c.kind==="ser") return c.col==="series_url" ? "shared" : "series."+c.col;
+  if (c.kind==="ed" || c.kind==="info") return c.col==="translation_cache" ? "" : "editions."+c.col;
+  if (c.kind==="st") return "stories."+c.col;
+  if (c.kind==="one") return c.t+"."+c.col;
+  if (c.kind==="fmt") return "formats."+(c.col==="runtime_minutes" ? "runtime" : c.col);
+  if (c.kind==="php") return "payhip_products.price_usd";
+  if (c.kind==="sb") return "story_bibles."+c.col;
+  return "";
 }
-function notionYes(c){ const k = notionKey(c); return k==="all" || !!(k && (REG[k]||{}).in_notion); }
+// the registry row for a key: an edition column counts under editions.* or edition_info.* (the sync reads both)
+function notionReg(k){ const [t, col] = k.split("."); return REG[k] || (t==="editions" ? REG["edition_info."+col] : null); }
+function notionYes(c){ const k = notionKey(c); return k==="shared" || k==="story" || !!(k && (notionReg(k)||{}).in_notion); }
 // what else changes with this column (one setting covers every format, every store link)
 function notionShared(c){
   if (c.kind==="sl") return " This setting covers every store link.";
@@ -1401,10 +1400,13 @@ function showNotion(id){
   const c = COLMAP[id]; if (!c) return;
   ntCol = id;
   const k = notionKey(c), yes = notionYes(c);
-  $("#ntthis").innerHTML = `<b>${esc(c.label)}</b>: ` + (yes ? `Yes. It goes to Notion, in the “📚 From the catalog” box at the top of the book's page.` : `No. It is not in the “📚 From the catalog” box in Notion.`)
-    + (k==="all" ? ` Marketing links always go; there is no setting to stop them.` : !k ? ` The Notion sync has no place for this column, so it can't be sent from here.` : esc(notionShared(c)));
+  $("#ntthis").innerHTML = `<b>${esc(c.label)}</b>: ` + (k==="shared" ? `Yes, always. It is in the “🔄 Shared with Supabase” section of the book's Notion page, which syncs both ways: a change made there is saved here, and a change made here shows there. There is no setting to stop it.`
+    : k==="story" ? `Yes, always. It is under Story details in the “📚 From Supabase” box of the book's Notion page.`
+    : !k ? `No. This column is worked out from other columns (or only used inside the Catalog Editor), so the Notion sync shows the columns it comes from instead.`
+    : yes ? `Yes. It goes to Notion, in the “📚 From Supabase” box at the top of the book's page.` + esc(notionShared(c))
+    : `No. It is not in the “📚 From Supabase” box in Notion. Press Send to Notion to add it.` + esc(notionShared(c)));
   const tg = $("#nttoggle");
-  tg.hidden = !k || k==="all";
+  tg.hidden = !k || k==="shared" || k==="story";
   tg.disabled = false;
   tg.textContent = yes ? "Stop sending to Notion" : "Send to Notion";
   $("#ntmsg").textContent = "";
@@ -1421,23 +1423,23 @@ function showNotion(id){
 // Send to Notion / Stop sending to Notion: changes field_registry.in_notion (adds the row when the sync's field has none yet),
 // and on Send makes sure edits to that column queue the book for Notion (notion_watch). Pages change at each book's next sync.
 $("#nttoggle").onclick = async ()=>{
-  const c = COLMAP[ntCol], k = notionKey(c); if (!k || k==="all") return;
+  const c = COLMAP[ntCol], k = notionKey(c); if (!k || k==="shared" || k==="story") return;
   const on = !notionYes(c), [t, col] = k.split("."), tg = $("#nttoggle");
   tg.disabled = true; $("#ntmsg").textContent = "Saving…";
   try{
-    let r = REG[k];
+    let r = notionReg(k);
     if (r){
       const rows = await api("PATCH", `field_registry?id=eq.${r.id}`, {in_notion:on}, {Prefer:"return=representation"});
       if (!rows || !rows.length) throw new Error("Only owners and editors can change this.");
-      REG[k] = rows[0];
+      REG[rows[0].table_name+"."+rows[0].column_name] = rows[0];
     } else {
       const rows = await api("POST", "field_registry", {table_name:t, column_name:col, label:origLabel(c), in_notion:on}, {Prefer:"return=representation"});   // Supabase numbers the row itself
       REG[k] = rows[0];
     }
-    if (on && c.kind !== "info")   // worked-out columns (long synopsis, series + book number) have no table column to watch
+    if (on && c.kind !== "info" && c.kind !== "php")   // worked-out columns (long synopsis, series + book number, Payhip price) have no table column to watch
       await api("POST", "notion_watch?on_conflict=table_name,column_name", {table_name:t, column_name:col, note:"Added from the Catalog Editor"}, {Prefer:"resolution=ignore-duplicates,return=minimal"}).catch(()=>{});
     showNotion(ntCol);
-    $("#ntmsg").textContent = on ? "Now sent to Notion. Each book's Notion page shows it after its next sync (the nightly refresh does every synced page)." : "No longer sent to Notion. Each book's Notion page drops it at its next sync (the nightly refresh does every synced page).";
+    $("#ntmsg").textContent = on ? "Now sent to Notion. Each book's “📚 From Supabase” box shows it after the book's next sync (the nightly refresh does every synced page)." : "No longer sent to Notion. Each book's “📚 From Supabase” box drops it at the book's next sync (the nightly refresh does every synced page).";
     setStatus(`${c.label}: ${on ? "now sent to Notion" : "no longer sent to Notion"}`, "ok");
   }catch(e){
     tg.disabled = false;
@@ -3070,8 +3072,6 @@ async function startNotionSync(){
 }
 async function sendToNotion(files, btn){
   if (!files.length){ setStatus("No books to send", "bad"); return; }
-  if (!btn.dataset.sure){ btn.dataset.sure = "1"; const t = btn.textContent; btn.textContent = `Click again to send ${files.length}`; setTimeout(()=>{ delete btn.dataset.sure; btn.textContent = t; }, 4000); return; }
-  delete btn.dataset.sure; btn.textContent = "Send shown to Notion";
   try{
     const waiting = new Set((await api("GET","notion_sync_queue?select=file_name&status=in.(Waiting,Working)&limit=5000")).map(r=>r.file_name));
     const add = files.filter(f=>!waiting.has(f));
