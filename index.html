@@ -531,6 +531,9 @@ dialog#ncdlg::backdrop{background:#0006}
   <p id="ntthis"></p>
   <h3 id="nthead"></h3>
   <div id="ntlist" style="overflow:auto;max-height:50vh"></div>
+  <h3 id="nthead2"></h3>
+  <p class="hint">Hover a column for why. Right-click one the sync has a place for → Send to Notion.</p>
+  <div id="ntlist2" style="overflow:auto;max-height:50vh"></div>
   <div class="row"><span class="hint" id="ntmsg"></span><span class="grow"></span><button id="nttoggle" type="button" class="primary" hidden></button><button id="ntclose" type="button">Done</button></div>
 </dialog>
 
@@ -615,7 +618,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…choose, hide, move and freeze columns?</summary>
     <ul>
-      <li>Tick columns in the sidebar. Type in “Find a column…” and press <b>Check all shown</b> to tick every column the search finds. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”. In that dialog's list, right-click an item → <b>Don't go to Notion</b>.</li>
+      <li>Tick columns in the sidebar. Type in “Find a column…” and press <b>Check all shown</b> to tick every column the search finds. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”. In that dialog, the first list is what goes to Notion (right-click an item → <b>Don't go to Notion</b>) and the second list is <b>what does not go</b> (hover for why; right-click one the sync has a place for → <b>Send to Notion</b>).</li>
       <li>Right-click a column heading → Does this go to Notion?, Clear filter, <b>Hide</b> (Hide column, Hide from here to end), <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, <b>Reset</b> (this column's width, all column widths, column order). Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
       <li>Drag a heading to move the column (a blue edge shows where it lands). Drag the right edge of a heading to resize; double-click that edge to reset the width.</li>
       <li><b>Show full text</b> (above the grid) shows long cells in full; otherwise only the first line shows.</li>
@@ -1560,6 +1563,17 @@ function showNotion(id){
   }
   $("#nthead").textContent = `Everything that goes to Notion (${n})`;
   $("#ntlist").innerHTML = html || `<div class="empty">Nothing is marked as going to Notion.</div>`;
+  let n2 = 0, html2 = "";
+  for (const [g, cs] of groups()){
+    const ns = cs.filter(x=>!notionYes(x)); if (!ns.length) continue;
+    n2 += ns.length;
+    html2 += `<h4 style="margin:10px 0 4px">${esc(g)}</h4><div>` + ns.map(x=>{
+      const why = notionKey(x) ? "Not sent yet. Right-click → Send to Notion." : notionWhy(x).replace(/[\u0001\u0003]/g,"").replace(/\u0002/g,"").trim();
+      return `<div data-col="${esc(x.id)}" title="${esc(why)}"${x.id===id?' style="font-weight:700"':""}>${esc(x.label)}</div>`;
+    }).join("") + `</div>`;
+  }
+  $("#nthead2").textContent = `Does not go to Notion (${n2})`;
+  $("#ntlist2").innerHTML = html2 || `<div class="empty">Everything goes to Notion.</div>`;
   if (!$("#ntdlg").open) $("#ntdlg").showModal();
 }
 // Send to Notion / Stop sending to Notion: changes field_registry.in_notion (adds the row when the sync's field has none yet),
@@ -1593,19 +1607,23 @@ async function setNotion(id, on){
 }
 $("#nttoggle").onclick = ()=>{ const c = COLMAP[ntCol]; if (!c) return; $("#nttoggle").disabled = true; setNotion(ntCol, !notionYes(c)); };
 // right-click an item in the dialog's list → Don't go to Notion (the menu sits inside the dialog so it shows on top of it)
-$("#ntlist").addEventListener("contextmenu", e=>{
+function ntListMenu(e){
   const it = e.target.closest("[data-col]"); if (!it) return;
   e.preventDefault(); closeCtx();
-  const id = it.dataset.col, c = COLMAP[id], k = notionKey(c);
+  const id = it.dataset.col, c = COLMAP[id], k = notionKey(c), no = !notionYes(c);
   const m = document.createElement("div"); m.className = "ctx";
-  m.innerHTML = (k==="shared" || k==="story")
+  m.innerHTML = no
+    ? (k ? `<button type="button" data-a="on">Send to Notion</button>` : `<button type="button" disabled title="${esc(notionWhy(c).replace(/[\u0001\u0003]/g,"").replace(/\u0002/g,"").trim())}">The Notion page has no place for it</button>`)
+    : (k==="shared" || k==="story")
     ? `<button type="button" disabled title="${k==="shared" ? "Shared items sync both ways and always go" : "Story details always go"}">Always goes to Notion (${k==="shared" ? "Shared section" : "Story details"})</button>`
     : `<button type="button" data-a="off">Don't go to Notion</button>`;
   m.style.position = "fixed";
   m.style.left = Math.min(e.clientX, innerWidth-260)+"px"; m.style.top = Math.min(e.clientY, innerHeight-60)+"px";
-  m.addEventListener("click", ev=>{ const b = ev.target.closest("button[data-a]"); if (!b) return; ev.stopPropagation(); closeCtx(); setNotion(id, false); });
+  m.addEventListener("click", ev=>{ const b = ev.target.closest("button[data-a]"); if (!b) return; ev.stopPropagation(); closeCtx(); setNotion(id, b.dataset.a==="on"); });
   $("#ntdlg").appendChild(m); ctxMenu = m;
-});
+}
+$("#ntlist").addEventListener("contextmenu", ntListMenu);
+$("#ntlist2").addEventListener("contextmenu", ntListMenu);
 // right-click a column named in a message (Min Age: "send Rating instead", and the like) → Send to Notion / Stop sending to Notion,
 // or Does this go to Notion? for that column. Works in any dialog (the menu goes inside it so it shows on top).
 document.addEventListener("contextmenu", e=>{
