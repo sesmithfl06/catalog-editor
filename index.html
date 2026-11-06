@@ -617,8 +617,8 @@ dialog#ncdlg::backdrop{background:#0006}
     </ul>
     <h3>What a book's Notion page looks like</h3>
     <ul>
-      <li><b>📚 From Supabase</b> (a box at the top): every field marked as going to Notion (right-click any column → “Does this go to Notion?” lists them, and its <b>Send to Notion</b> / <b>Stop sending to Notion</b> button changes it). Blank fields (empty, n/a, n/d) are left out. A translation shows its English beside a field when the two differ. The box is rebuilt at every sync: edit these in the Catalog Editor. If someone changes a “Label: value” line inside the box in Notion, that field moves to the Shared section (“Other shared details”), its new value is saved here, and from then on it syncs both ways for that book. Any other line changed inside the box is kept in the Shared section under “Changed in Notion”.</li>
-      <li><b>🔄 Shared with Supabase</b>: Loglines, Excerpts, Teasers, Awards, Links (series page, SES Store = Payhip links, BookFunnel, store links, cover image and alt text, website book post and the other marketing links), Reviews and every kind of marketing copy. It syncs <b>both ways</b>: a change made in Notion is saved here, a change made here shows there; additions from both sides are kept; when both sides changed the same link, Notion's wins. A new “Label: link” line adds a new marketing link; a new heading adds a new kind of marketing copy. Saves from Notion are logged in the change log as “Notion sync”, so they can be undone.</li>
+      <li><b>📚 From Supabase</b> (a box at the top): every field marked as going to Notion (right-click any column → “Does this go to Notion?” lists them, and its <b>Send to Notion</b> / <b>Stop sending to Notion</b> button changes it). Blank fields (empty, n/a, n/d) are left out, and Translator and Proofreader show only for translations. A translation shows its English beside a field when the two differ. The box is rebuilt at every sync: edit these in the Catalog Editor. If someone changes a “Label: value” line inside the box in Notion, that field moves to the Shared section (“Other shared details”), its new value is saved here, and from then on it syncs both ways for that book. Any other line changed inside the box is kept in the Shared section under “Changed in Notion”.</li>
+      <li><b>🔄 Shared with Supabase</b>: Loglines, Excerpts, Teasers, Awards, Links (series page, SES Store = Payhip links, BookFunnel, store links, cover image and alt text, website book post and the other marketing links), Store IDs (Amazon ASINs and Apple ID), Reviews and every kind of marketing copy. It syncs <b>both ways</b>: a change made in Notion is saved here, a change made here shows there; additions from both sides are kept; when both sides changed the same link, Notion's wins. A new “Label: link” line adds a new marketing link; a new heading adds a new kind of marketing copy. Saves from Notion are logged in the change log as “Notion sync”, so they can be undone.</li>
       <li><b>📝 Notion only</b>: never copied here. A duplicate always ends up once, in the Shared section: a field from the box typed or pasted into Notion only moves to the Shared section (“Other shared details”, two-way from then on), and anything that repeats the Shared section is removed from Notion only. Old-system sections (Loglines, Teasers, Awards, buy links, Website, BookFunnel, Book Cover, Reviews, “Archived Notion …”) are merged into the Shared section.</li>
       <li><b>Clearing out the old system</b> happens only once per page, at its first sync with this layout: lines with nothing after the “:”, empty list items, leftover dividers and the old template lines (“Title:”, “Release Date:”, “Keywords:”, “Digital Price:” …) are removed. After that, an empty line or a “Label:” someone types in Notion only is left alone.</li>
       <li><b>Long Synopsis</b> goes to Notion. It is put together in Supabase from Award line + Series intro + Essential synopsis + Promo line, and the sync sends the finished text (under its own heading in the box). Notion doesn't put it back together: change its parts here. If its text is changed in the box or pasted into Notion only, Long Synopsis moves to the Shared section (still showing the text Supabase builds) and the Notion edit is kept under “Changed in Notion”. Other worked-out columns (Series & book number, Book # with no decimals, Author, Publisher) work the same way.</li>
@@ -1029,27 +1029,28 @@ function applyDefaultOrder(){
 
 /* ---------- sidebar groups (what a person looks for) ---------- */
 // Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
-const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Links","Translations"];
+const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Store IDs","Links","Translations"];
 const GROUP_ITEMS = {
   "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","ed:language","ed:series","ed:number_in_series","info:series_and_book_number","one:projects:plot",
     "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:essential_description","ed:archived_short_synopsis","ed:archived_long_synopsis",
     "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience","st:main_genre_differentiated",
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
     "diff:all","one:edition_release_notes:subscription_publication","info:publisher","one:edition_release_notes:collection_publication",
-    "list:authors_note","info:author","info:author_bio","ed:sheet_order","ed:story_id","st:story_id"],
+    "list:authors_note","info:author","info:author_bio","ed:translator","ed:proofreader","ed:sheet_order","ed:story_id","st:story_id"],
   "Story": ["st:main_plot","st:subplots","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
   "Series": ["ser:series_synopsis","ser:series_url","ser:series_note"],
   "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","ed:excerpts","tsr:Teaser","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
   "Story Bible (companion book)": ["sl:Payhip|Story Bible|URL","sb:price_usd","sl:BookFunnel|Story Bible|URL","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
+  "Store IDs": ["sl:Amazon|eBook|ASIN","sl:Amazon|Paperback|ASIN","sl:Amazon|Hardcover|ASIN","sl:Apple|eBook|ID"],   // IDs, not links
   "Links": [],
-  "Translations": ["ed:translator","ed:proofreader","ed:ai_translations","info:translation_cache","calc:bestseller_line"]
+  "Translations": ["ed:ai_translations","info:translation_cache","calc:bestseller_line"]
 };
 const KIND_GROUP = {tsr:"Marketing", calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
 const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
 function placeCol(c){
   for (const g of GROUP_ORDER){ const i = GROUP_ITEMS[g].indexOf(c.id); if (i>=0){ c.group = g; c.so = i; return; } }
-  c.group = KIND_GROUP[c.kind] || "Book Basics";   // any column not listed above lands with its kind
+  c.group = (c.kind==="sl" && (c.lt==="ASIN" || c.lt==="ID")) ? "Store IDs" : KIND_GROUP[c.kind] || "Book Basics";   // any column not listed above lands with its kind (an ASIN or ID with the Store IDs)
   c.so = 1000 + ((c.kind==="fmt") ? (FORMAT_RANK[c.f]??9)*1000 + c.order : (c.kind==="ml" || c.kind==="aff") ? 5000 + c.order : c.order);
 }
 // Built-in nicknames: shown unless a saved name (right-click → Rename column…) replaces them. "Back to the original name" saves {plain:true}.
