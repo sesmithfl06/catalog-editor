@@ -8,25 +8,26 @@
 :root{
   --bg:#f6f5f2; --panel:#ffffff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e3e1dc; --soft:#efeee9;
   --accent:#2f5d8a; --accent-ink:#ffffff; --ok:#2e7d4f; --warn:#a15c00; --bad:#b3261e; --ro:#f1f0ec;
-  --sel:#e7eef6; --focus:#2f5d8a55; --band:#f8f7f4; --roband:#eae8e3;
+  --sel:#e7eef6; --focus:#2f5d8a55; --band:#f8f7f4; --roband:#eae8e3; --link:#1f5fa8;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#17181a; --panel:#1f2023; --ink:#ececee; --muted:#9a9aa1; --line:#33343a; --soft:#26272b;
     --accent:#7fb0e0; --accent-ink:#0d1a26; --ok:#6cc58f; --warn:#e0a54f; --bad:#ef7f77; --ro:#232428;
-    --sel:#22303d; --focus:#7fb0e055; --band:#25262a; --roband:#2b2c31;
+    --sel:#22303d; --focus:#7fb0e055; --band:#25262a; --roband:#2b2c31; --link:#8cc8ff;
   }
 }
 :root[data-theme="dark"]{
   --band:#25262a; --roband:#2b2c31;
   --bg:#17181a; --panel:#1f2023; --ink:#ececee; --muted:#9a9aa1; --line:#33343a; --soft:#26272b;
   --accent:#7fb0e0; --accent-ink:#0d1a26; --ok:#6cc58f; --warn:#e0a54f; --bad:#ef7f77; --ro:#232428;
-  --sel:#22303d; --focus:#7fb0e055;
+  --sel:#22303d; --focus:#7fb0e055; --link:#8cc8ff;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
+a,a:visited{color:var(--link)}   /* light blue in dark mode, so links never show dark blue on black */
 button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:5px 10px}
 button:hover{border-color:var(--accent)}
 button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -645,6 +646,7 @@ dialog#ncdlg::backdrop{background:#0006}
       <li>Press <b>Story workflow</b> or <b>Story bible workflow</b> at the top. Each step says which app it happens in. Pick a book at the top of the list to put its name and file name in the prompts; for a story, <b>English book</b> or <b>Translation</b> switches the steps (picking a book sets it for you).</li>
       <li>With a book picked, each step shows whether it is done: ✓ green when done, red ! when late, and the next step to do is outlined. Most steps check themselves from the catalog and the Release checklist (book details, ISBNs, cover, Vellum, page count, Payhip, uploads, Vellum link, Notion, store links, the story bible's details and links); what is still missing is written under the step. Steps nothing in the catalog can show (Bob's pictures and covers, the NYT line on a story bible cover, Vellum for a story bible…) have a <b>Done</b> box; ticks are kept in Supabase (release_steps, logged in the change log) and untick to undo.</li>
       <li>In <b>Release</b>, each book's card has <b>Story workflow</b> (and <b>Story bible workflow</b> for English books): it opens that book's list at the next step to do.</li>
+      <li>The Distribution app's <b>Workflow › Workflow Hub…</b> has the same steps with buttons that open Claude, Photoshop and the Vellum template. Its Catalog Editor buttons open this page at the book, at <b>Find store links for shown books</b>, or at the book's workflow. Ticks made in either place show in both.</li>
       <li>The Vellum, cover, Bob and Payhip steps show the values they need from the catalog (ISBNs, copyright page genres, end-of-book promo, bestseller line, the story's cover, Long Synopsis, the heading “Discover your new love!” and Reasons to Love for a story; the Story Bible Synopsis for a story bible), each with a <b>Copy</b> button. A value in red is still blank in the catalog.</li>
       <li><b>Open Claude with the prompt</b> opens claude.ai in a new tab with the prompt already in the message box; it is also copied, so ⌘V works if the box is empty. Attach the file the step names, then send. <b>Open Bob with the prompt</b> does the same in ChatGPT. Open <b>Prompt</b> to read it first.</li>
     </ul>
@@ -3895,7 +3897,11 @@ function wfSteps(kind, lang, ed, v){
   const F = ed ? f : "<file name>";
   const has = x => x != null && String(x).trim() !== "";
   const inCat = {chk:()=>ed ? {done:true, detail:"In the catalog"} : null};
-  const sql = {app:"Supabase", text:"SQL Editor → New query: paste the whole script from Claude, replacing anything in the box, and press Run. Then press Reload from Supabase here; anything still blank is listed under this step.", links:[["Open the SQL Editor", WF_SQL]], rk:"details"};
+  // Claude writes the book into Supabase itself (Supabase Write connector); the Release checklist's 'details' check lists anything still blank.
+  const written = "Claude fills in the book in Supabase with the Supabase Write connector. Then press Reload from Supabase here; anything still blank is listed under this step.";
+  const newBook = {rk:"details", chk:()=>ed ? {done:true, detail:"In the catalog"} : null};
+  // One button per ISBN cell of the offered formats (opens the grid at that cell).
+  const isbnCells = ed ? ["eBook","Paperback","Hardcover","Audiobook"].filter(x=>!v || v.offered.has(x)).map(x=>[x + " ISBN cell", `fmt:${x}:isbn`]) : [];
   const pages = {app:"Vellum", text:"Enter the print file's page count and page size in the grid.", rk:"pages", act:"open"};
   const heading = ed ? WF_RTL_HEADING[ed.language] || "" : "";
   const payVals = v ? [["Long Synopsis", v.synopsis], ["Heading", heading], ["Reasons to Love", v.rtl]] : [];
@@ -3919,7 +3925,7 @@ function wfSteps(kind, lang, ed, v){
         chk: v=>{ if (!v) return null; if (!sb) return {done:false, detail:"No story bible in the catalog yet"};
           const miss = [!has(sb.word_count) && "word count", !has(sb.bible_md) && "md file name", !has(sb.description) && "Story Bible Synopsis"].filter(Boolean);
           return miss.length ? {done:false, detail:"Still blank: " + miss.join(", ")} : {done:true, detail:`In the catalog: ${sb.word_count} words, ${sb.bible_md}, Story Bible Synopsis`}; }},
-      {stage:"Write", app:"Bowker", text:"Get the story bible's ISBN and paste it in the SB ISBN column of the grid.", links:[["Open Bowker", "https://www.myidentifiers.com/"]], act:"open",
+      {stage:"Write", app:"Bowker", text:"Get the story bible's ISBN and paste it in the SB ISBN cell.", links:[["Open Bowker", "https://www.myidentifiers.com/"]], cells: ed ? [["SB ISBN cell", "sb:isbn"]] : [],
         chk: v=>v ? (has(v.bibleIsbn) ? {done:true, detail:"SB ISBN " + v.bibleIsbn} : {done:false, detail:"SB ISBN is blank"}) : null},
       {stage:"Pictures and cover", app:"Bob (ChatGPT)", text:"Put in the pictures and maps with the story bible creation skill. It saves a .docx whose name ends in pre-vellum.",
         attach:"The pre-images .docx and the story's manuscript.", tick:"bible_pictures",
@@ -3950,11 +3956,9 @@ function wfSteps(kind, lang, ed, v){
     const en = wfEnglish(ed), L = ed ? ed.language : "<language>";
     const of = en ? wfName(en) : ed ? `“${ed.title || f}”` : "my book";
     return [
-      Object.assign({stage:"Before release", app:"Claude", text:"Add the edition to the catalog with the new-book-metadata skill. The translator's marketing text goes in word for word. Claude writes one SQL script.",
-        attach:"The translator's .docx.",
-        claude:`Use the new-book-metadata skill. I've attached the translator's docx for the ${L} edition of ${of}${ed ? `; its file name is ${f}` : ""}. Fill in or add this edition in the Supabase catalog and give me the one SQL script for the Supabase SQL Editor.`}, inCat),
-      Object.assign({stage:"Before release"}, sql),
-      {stage:"Before release", app:"Bowker", text:"Get the ISBNs and paste them in the ISBN columns of the grid.", links:[["Open Bowker", "https://www.myidentifiers.com/"]], act:"open", rk:"isbns"},
+      Object.assign({stage:"Before release", app:"Claude", text:"Attach the translator's .docx in Claude to use the new-book-metadata skill.", sub:[written],
+        claude:`Use the new-book-metadata skill. I've attached the translator's docx for the ${L} edition of ${of}${ed ? `; its file name is ${f}` : ""}. Fill in or add this edition in the Supabase catalog with the Supabase Write connector.`}, newBook),
+      {stage:"Before release", app:"Bowker", text:"Get the ISBNs and paste each one in its cell (the buttons below open each cell).", links:[["Open Bowker", "https://www.myidentifiers.com/"]], cells:isbnCells, rk:"isbns"},
       {stage:"Before release", app:"Claude", text:"Get the copyright page, synopsis, cover text lines and Vellum checklist with the non-english-edition skill.", tick:"non_english",
         claude:`Use the non-english-edition skill for ${ed ? f : `the ${L} edition of ${of}`}: give me the copyright page, synopsis, cover text lines and the Vellum checklist.`},
       {stage:"Before release", app:"Vellum", text:`Duplicate the ${L} template${ed ? `, name it ${f},` : ""} and use the saved story format. Follow the Vellum checklist from step 4. Export the eBooks and the PDF.`, rk:"vellum"},
@@ -3971,11 +3975,9 @@ function wfSteps(kind, lang, ed, v){
   const desc = ed && ed.essential_description ? String(ed.essential_description).slice(0, 1500) : "";
   const series = ed && ed.series ? `, book ${ed.number_in_series ?? "?"} of the ${ed.series} series` : "";
   return [
-    Object.assign({stage:"Before Subsc Pub", app:"Claude", text:"Add the book to the catalog with the new-book-metadata skill (title, synopses, genres, word count, chapters, end-of-book promo…). Claude writes one SQL script.",
-      attach:"The story's manuscript.",
-      claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. Fill in or add this book in the Supabase catalog and give me the one SQL script for the Supabase SQL Editor.`}, inCat),
-    Object.assign({stage:"Before Subsc Pub"}, sql),
-    {stage:"Before Subsc Pub", app:"Bowker", text:"Get the ISBNs (eBook and paperback, plus hardcover or audiobook when offered) and paste them in the ISBN columns of the grid.", links:[["Open Bowker", "https://www.myidentifiers.com/"]], act:"open", rk:"isbns"},
+    Object.assign({stage:"Before Subsc Pub", app:"Claude", text:"Attach the manuscript in Claude to use the new-book-metadata skill.", sub:[written],
+      claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. Fill in or add this book in the Supabase catalog with the Supabase Write connector.`}, newBook),
+    {stage:"Before Subsc Pub", app:"Bowker", text:"Get the ISBNs (eBook and paperback, plus hardcover or audiobook when offered) and paste each one in its cell (the buttons below open each cell).", links:[["Open Bowker", "https://www.myidentifiers.com/"]], cells:isbnCells, rk:"isbns"},
     {stage:"Before Subsc Pub", app:"Bob (ChatGPT)", text:"Make the cover image with space for the NYT line, with the text placed like the previous book in the series (or, for book 1, a placement the whole series can reuse).", tick:"cover_art",
       attach: prev ? `The cover of ${wfName(prev)}.` : "The cover of another book in the series, if there is one.",
       bob:`Make the cover image for ${t}${series}. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
@@ -4047,6 +4049,7 @@ function wfRender(){
     if (s.claude) acts.push(`<button type="button" class="primary" data-a="claude" data-i="${i}">Open Claude with the prompt</button>`, `<button type="button" data-a="copy" data-i="${i}">Copy prompt</button>`);
     if (s.bob) acts.push(`<button type="button" class="primary" data-a="bob" data-i="${i}">Open Bob with the prompt</button>`, `<button type="button" data-a="copy" data-i="${i}">Copy prompt</button>`);
     for (const [label, url] of s.links || []) acts.push(`<a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)} ↗</a>`);
+    for (const [label, col] of s.cells || []) acts.push(`<button type="button" data-a="cell" data-col="${esc(col)}" title="Show this book's cell in the grid, ready to paste">${esc(label)}</button>`);
     if (s.act === "open" && ed) acts.push(`<button type="button" data-a="open">Show this book in the grid</button>`);
     if (s.act === "bible") acts.push(`<button type="button" data-a="bible">Story bible workflow</button>`);
     const text = s.claude || s.bob;
@@ -4112,6 +4115,7 @@ $("#wflist").addEventListener("click", async ev=>{
     const [k, val] = s.vals[+b.dataset.j];
     try{ await copyText(val); msg(k + " copied."); }catch(e){ msg("Copy was blocked: select the value and copy it."); }
   } else if (a === "open"){ const ed = wfBook(); if (ed){ $("#wfdlg").close(); location.hash = "book=" + encodeURIComponent(ed.file_name); } }
+  else if (a === "cell"){ const ed = wfBook(); if (ed){ $("#wfdlg").close(); location.hash = "book=" + encodeURIComponent(ed.file_name) + "&col=" + encodeURIComponent(b.dataset.col); } }
   else if (a === "bible") wfOpen("bible");
 });
 $("#wflist").addEventListener("change", async ev=>{
@@ -4176,18 +4180,20 @@ $("#export").onclick = e=>{
 
 /* ---------- links straight to one cell: #book=<file_name>&col=<column id> ----------
    The Distribution Clipboard Queue app sends these. col is optional (no col = the book's row).
+   do= (from the app's Workflow Hub) also opens something for that book: links = Find store links for
+   shown books with only that book shown; story / bible = its Story / Story bible workflow; release = Release.
    A new tab signs in first as usual; the link waits in pendingJump and runs once loadAll finishes.
    After jumping, book and col are taken off the address so a reload doesn't jump again. */
 let pendingJump = null, appReady = false;
 function readJumpHash(){
   const p = new URLSearchParams(location.hash.slice(1));
-  const book = (p.get("book")||"").trim();
-  return book ? {book, col:(p.get("col")||"").trim()} : null;
+  const book = (p.get("book")||"").trim(), act = (p.get("do")||"").trim();
+  return book || act ? {book, col:(p.get("col")||"").trim(), act} : null;
 }
 function clearJumpHash(){
   const p = new URLSearchParams(location.hash.slice(1));
-  if (!p.has("book") && !p.has("col")) return;
-  p.delete("book"); p.delete("col");
+  if (!p.has("book") && !p.has("col") && !p.has("do")) return;
+  p.delete("book"); p.delete("col"); p.delete("do");
   const rest = p.toString();
   history.replaceState(history.state, "", location.pathname + location.search + (rest ? "#" + rest : ""));
 }
@@ -4201,7 +4207,12 @@ async function runPendingJump(){
   const j = pendingJump; pendingJump = null;
   if (!j) return;
   clearJumpHash();
-  try{ await jumpTo(j.book, j.col); }catch(err){ setStatus(friendly(err), "bad"); }
+  try{
+    if (j.act === "story" || j.act === "bible"){ wfOpen(j.act, j.book || undefined); return; }
+    if (j.book) await jumpTo(j.book, j.col);
+    if (j.act === "links") $("#storelinks").click();
+    else if (j.act === "release") $("#release").click();
+  }catch(err){ setStatus(friendly(err), "bad"); }
 }
 /* Link view: a link shows ONLY that book, and only its title plus the linked column. Your own
    filters, hidden rows and ticked columns are left as they were and come back with
