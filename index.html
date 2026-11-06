@@ -388,14 +388,20 @@ dialog#ncdlg::backdrop{background:#0006}
 <!-- ============ Release checklist ============ -->
 <dialog id="rldlg">
   <h2>Release checklist</h2>
-  <p class="hint">Every book not released yet or released in the last 60 days, with each step of its release. Most steps tick themselves from the catalog (blank details, ISBNs, page count, Payhip status, story bible, store links) and the Distribution app ticks “Uploaded” when it finishes a distributor. Tick the others yourself; untick to undo. A step with nothing in the catalog to show it (Vellum, cover, subscription post) counts as done once its date has passed. Click a title to open that book in the grid.</p>
+  <p class="hint">Choose which book to look at first (loading every book at once times out). Each book not released yet or released in the last 60 days shows each step of its release. Most steps tick themselves from the catalog (blank details, ISBNs, page count, Payhip status, story bible, store links) and the Distribution app ticks “Uploaded” when it finishes a distributor. Tick the others yourself; untick to undo. A step with nothing in the catalog to show it (Vellum, cover, subscription post) counts as done once its date has passed. Click a title to open that book in the grid.</p>
+  <div class="row" id="rlscope">
+    <b>Which books?</b>
+    <label class="chk"><input type="radio" name="rlscope" value="closest"> Closest release to today</label>
+    <label class="chk"><input type="radio" name="rlscope" value="active"> Most recent activity</label>
+    <label class="chk"><input type="radio" name="rlscope" value="both"> Both</label>
+  </div>
   <div class="row">
     <label class="chk"><input type="checkbox" id="rlshown"> Only books shown in the grid</label>
     <label class="chk"><input type="checkbox" id="rlopen" checked> Only books with something left to do</label>
     <span class="grow"></span>
     <span class="hint" id="rlmsg"></span>
   </div>
-  <div id="rllist"><div class="empty">Loading…</div></div>
+  <div id="rllist"><div class="empty">Pick one of the choices above to load the release checklist.</div></div>
   <div class="row"><span class="grow"></span><button id="rlreload" type="button">Refresh</button><button id="rlclose" class="primary" type="button">Done</button></div>
 </dialog>
 
@@ -585,7 +591,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…see where each new book is in its release?</summary>
     <ul>
-      <li>Press <b>Release</b> at the top. Each book not released yet (or released in the last 60 days) shows its steps in order. <b>English</b>: Before Subsc Pub → Payhip → Wide release. <b>Other languages</b>: Before release → Release and after (Payhip is part of the release).</li>
+      <li>Press <b>Release</b> at the top, then choose <b>Closest release to today</b>, <b>Most recent activity</b> (most edits logged in the last 30 days) or <b>Both</b>; only those book(s) load, so it doesn't time out. Each book not released yet (or released in the last 60 days) shows its steps in order. <b>English</b>: Before Subsc Pub → Payhip → Wide release. <b>Other languages</b>: Before release → Release and after (Payhip is part of the release).</li>
       <li>✓ steps are done; a red ! step is late. <b>Get ISBNs</b> is due by Subsc Pub (English) or the release date (other languages). <b>Get store links</b> is due 2 days after that format's date (eBook and paperback from the Pub Date, hardcover and audiobook from their own dates) and stays open until every link is in.</li>
       <li>Steps tick themselves from the catalog: Book details (the script check and your inputs), ISBNs, page count, Payhip product Live, story bible approved, Vellum link created, store links. <b>Uploaded to the stores</b> is ticked by the Distribution app when it finishes a distributor (or when all the eBook and paperback links are in).</li>
       <li>Formatted in Vellum, Cover done and Added to the subscription post have a box to tick (Cover also ticks itself when the cover image link is filled). They count as done once their date has passed. Unticking removes your tick.</li>
@@ -3533,15 +3539,54 @@ $("#slclose").onclick = ()=>{
 };
 
 /* ---------- Release checklist (view release_checklist, ticks in release_steps; see release-workflow.sql) ---------- */
-let rlRows = [], rlBusy = false;
+let rlRows = [], rlBusy = false, rlWhy = "";
 const rlMsg = t => { $("#rlmsg").textContent = t || ""; };
 const rlDay = d => d ? new Date(d + "T12:00:00").toLocaleDateString(undefined, {month:"short", day:"numeric", year: d.slice(0,4) === String(new Date().getFullYear()) ? undefined : "numeric"}) : "";
 const RL_HOW = {"data":"from the catalog", "date passed":"its date has passed", "Catalog Editor":"ticked", "Distribution app":"Distribution app"};
+// Which books the popup loads: the in-progress book whose release date is nearest today, the one with the most recent edits, or both.
+function rlInProgress(){
+  const cut = new Date(); cut.setDate(cut.getDate() - 60); const c = cut.toISOString().slice(0,10);
+  return data.editions.filter(ed=>!ed.not_released_reason && !ed.anthology_only && !/(BX|\+|TWOSES)/.test(ed.file_name || "") &&
+    (!ed.publication_date || String(ed.publication_date).slice(0,10) >= c || String(ed.subscription_publication||"").slice(0,10) >= c));
+}
+function rlClosest(){
+  const now = Date.now(); let best = null, bd = Infinity;
+  for (const ed of rlInProgress()){
+    if (!ed.publication_date) continue;
+    const d = Math.abs(new Date(String(ed.publication_date).slice(0,10) + "T12:00:00").getTime() - now) + (ed.language === "English" ? 0 : 1);
+    if (d < bd){ bd = d; best = ed; }
+  }
+  return best;
+}
+async function rlMostActive(){
+  const since = new Date(Date.now() - 30*864e5).toISOString();
+  const log = await api("GET", `change_log?select=new_values,old_values&changed_at=gte.${encodeURIComponent(since)}&order=changed_at.desc&limit=1000`);
+  const ok = new Set(rlInProgress().map(ed=>ed.file_name)), n = new Map();
+  for (const r of log || []){
+    const f = (r.new_values && r.new_values.file_name) || (r.old_values && r.old_values.file_name);
+    if (f && ok.has(f)) n.set(f, (n.get(f) || 0) + 1);
+  }
+  let best = null, bn = 0;
+  for (const [f, k] of n) if (k > bn){ bn = k; best = f; }
+  return best ? data.editions.find(ed=>ed.file_name === best) : null;
+}
 async function rlLoad(){
   if (rlBusy) return;
+  const scope = (document.querySelector("input[name=rlscope]:checked") || {}).value;
+  if (!scope) return;
   rlBusy = true; rlMsg("Loading…");
   try{
-    rlRows = await getAll("release_checklist", "sheet_order,stage,step_order");
+    const picks = [];
+    if (scope === "closest" || scope === "both"){ const e = rlClosest(); if (e) picks.push(["closest release to today", e]); }
+    if (scope === "active" || scope === "both"){ const e = await rlMostActive(); if (e) picks.push(["most recent activity", e]); }
+    const names = [...new Set(picks.map(p=>p[1].file_name))];
+    rlWhy = picks.map(p=>`${p[0]}: ${p[1].title || p[1].file_name}`).join(" · ");
+    if (!names.length){
+      rlRows = [];
+      $("#rllist").innerHTML = `<div class="empty">${scope === "active" ? "No in-progress book has changes logged in the last 30 days." : "No in-progress book has a release date."}</div>`;
+      rlMsg(""); return;
+    }
+    rlRows = await getAll("release_checklist?file_name=in." + encodeURIComponent("(" + names.map(n=>'"' + n.replace(/"/g,'\\"') + '"').join(",") + ")"), "sheet_order,stage,step_order");
     rlRender();
   }catch(err){
     rlRows = [];
@@ -3569,7 +3614,7 @@ function rlRender(){
   const all = list.length;
   if (openOnly) list = list.filter(b=>b.open.length);
   list.sort((a,b)=> (b.late>0) - (a.late>0) || a.next.localeCompare(b.next) || (a.r.sheet_order||0) - (b.r.sheet_order||0));
-  rlMsg(`${list.length} book(s)` + (openOnly && all > list.length ? ` (${all - list.length} with nothing left hidden)` : "") +
+  rlMsg((rlWhy ? rlWhy + " — " : "") + `${list.length} book(s)` + (openOnly && all > list.length ? ` (${all - list.length} with nothing left hidden)` : "") +
     `, ${list.reduce((n,b)=>n+b.late,0)} late step(s).`);
   if (!list.length){ $("#rllist").innerHTML = `<div class="empty">${shownOnly ? "None of the books shown in the grid is in progress." : "Nothing in progress."}</div>`; return; }
   $("#rllist").innerHTML = list.map(b=>{
@@ -3594,7 +3639,13 @@ function rlStep(s){
   return `<div class="rlstep${s.done ? " done" : ""}${s.overdue ? " late" : ""}">${box}
     <div><span class="what">${esc(s.step)}</span> ${due}${ev ? `<div class="ev">${esc(ev)}</div>` : ""}</div></div>`;
 }
-$("#release").onclick = ()=>{ $("#rldlg").showModal(); rlLoad(); };
+$("#release").onclick = ()=>{
+  rlRows = []; rlWhy = ""; rlMsg("");
+  document.querySelectorAll("input[name=rlscope]").forEach(r=>r.checked = false);
+  $("#rllist").innerHTML = `<div class="empty">Pick one of the choices above to load the release checklist.</div>`;
+  $("#rldlg").showModal();
+};
+$("#rlscope").onchange = ()=>rlLoad();
 $("#rlreload").onclick = ()=>rlLoad();
 $("#rlclose").onclick = ()=>$("#rldlg").close();
 $("#rlshown").onchange = $("#rlopen").onchange = ()=>rlRender();
