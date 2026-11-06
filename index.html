@@ -1254,9 +1254,9 @@ async function loadAll(){
   await ensureLoaded([{kind:"sb"}, {kind:"fmt"}]);   // lines on format, store link and story bible cells need both, whatever columns are shown
   fillFilters();
   await loadPresetsDb();
-  renderColumnList();
-  await ensureLoaded(ticked());
-  renderGrid();
+  const startView = PRESETS.find(p=>p.editor_view && p.preset_name==="Distribute");   // the editor opens on the Distribute view
+  if (startView && !pendingJump){ renderPresetMenu("id:"+startView.id); await applyPreset(presetToView(startView)); }
+  else { renderColumnList(); await ensureLoaded(ticked()); renderGrid(); }
   setStatus("Ready", "ok");
   warnDuplicateLabels();   // after "Ready" so the warning stays visible
   queueCount();
@@ -2171,6 +2171,13 @@ function cmpSortVals(av, bv){
 // so the rows end up grouped by language, inside each language by series (its own name), inside each series by book #.
 function defaultSortRows(rows){
   const num = ed => { const n = parseFloat(ed.number_in_series); return isFinite(n) ? n : null; };
+  // The most recent release in English and in French goes to the very top (English first); everything else keeps the order below.
+  const newest = lang => rows.filter(ed=>ed.language===lang && ed.publication_date).reduce((m,ed)=> !m || String(ed.publication_date) > String(m.publication_date) ? ed : m, null);
+  const top = [newest("English"), newest("French")].filter(Boolean);
+  const sorted = defaultSortRows0(rows.filter(ed=>!top.includes(ed)), num);
+  return top.concat(sorted);
+}
+function defaultSortRows0(rows, num){
   return rows.map((ed,i)=>({ed,i,n:num(ed)})).sort((a,b)=>{
     const l = collator.compare(a.ed.language||"", b.ed.language||""); if (l) return l;
     const s = collator.compare(a.ed.series||"", b.ed.series||""); if (s) return s;
