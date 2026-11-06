@@ -46,8 +46,16 @@ create trigger release_steps_no_truncate before truncate on public.release_steps
   for each statement execute function public.guard_truncate();
 
 -- ============ 2. release_checklist ============
+-- release_checklist_for(p_files): the checklist for only the named books (null = every book in progress).
+-- The filter sits at the very start, so asking for one book only works out that one book. Filtering the
+-- view afterwards still worked out every book first and timed out.
 drop view if exists public.release_checklist;
-create view public.release_checklist with (security_invoker = true) as
+create or replace function public.release_checklist_for(p_files text[] default null)
+returns table(file_name text, title text, language text, sheet_order integer, publication_date date,
+              subscription_publication date, stage integer, stage_name text, step_order integer, step_key text,
+              step text, done boolean, done_how text, done_on date, done_by text, due date, overdue boolean,
+              detail text, can_tick boolean)
+language sql stable security invoker set statement_timeout = '60s' as $fn$
 with b as (
   select e.file_name, e.title, e.language, e.sheet_order, e.series, e.number_in_series,
          e.publication_date as pub, e.subscription_publication as sub,
@@ -57,6 +65,7 @@ with b as (
    where e.not_released_reason is null
      and not coalesce(e.anthology_only, false)
      and e.file_name !~ '(BX|\+|TWOSES)'
+     and (p_files is null or e.file_name = any(p_files))
      and (e.publication_date is null or e.publication_date >= current_date - 60
           or e.subscription_publication >= current_date - 60
           or exists (select 1 from public.release_steps r where r.file_name = e.file_name and r.done_on >= current_date - 60))
@@ -167,7 +176,13 @@ select b.file_name, b.title, b.language, b.sheet_order, b.pub as publication_dat
        s.step_key in ('vellum', 'cover', 'subscription_post', 'payhip_live', 'distribution') as can_tick
   from judged s
   join b using (file_name)
-  left join public.release_steps r on r.file_name = s.file_name and r.step = s.step_key;
+  left join public.release_steps r on r.file_name = s.file_name and r.step = s.step_key
+$fn$;
+revoke all on function public.release_checklist_for(text[]) from public, anon;
+grant execute on function public.release_checklist_for(text[]) to authenticated;
+
+create view public.release_checklist with (security_invoker = true) as
+  select * from public.release_checklist_for(null);
 
 revoke all on public.release_checklist from anon;
 grant select on public.release_checklist to authenticated;

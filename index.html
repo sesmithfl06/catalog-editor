@@ -3538,7 +3538,7 @@ $("#slclose").onclick = ()=>{
   if (slChanged) setStatus(`${slChanged} store link(s) added.`, "ok");
 };
 
-/* ---------- Release checklist (view release_checklist, ticks in release_steps; see release-workflow.sql) ---------- */
+/* ---------- Release checklist (function release_checklist_for, ticks in release_steps; see release-workflow.sql) ---------- */
 let rlRows = [], rlBusy = false, rlWhy = "";
 const rlMsg = t => { $("#rlmsg").textContent = t || ""; };
 const rlDay = d => d ? new Date(d + "T12:00:00").toLocaleDateString(undefined, {month:"short", day:"numeric", year: d.slice(0,4) === String(new Date().getFullYear()) ? undefined : "numeric"}) : "";
@@ -3586,12 +3586,12 @@ async function rlLoad(){
       $("#rllist").innerHTML = `<div class="empty">${scope === "active" ? "No in-progress book has changes logged in the last 30 days." : "No in-progress book has a release date."}</div>`;
       rlMsg(""); return;
     }
-    rlRows = await getAll("release_checklist?file_name=in." + encodeURIComponent("(" + names.map(n=>'"' + n.replace(/"/g,'\\"') + '"').join(",") + ")"), "sheet_order,stage,step_order");
+    rlRows = (await api("POST", "rpc/release_checklist_for", {p_files:names}) || []).sort((a,b)=> (a.sheet_order||0) - (b.sheet_order||0) || a.stage - b.stage || a.step_order - b.step_order);
     rlRender();
   }catch(err){
     rlRows = [];
     $("#rllist").innerHTML = `<div class="empty">${/release_checklist|relation|schema cache/i.test(err.message||"")
-      ? "The release checklist isn't in Supabase yet: run release-workflow.sql (catalog-editor repo) once in the Supabase SQL Editor."
+      ? "The release checklist isn't in Supabase yet: run release-workflow.sql (catalog-editor repo) once in the Supabase SQL Editor (it was updated: run it again)."
       : esc(friendly(err))}</div>`;
     rlMsg("");
   }finally{ rlBusy = false; }
