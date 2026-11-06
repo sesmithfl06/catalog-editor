@@ -645,7 +645,7 @@ dialog#ncdlg::backdrop{background:#0006}
       <li>Press <b>Story workflow</b> or <b>Story bible workflow</b> at the top. Each step says which app it happens in. Pick a book at the top of the list to put its name and file name in the prompts; for a story, <b>English book</b> or <b>Translation</b> switches the steps (picking a book sets it for you).</li>
       <li>With a book picked, each step shows whether it is done: ✓ green when done, red ! when late, and the next step to do is outlined. Most steps check themselves from the catalog and the Release checklist (book details, ISBNs, cover, Vellum, page count, Payhip, uploads, Vellum link, Notion, store links, the story bible's details and links); what is still missing is written under the step. Steps nothing in the catalog can show (Bob's pictures and covers, the NYT line on a story bible cover, Vellum for a story bible…) have a <b>Done</b> box; ticks are kept in Supabase (release_steps, logged in the change log) and untick to undo.</li>
       <li>In <b>Release</b>, each book's card has <b>Story workflow</b> (and <b>Story bible workflow</b> for English books): it opens that book's list at the next step to do.</li>
-      <li>The Vellum, cover, Bob and Payhip steps show the values they need from the catalog (ISBNs, copyright page genres, end-of-book promo, bestseller line, the story's cover, Long Synopsis, the heading “Discover your new love!” and Reasons to Love for a story; the story bible description for a story bible), each with a <b>Copy</b> button. A value in red is still blank in the catalog.</li>
+      <li>The Vellum, cover, Bob and Payhip steps show the values they need from the catalog (ISBNs, copyright page genres, end-of-book promo, bestseller line, the story's cover, Long Synopsis, the heading “Discover your new love!” and Reasons to Love for a story; the Story Bible Synopsis for a story bible), each with a <b>Copy</b> button. A value in red is still blank in the catalog.</li>
       <li><b>Open Claude with the prompt</b> opens claude.ai in a new tab with the prompt already in the message box; it is also copied, so ⌘V works if the box is empty. Attach the file the step names, then send. <b>Open Bob with the prompt</b> does the same in ChatGPT. Open <b>Prompt</b> to read it first.</li>
     </ul>
   </details>
@@ -922,7 +922,7 @@ function diffText(file){
     return `${diffLabel(r.field)}: ${v.length>60 ? v.slice(0,60)+"…" : v}${n}`; }).join("; ");
 }
 const SB_GROUP = "Story Bible (companion book)";
-const SB_FIELDS = ["isbn","publication_date","word_count","price_usd"];
+const SB_FIELDS = ["isbn","publication_date","word_count","price_usd","description"];
 const SB_SELECT = "id,file_name," + SB_FIELDS.join(",");   // never the bible text itself (bible_md), which is large
 // Column ids that changed with the October 2026 data changes, so saved views and links still find them.
 const RENAMED = {"ed:long_synopsis_lead_in":["info:long_synopsis"], "ed:long_synopsis_closing_line":["info:long_synopsis"], "promo:text":["info:long_synopsis"], "ed:long_synopsis_award_line":["info:long_synopsis"], "ed:long_synopsis_series_intro":["info:long_synopsis"], "promo:line":["info:long_synopsis"], "ed:long_synopsis":["info:long_synopsis"], "ed:series_and_book_number":["info:series_and_book_number"], "ed:chapters":["ed:audio_files","ed:chapter_notes"], "fmt:Audiobook:runtime":["fmt:Audiobook:runtime_minutes"], "info:english_title":["st:english_title"], "ser:reading_note":["ser:series_note"], "sb:price_usd":["php:Story Bible"], "one:edition_release_notes:not_released_reason":["diff:all"], "diff:extra_stories":["diff:all"], "diff:omitted_stories":["diff:all"], "diff:not_released_reason":["diff:all"], "diff:paperback_price_note":["diff:all"], "diff:audio_release_dates":["diff:all"]};
@@ -963,6 +963,7 @@ const HELP = {
   "editions.long_synopsis_series_intro":"Series intro, e.g. The Dragon Lords of Valdier universe is vast… Its own paragraph after the award line. Not in the Essential Description.",
   "editions.loglines":"Marketing lines for the book. Unlike the other text columns, a logline is allowed to repeat parts of the other loglines, or text taken from other sources such as the synopsis.",
   "editions.kindle_unlimited":"Whether the eBook is in Kindle Unlimited (KU), which means it is sold only on Amazon.",
+  "story_bibles.description":"The story bible's synopsis for Payhip: the standard text, leaving out the sections this story bible doesn't have. The story bible creation skill writes it.",
   "editions.vellum_link_created":"Has the complete store link been saved in booklinks copy.vellum?",
     "stories.spice":"0 = no romance, 1 = flirting or kissing, 2 = fade to black, 3 = one or two descriptively sexy scenes, 4 = three or more sexy scenes, 5 = a strong sexy focus throughout. Exception: a story with a strong sexy focus, or a polyamorous one, but only one or two explicit scenes is a 4.",
   "stories.main_genre_differentiated":"The main genre that differentiates the book from other S.E. Smith books, not from books by other authors.",
@@ -1102,7 +1103,7 @@ const GROUP_ITEMS = {
   "Series": ["ser:series_synopsis","ser:series_url","ser:series_note"],
   "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","ed:excerpts","tsr:Teaser","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
-  "Story Bible (companion book)": ["sl:Payhip|Story Bible|URL","sb:price_usd","sl:BookFunnel|Story Bible|URL","sb:isbn","sb:publication_date","sb:word_count","list:bookclub"],
+  "Story Bible (companion book)": ["sl:Payhip|Story Bible|URL","sb:price_usd","sl:BookFunnel|Story Bible|URL","sb:isbn","sb:publication_date","sb:word_count","sb:description","list:bookclub"],
   "Store IDs": ["sl:Amazon|eBook|ASIN","sl:Amazon|Paperback|ASIN","sl:Amazon|Hardcover|ASIN","sl:Apple|eBook|ID"],   // IDs, not links
   "Links": [],
   "Translations": ["ed:ai_translations","info:translation_cache","calc:bestseller_line"]
@@ -1123,7 +1124,7 @@ const DEFAULT_NICKS = {
   "slc:Books2Read|eBook|Universal Link":"Store #",
   "sl:Amazon|eBook|ASIN":"ASIN", "sl:Apple|eBook|ID":"Apple ID", "sl:Amazon|Paperback|ASIN":"Pb ASIN", "sl:Amazon|Hardcover|ASIN":"Hc ASIN",
   "ml:Amazon affiliate link:url":"Amz eB US Affil", "ml:Apple Books affiliate link:url":"Apple Affil", "ml:B&N affiliate link:url":"BN Affil", "ml:Google Play affiliate link:url":"Google Play Affil",
-  "sb:isbn":"SB ISBN", "sb:publication_date":"SB Pub", "sb:word_count":"SB words", "sb:price_usd":"SB $",
+  "sb:isbn":"SB ISBN", "sb:description":"SB synopsis", "sb:publication_date":"SB Pub", "sb:word_count":"SB words", "sb:price_usd":"SB $",
   "info:translation_cache":"Translation Cache", "calc:bestseller_line":"Bestseller line",
   "ed:end_of_story_promo":"End promo (current)", "ed:new_end_of_story_promo_file_name":"New end promo file", "ed:new_end_of_story_promo_rule":"New end promo rule",
   "ed:character_sheet_included":"Char sheet", "st:main_genre_differentiated":"Main genre", "ed:vellum_link_created":"Vellum link",
@@ -1161,7 +1162,7 @@ function buildCatalog(sample){
     addCol({id:`aff:Amazon|${f}|${g}`, kind:"aff", aff:{s:"Amazon", f, region:g}, table:"calculated_store_urls", label:`Amazon ${f} ${g} affiliate link`, group:"Affiliate links", order:6000.2 + fi*0.01 + gi*0.0001, ro:true, note:AFF_NOTE}); }));
   FMT_NAMES = new Set([...Object.keys(FMT_FIELDS), ...sample.formats.filter(f=>f!=="Story Bible")]);
   for (const f of sample.formats) for (const c of (FMT_FIELDS[f] || FMT_FIELDS_OTHER)) addCol({id:`fmt:${f}:${c}`, kind:"fmt", f, col:c, table:"formats", label:`${f} · ${regLabel("formats",c)}`, group:"Format: "+f, order:7000+regOrder("formats",c), ro:false});
-  SB_FIELDS.forEach((c,i)=>addCol({id:"sb:"+c, kind:"sb", col:c, table:"story_bibles", label:`Story Bible · ${regLabel("story_bibles",c)}`, group:SB_GROUP, order:7800+i, ro:false}));
+  SB_FIELDS.forEach((c,i)=>addCol({id:"sb:"+c, kind:"sb", col:c, table:"story_bibles", label: c === "description" ? "Story Bible · Synopsis" : `Story Bible · ${regLabel("story_bibles",c)}`, group:SB_GROUP, order:7800+i, ro:false}));
   for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
   if (sample.slKeys.includes("Books2Read|eBook|Universal Link")) addCol({id:"slc:Books2Read|eBook|Universal Link", kind:"slc", s:"Books2Read", f:"eBook", lt:"Universal Link", col:"store_count", table:"store_links", label:"Books2Read store count", group:"Store links: Books2Read", order:8000.5, ro:false});
   addCol({id:"diff:all", kind:"diffall", table:"edition_differences", label:"Edition differences", group:"Edition differences", order:regOrder("editions","anthology_only") + 0.5, ro:false});
@@ -3855,7 +3856,7 @@ async function wfLoadVals(ed){
     api("GET", `release_steps?select=step,done_on,done_by&file_name=eq.${F}&step=like.wf:*`).catch(()=>[]),
     api("GET", `formats?select=format,isbn,not_offered&file_name=eq.${F}`).catch(()=>[]),
     api("GET", `edition_info?select=copyright_page_genres,end_of_story_promo,new_end_of_story_promo,cover_image_link,long_synopsis,reasons_to_love&file_name=eq.${F}`).catch(()=>[]),
-    api("GET", "story_bibles?select=file_name,isbn,bible_md,word_count,status,publication_date,has_pictures,has_creatures,has_places,has_family_lines,has_alliances,has_pronunciations,has_culture_words,has_timeline,has_book_connections,has_book_club_questions").catch(()=>[]),
+    api("GET", "story_bibles?select=file_name,isbn,bible_md,word_count,status,publication_date,description,has_pictures,has_creatures,has_places,has_family_lines,has_alliances,has_pronunciations,has_culture_words,has_timeline,has_book_connections,has_book_club_questions").catch(()=>[]),
     api("GET", `bestseller_lines?select=bestseller_line&language=eq.${encodeURIComponent(ed.language || "English")}`).catch(()=>[]),
     api("GET", `store_links?select=format,link_or_id&file_name=eq.${F}&store=eq.Payhip`).catch(()=>[]),
     api("GET", `notion_pages?select=last_synced_at&file_name=eq.${F}`).catch(()=>[])
@@ -3913,10 +3914,12 @@ function wfSteps(kind, lang, ed, v){
   if (kind === "bible"){
     const sb = v && v.sb;
     return [
-      {stage:"Write", app:"Claude", text:"Write the story bible without pictures with the story-bible-editorial-stager skill. It saves a .docx whose name ends in pre-images and fills in the story bible's details in Supabase (which sections it has, word count, md file name).",
+      {stage:"Write", app:"Claude", text:"Write the story bible without pictures with the story-bible-editorial-stager skill. It saves a .docx whose name ends in pre-images and fills in the story bible's details in Supabase (which sections it has, word count, md file name, Story Bible Synopsis).",
         attach:"The story's manuscript.",
         claude:`Use the story-bible-editorial-stager skill to make the story bible for ${t}. I've attached the story's manuscript. Save the draft as a DOCX whose name ends in pre-images, then fill in its details in Supabase.`,
-        chk: v=>v ? (sb && has(sb.word_count) && has(sb.bible_md) ? {done:true, detail:`In the catalog: ${sb.word_count} words, ${sb.bible_md}`} : {done:false, detail: sb ? "Story bible row is there, but word count or md file name is blank" : "No story bible in the catalog yet"}) : null},
+        chk: v=>{ if (!v) return null; if (!sb) return {done:false, detail:"No story bible in the catalog yet"};
+          const miss = [!has(sb.word_count) && "word count", !has(sb.bible_md) && "md file name", !has(sb.description) && "Story Bible Synopsis"].filter(Boolean);
+          return miss.length ? {done:false, detail:"Still blank: " + miss.join(", ")} : {done:true, detail:`In the catalog: ${sb.word_count} words, ${sb.bible_md}, Story Bible Synopsis`}; }},
       {stage:"Write", app:"Bowker", text:"Get the story bible's ISBN and paste it in the SB ISBN column of the grid.", links:[["Open Bowker", "https://www.myidentifiers.com/"]], act:"open",
         chk: v=>v ? (has(v.bibleIsbn) ? {done:true, detail:"SB ISBN " + v.bibleIsbn} : {done:false, detail:"SB ISBN is blank"}) : null},
       {stage:"Pictures and cover", app:"Bob (ChatGPT)", text:"Put in the pictures and maps with the story bible creation skill. It saves a .docx whose name ends in pre-vellum.",
@@ -3936,8 +3939,8 @@ function wfSteps(kind, lang, ed, v){
           `Export the eBooks and the PDF, then export Word (.docx) as ${F}-Bible-vellum.docx.`],
         vals: v ? [["SB ISBN", v.bibleIsbn]].concat(promoVals) : []},
       {stage:"Vellum", app:"Update md files", text:`Open Update md files (Dropbox: 05_Scripts_and_Tools/Scripts/Update md files) so Story-Bibles-md/${F}-bible.md matches the Vellum export.`, tick:"bible_md"},
-      {stage:"Payhip", app:"Payhip", text:"Put the story bible on Payhip with its Bundle (eBook + Story Bible) and set them Live. Description: paste the story bible description below (the standard text, with only the sections this story bible has).", links:[["Open Payhip", "https://payhip.com/"]],
-        chk: v=>v ? (has(v.payhip["Story Bible"]) ? {done:true, detail:"Story bible link in the catalog"} : null) : null, tick:"bible_payhip", vals: v ? [["Story bible description", wfBibleBlurb(sb)]] : []},
+      {stage:"Payhip", app:"Payhip", text:"Put the story bible on Payhip with its Bundle (eBook + Story Bible) and set them Live. Description: paste the Story Bible Synopsis below.", links:[["Open Payhip", "https://payhip.com/"]],
+        chk: v=>v ? (has(v.payhip["Story Bible"]) ? {done:true, detail:"Story bible link in the catalog"} : null) : null, tick:"bible_payhip", vals: v ? [["Story Bible Synopsis", (sb && sb.description) || wfBibleBlurb(sb)]] : []},
       {stage:"Payhip", app:"Catalog Editor", text:"Paste the story bible's Payhip link in the Payhip Story Bible URL column and the Bundle link in the Payhip Bundle URL column, set the story bible's status to Approved and fill SB Pub. Find store links for shown books also lists the blank links.", act:"open",
         chk: v=>{ if (!v) return null; const miss = [!has(v.payhip["Story Bible"]) && "Payhip Story Bible URL", !has(v.payhip.Bundle) && "Payhip Bundle URL",
           !(sb && sb.status === "Approved") && "status Approved", !(sb && sb.publication_date) && "SB Pub"].filter(Boolean);
