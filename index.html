@@ -524,7 +524,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…edit a cell from the keyboard?</summary>
     <ul>
-      <li>A plain click only <i>selects</i>. To edit: <kbd>Enter</kbd> or <kbd>F2</kbd> on the selected cell, or right-click → Edit (it says “not editable” if the column is read-only).</li>
+      <li>A plain click only <i>selects</i>. To edit: <kbd>Enter</kbd> or <kbd>F2</kbd> on the selected cell, or right-click → Edit (on a read-only column it says “not editable”; click it, or press Enter / F2 on the cell, to see why and how to change it instead).</li>
       <li><kbd>↑ ↓ ← →</kbd> move to the next <i>editable</i> cell (read-only cells are skipped).</li>
       <li>In the editor: <kbd>Enter</kbd> saves and moves down to the next editable cell; <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line in long text; <kbd>Tab</kbd> saves and moves right; <kbd>Shift</kbd>+<kbd>Tab</kbd> saves and moves left; <kbd>Esc</kbd> cancels; clicking outside the editor saves.</li>
       <li><b>Undo</b> <kbd>⌘</kbd>+<kbd>Z</kbd>; <b>Redo</b> <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (or <kbd>Ctrl</kbd>+<kbd>Y</kbd>). They don't work while you are typing in a box; use the Undo / Redo buttons at the top then.</li>
@@ -1114,7 +1114,7 @@ function buildCatalog(sample){
   // Min Age: worked out from Rating (read-only), sits next to Age Max
   addCol({id:"calc:min_age", kind:"calc", col:"min_age", table:"stories", label:"Min Age", group:"Book Basics", order:regOrder("stories","age_max")-0.5, ro:true, note:"Worked out from Rating: G = 10, T = 13, M = 17, E = 18. Change the Rating to change it."});
   // Bestselling author line in the edition's language: read from the Supabase table bestseller_lines (one line per language)
-  addCol({id:"calc:bestseller_line", kind:"calc", col:"bestseller_line", table:"edition_info", label:"Bestselling author line (in this language)", group:"Translations", order:9911, ro:true, note:"From the Supabase table bestseller_lines (one line per language). Blank when that language has no such line. Change it in Supabase → Table Editor → bestseller_lines."});
+  addCol({id:"calc:bestseller_line", kind:"calc", col:"bestseller_line", table:"edition_info", label:"Bestselling author line (in this language)", group:"Translations", order:9911, ro:false, note:"One line per language, kept in the Supabase table bestseller_lines and shared by every book in that language: changing it here changes it for all of them. Blank when that language has no line yet; typing one adds it."});
   // worked out in edition_info (read-only); long synopsis and series + book number keep their usual place in the grid
   for (const c of ["whole_book_number","author","publisher","author_bio","translation_cache","long_synopsis","series_and_book_number"]){
     const inInfo = !!REG["edition_info."+c];
@@ -1660,9 +1660,9 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     let cellUrl = ""; try{ const mu = String(cc ? valueOf(ed, cc) ?? "" : "").match(/https?:\/\/[^\s;,"'<>]+/); if (mu) cellUrl = mu[0]; }catch(_){}
     const m = document.createElement("div"); m.className = "ctx";
     const who = proseAuthor(ed, cc), whoOwn = who ? PROSE_AUTHORS[authorKey(ed, cc)] : "";
-    m.innerHTML = (who ? `<div class="hint" style="margin:0;padding:4px 10px">${who}</div><button type="button" data-a="who">Change to ${who==="Written by Ai" ? "Written by a human" : "Written by Ai"}</button>` + (whoOwn ? `<button type="button" data-a="whorule">Go back to the rule of thumb</button>` : "") : "") + (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + (offF ? `<button type="button" data-a="offer">Mark ${esc(offF)} as ${offNow ? "not offered" : "offered"} for this book</button>` : "") + `<button type="button" data-a="edit"${canEd?"":" disabled"}>Edit${canEd?"":" (not editable)"}</button>${cc && cc.id==="info:long_synopsis" ? '<button type="button" data-a="promo">Change promo line…</button>' : ""}<button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
+    m.innerHTML = (who ? `<div class="hint" style="margin:0;padding:4px 10px">${who}</div><button type="button" data-a="who">Change to ${who==="Written by Ai" ? "Written by a human" : "Written by Ai"}</button>` + (whoOwn ? `<button type="button" data-a="whorule">Go back to the rule of thumb</button>` : "") : "") + (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + (offF ? `<button type="button" data-a="offer">Mark ${esc(offF)} as ${offNow ? "not offered" : "offered"} for this book</button>` : "") + `<button type="button" data-a="edit">Edit${canEd?"":" (not editable: click to see why and how)"}</button>${cc && cc.id==="info:long_synopsis" ? '<button type="button" data-a="promo">Change promo line…</button>' : ""}<button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
     m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
-    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="who"){ setProseAuthor(ed, cc, who==="Written by Ai" ? "human" : "ai"); return; } if (b.dataset.a==="whorule"){ setProseAuthor(ed, cc, null); return; } if (b.dataset.a==="openurl"){ window.open(cellUrl, "_blank", "noopener"); return; } if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="offer"){ setOffered(ed, offF, !offNow); return; } if (b.dataset.a==="edit"){ openEditor(td); return; } if (b.dataset.a==="promo"){ openPromoDlg(ed); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
+    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="who"){ setProseAuthor(ed, cc, who==="Written by Ai" ? "human" : "ai"); return; } if (b.dataset.a==="whorule"){ setProseAuthor(ed, cc, null); return; } if (b.dataset.a==="openurl"){ window.open(cellUrl, "_blank", "noopener"); return; } if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="offer"){ setOffered(ed, offF, !offNow); return; } if (b.dataset.a==="edit"){ if (!canEd){ showWhyNoEdit(ed, cc); return; } openEditor(td); return; } if (b.dataset.a==="promo"){ openPromoDlg(ed); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
     document.body.appendChild(m); ctxMenu = m;
     return;
   }
@@ -1876,6 +1876,27 @@ function canEdit(ed, c){
   if (c.kind==="fmt") return !!data.fmt[rowKey(ed,c)] || c.f==="eBook";   // only formats the book has (add one with right-click → Add format); the eBook row is made on the first save
   if (c.kind==="sb") return !!data.sb[ed.file_name];      // only books that have a story bible; add one with right-click
   return true;
+}
+// Why a cell can't be edited, and what to do instead (shown in the right-click menu, on Enter / F2, in the cell's tooltip and in the "Opened ..." message)
+function whyNoEdit(ed, c){
+  const name = ed.title || ed.file_name;
+  if (c.kind==="st" && !ed.story_id) return `${name} isn't linked to a story, and this column is kept on the story. Link it in Supabase → Table Editor → editions (fill story_id for this book), then reload.`;
+  if (c.kind==="est" && ed.language==="English") return "English text kept on a translation only exists on translated books. For an English book, edit the real column (the one this sits beside).";
+  if (c.kind==="ser" && !ed.series) return `${name} isn't in a series. Set its series in the Series column first, then this opens up.`;
+  if (c.kind==="ser") return `This series has no ${ed.language} row yet. Add one in Supabase → Table Editor → series (series “${ed.series}”, language ${ed.language}), then reload.`;
+  if (c.kind==="fmt") return `This book has no ${c.f}. Right-click → Add ${c.f} for this book, then edit it.`;
+  if (c.kind==="sb") return "This book has no story bible. Right-click → Add a story bible for this book, then edit it.";
+  if (c.kind==="aff") return "Affiliate links are worked out from the store IDs. Change the store link or ID columns they come from and this updates by itself.";
+  if (c.kind==="list") return "Story details are kept as lists in Supabase and can't be edited in the grid. Change them in Supabase → Table Editor → the story details tables (or in Notion if they sync from there).";
+  if (c.kind==="calc" && c.col==="min_age") return "Min Age is worked out from Rating. Change Rating (right-click the Rating column to send it to Notion) and this updates by itself.";
+  if (c.kind==="info") return "This is worked out in Supabase (view edition_info) from other columns. Change the columns it comes from and it updates by itself.";
+  return "This column is read-only in the Catalog Editor. To change it, edit it in Supabase → Table Editor → " + (c.table || "its table") + ".";
+}
+function showWhyNoEdit(ed, c){
+  if (!ed || !c) return;
+  const why = whyNoEdit(ed, c);
+  setStatus(`${c.label} can't be edited here. ${why}`, "warn");
+  alert(`${c.label} can't be edited here.\n\n${why}`);
 }
 // A cell gets a line when its format isn't offered for the book (no formats row, or marked Not offered; for the eBook see ebookOffered).
 // When the format is offered, an empty cell is a blank to fill, whether or not its store link / formats row exists yet.
@@ -2298,7 +2319,7 @@ function renderGrid(){
       const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", emptyCls(ed,c,v), (isLong(c)?"long":""), (c.id==="ed:title"?"title":""), (isGenreCol(c)?"genres":"")].join(" ");
       const noFmt = c.kind==="fmt" && !data.fmt[rowKey(ed,c)] ? `This book has no ${c.f}. Right-click → Add ${c.f} to add it.`
         : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it." : "";
-      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt, valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
+      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt || (ok ? "" : "Can't be edited: " + whyNoEdit(ed,c)), valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
     });
     h += "</tr>";
   });
@@ -2620,6 +2641,8 @@ function parseFor(c, text){
 let editing = null; // {td, ed, c, old}
 /* left click only selects a cell; editing is right-click → Edit (or Enter / F2 on the selected cell) */
 $("#gridwrap").addEventListener("keydown", e=>{
+  const ro = e.target.closest("td.ro[data-r]");
+  if (ro && !editing && (e.key==="Enter" || e.key==="F2")){ e.preventDefault(); showWhyNoEdit(viewRows[+ro.dataset.r], viewCols[+ro.dataset.c]); return; }
   const td = e.target.closest("td.edit"); if (!td || editing) return;
   if (e.key==="Enter" || e.key==="F2"){ e.preventDefault(); openEditor(td); }
   else if (e.key.startsWith("Arrow")) { e.preventDefault(); move(td, {ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key]); }
@@ -2831,8 +2854,17 @@ async function write(ed, c, v){
       }
       const r = await patchOne("editions", fn, {promo_line_id:id}); Object.assign(ed, r); await refreshInfo(ed.file_name); return;
     }
+    case "calc": {
+      if (c.col!=="bestseller_line") throw new Error(whyNoEdit(ed,c));
+      // One line per language, shared by every book in that language: change the language's row, or add it
+      const val = v==null || v==="" ? null : v, lang = ed.language, now = new Date().toISOString();
+      const cur = (data.bl||(data.bl={}))[lang];
+      data.bl[lang] = cur ? await patchOne("bestseller_lines", "language=eq."+q(lang), {bestseller_line:val, updated_at:now})
+                          : await insertOne("bestseller_lines", {language:lang, bestseller_line:val});
+      renderGrid(); return;
+    }
     case "info": {
-      if (c.col!=="translation_cache") throw new Error("This column is worked out and can't be edited here.");
+      if (c.col!=="translation_cache") throw new Error(whyNoEdit(ed,c));
       // The Translation Cache is one setting per language (settings key translation_cache_<language>), shared by every book in that language
       const key = "translation_cache_"+ed.language, val = v==null ? "" : v;
       const rows = await api("PATCH", "settings?key=eq."+q(key), {value:val}, PATCH);
@@ -2906,7 +2938,7 @@ async function write(ed, c, v){
       return;
     }
   }
-  throw new Error("This column can't be edited here.");
+  throw new Error(whyNoEdit(ed,c));
 }
 function updateCell(ed, c){
   // story and series values are shared, so refresh every visible row that uses them
@@ -3823,7 +3855,7 @@ async function jumpTo(book, colId){
   for (const t of tds){ t.classList.remove("jump"); void t.offsetWidth; t.classList.add("jump"); t.addEventListener("animationend", ()=>t.classList.remove("jump"), {once:true}); }
   const name = ed.title || ed.file_name;
   let msg, kind = "ok";
-  if (c) msg = `Opened ${name} · ${c.label}` + (canEdit(ed,c) ? "" : " (can't be edited for this book)") + ".";
+  if (c) msg = `Opened ${name} · ${c.label}` + (canEdit(ed,c) ? "" : " (can't be edited: " + whyNoEdit(ed,c) + ")") + ".";
   else if (colId){ msg = `Opened ${name}. The column “${colId}” isn't in the Catalog Editor, so this is the book's row.`; kind = "warn"; }
   else msg = `Opened ${name}.`;
   setStatus(msg, kind);
