@@ -557,7 +557,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…choose, hide, move and freeze columns?</summary>
     <ul>
-      <li>Tick columns in the sidebar. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”. In that dialog's list, right-click an item → <b>Don't go to Notion</b>.</li>
+      <li>Tick columns in the sidebar. Type in “Find a column…” and press <b>Check all shown</b> to tick every column the search finds. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”. In that dialog's list, right-click an item → <b>Don't go to Notion</b>.</li>
       <li>Right-click a column heading → Does this go to Notion?, Clear filter, <b>Hide</b> (Hide column, Hide from here to end), <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, <b>Reset</b> (this column's width, all column widths, column order). Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
       <li>Drag a heading to move the column (a blue edge shows where it lands). Drag the right edge of a heading to resize; double-click that edge to reset the width.</li>
       <li><b>Show full text</b> (above the grid) shows long cells in full; otherwise only the first line shows.</li>
@@ -677,6 +677,7 @@ dialog#ncdlg::backdrop{background:#0006}
         <label class="chk" title="Shows the title plus every column that has a blank to fill for at least one book shown. Striped cells are empty because the book isn't part of that table (no award, no subtitle, no such format…), so they don't count."><input type="checkbox" id="fcolblank"> Blanks</label>
         <div class="hint" style="margin-top:2px">This may take a minute to load.</div>
         <input id="colsearch" type="search" placeholder="Find a column…">
+        <button id="checkshown" type="button" hidden title="Ticks every column the search above is showing">Check all shown</button>
         <div class="btns">
           <button id="none" title="Untick everything">Clear</button>
           <button id="expand">Open all</button>
@@ -1295,13 +1296,16 @@ function groups(){
   for (const c of [...COLS].sort((a,b)=>a.so-b.so || a.label.localeCompare(b.label))){ if(!g.has(c.group)) g.set(c.group,[]); g.get(c.group).push(c); }
   return g;
 }
+function colSearchWords(){ return $("#colsearch").value.trim().toLowerCase().split(/\s+/).filter(Boolean); }
+function colMatches(c, g, words){ const hay = (c.label+" "+(c.full||c.orig||"")+" "+g+" "+(c.col||"")).toLowerCase().replace(/_/g," "); return words.every(w=>hay.includes(w)); }
 function renderColumnList(){
   const q = $("#colsearch").value.trim().toLowerCase();
+  $("#checkshown").hidden = !q;
   const open = new Set([...document.querySelectorAll(".grp[open]")].map(d=>d.dataset.g));
   let html = "";
   for (const [g, cs] of groups()){
     const words = q.split(/\s+/).filter(Boolean);
-    const show = cs.filter(c=>{ const hay = (c.label+" "+(c.full||c.orig||"")+" "+g+" "+(c.col||"")).toLowerCase().replace(/_/g," "); return words.every(w=>hay.includes(w)); });
+    const show = cs.filter(c=>colMatches(c, g, words));
     if (!show.length) continue;
     const n = cs.filter(c=>onSet().has(c.id)).length;
     const isOpen = q || open.has(g);
@@ -1320,6 +1324,15 @@ $("#collist").addEventListener("change", async e=>{
   await refresh();
 });
 $("#colsearch").addEventListener("input", renderColumnList);
+// Check all shown: ticks every column the "Find a column…" search is showing right now
+$("#checkshown").onclick = async ()=>{
+  const words = colSearchWords(); if (!words.length) return;
+  const vb = viewSnap();
+  for (const [g, cs] of groups()) for (const c of cs) if (colMatches(c, g, words)) setColOn(c.id, true);
+  recordView(vb);
+  renderColumnList();
+  await refresh();
+};
 /* right-click a section header: Check all / Uncheck all for that section only (shown rows; works open or closed) */
 /* ---------- column nicknames and new names (right-click a column → Rename column…) ----------
    Kept in the Supabase table settings, key editor_column_names, as {"column id": {"nick": "…"} or {"name": "…"}}. */
