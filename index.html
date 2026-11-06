@@ -213,6 +213,7 @@ code{font-size:12px;word-break:break-all}
 .ctx button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:6px 10px;border-radius:5px;font-size:13px}
 .ctx button:hover{background:var(--soft)}
 .ctx .sub{padding-left:12px}
+.colref{text-decoration:underline dotted;cursor:context-menu}
 /* Find store links */
 dialog#sldlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:1100px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
 dialog#sldlg::backdrop{background:#0006}
@@ -620,7 +621,7 @@ dialog#ncdlg::backdrop{background:#0006}
       <li><b>📝 Notion only</b>: never copied here. A duplicate always ends up once, in the Shared section: a field from the box typed or pasted into Notion only moves to the Shared section (“Other shared details”, two-way from then on), and anything that repeats the Shared section is removed from Notion only. Old-system sections (Loglines, Teasers, Awards, buy links, Website, BookFunnel, Book Cover, Reviews, “Archived Notion …”) are merged into the Shared section.</li>
       <li><b>Clearing out the old system</b> happens only once per page, at its first sync with this layout: lines with nothing after the “:”, empty list items, leftover dividers and the old template lines (“Title:”, “Release Date:”, “Keywords:”, “Digital Price:” …) are removed. After that, an empty line or a “Label:” someone types in Notion only is left alone.</li>
       <li><b>Long Synopsis</b> goes to Notion. It is put together in Supabase from Award line + Series intro + Essential synopsis + Promo line, and the sync sends the finished text (under its own heading in the box). Notion doesn't put it back together: change its parts here. If its text is changed in the box or pasted into Notion only, Long Synopsis moves to the Shared section (still showing the text Supabase builds) and the Notion edit is kept under “Changed in Notion”. Other worked-out columns (Series & book number, Book # with no decimals, Author, Publisher) work the same way.</li>
-      <li><b>Can't go to Notion</b> (right-click the column → Does this go to Notion? says why): Min Age (send Rating), Promo line (it is inside Long Synopsis), affiliate links (worked out from the store links, which go), the English text kept on translations (shown beside each translated field automatically), Edition differences, Books2Read store count, award badge, Bestselling author line, Translation Cache, and the story lists Pet names &amp; invented words, Pronunciations, Scene image prompts and Author's Note.</li>
+      <li><b>Can't go to Notion</b> (right-click the column → Does this go to Notion? says why): Min Age (send <span class="colref" data-col="st:rating" title="Right-click: Send to Notion">Rating</span>), Promo line (it is inside <span class="colref" data-col="info:long_synopsis" title="Right-click: Send to Notion">Long Synopsis</span>), affiliate links (worked out from the store links, which go), the English text kept on translations (shown beside each translated field automatically), Edition differences, Books2Read store count, award badge, Bestselling author line, Translation Cache, and the story lists Pet names &amp; invented words, Pronunciations, Scene image prompts and Author's Note.</li>
       <li>An edition with no Notion page gets a new one: English books in SES Books, other languages in SES Books → the language page (French, German…), named “English Title - Language”, placed under the book's series heading after the books with lower numbers (a new series gets its own heading, in alphabetical order). A page with that name that is already there is used instead. A page Notion says it can't find usually needs sharing with the integration: in Notion ••• → Connections.</li>
     </ul>
     <h3>What queues a book by itself</h3>
@@ -1437,17 +1438,21 @@ function notionKey(c){
 function notionWhy(c){
   if (c.kind==="info" && c.col==="long_synopsis") return " Long Synopsis is put together in Supabase from its parts (Award line + Series intro + Essential synopsis + Promo line). The sync sends the finished text, so the Notion page shows it in full under its own heading in the box. Notion doesn't put it back together: change one of its parts here. If someone edits it in Notion (or pastes it into Notion only), it moves to the Shared section, and the edit is kept under “Changed in Notion”, because it can't be split back into its parts.";
   if (c.kind==="info") return " It is worked out in Supabase, so the sync sends the finished value. Change it through the columns it comes from; an edit made to it in Notion is kept under “Changed in Notion” in the Shared section.";
-  if (c.kind==="promo") return " The promo line is part of Long Synopsis, which goes to Notion.";
-  if (c.kind==="calc" && c.col==="min_age") return " Min Age is worked out from Rating; send Rating instead.";
+  if (c.kind==="promo") return " The promo line is part of " + colRef("info:long_synopsis", "Long Synopsis") + ", which goes to Notion.";
+  if (c.kind==="calc" && c.col==="min_age") return " Min Age is worked out from Rating; send " + colRef("st:rating", "Rating") + " instead.";
   if (c.kind==="calc") return " It is read from another Supabase table (bestseller_lines), and the Notion page has no place for it.";
-  if (c.kind==="aff") return " Affiliate links are worked out from the store IDs; the store links themselves go, in the Shared section.";
+  if (c.kind==="aff"){ const sl = COLS.find(x=>x.kind==="sl" && x.id.startsWith("sl:"+c.id.slice(4).split("|")[0]+"|")); return " Affiliate links are worked out from the store IDs; the " + (sl ? colRef(sl.id, "store links") : "store links") + " themselves go, in the Shared section."; }
   if (c.kind==="est") return " English text on a translation is shown automatically beside the translated field in the box.";
   if (c.kind==="diff" || c.kind==="diffall") return " The Notion page has no place for edition differences.";
-  if (c.kind==="slc") return " The Books2Read store count is only used here; the Books2Read link goes, in the Shared section.";
-  if (c.kind==="one" && c.t==="edition_awards") return " The award badge (an image) has no place on the Notion page; the award text goes, in the Shared section.";
+  if (c.kind==="slc") return " The Books2Read store count is only used here; the " + colRef("sl:Books2Read|eBook|Universal Link", "Books2Read link") + " goes, in the Shared section.";
+  if (c.kind==="one" && c.t==="edition_awards") return " The award badge (an image) has no place on the Notion page; the " + colRef("one:edition_awards:award", "award text") + " goes, in the Shared section.";
   if (c.col==="translation_cache") return " It is only used inside the Catalog Editor.";
   return " The Notion page has no place for it.";
 }
+// a column named inside a message ("send Rating instead"): shown underlined; right-click it → Send to Notion / Stop sending to Notion.
+// colRef marks it in plain text; refHtml escapes the text and turns each mark into its span (plain text when the column isn't loaded).
+const colRef = (id, text) => "\u0001" + id + "\u0002" + text + "\u0003";
+const refHtml = s => esc(s).replace(/\u0001([^\u0002]*)\u0002([^\u0003]*)\u0003/g, (m, id, t) => COLMAP[id] ? `<span class="colref" data-col="${id}" title="Right-click: Send to Notion">${t}</span>` : t);
 function notionRegs(k){ const [t, col] = k.split("."); return [REG[k], t==="editions" ? REG["edition_info."+col] : null].filter(Boolean); }
 function notionReg(k){ const rs = notionRegs(k); return rs.find(r=>r.in_notion) || rs[0] || null; }
 function notionYes(c){ const k = notionKey(c); return k==="shared" || k==="story" || !!(k && (notionReg(k)||{}).in_notion); }
@@ -1465,9 +1470,9 @@ function showNotion(id){
   const k = notionKey(c), yes = notionYes(c);
   $("#ntthis").innerHTML = `<b>${esc(c.label)}</b>: ` + (k==="shared" ? `Yes, always. It is in the “🔄 Shared with Supabase” section of the book's Notion page, which syncs both ways: a change made there is saved here, and a change made here shows there. There is no setting to stop it.`
     : k==="story" ? `Yes, always. It is under Story details in the “📚 From Supabase” box of the book's Notion page.`
-    : !k ? `No.` + esc(notionWhy(c))
-    : yes ? `Yes. It goes to Notion, in the “📚 From Supabase” box at the top of the book's page.` + esc(notionShared(c)) + (c.kind==="info" ? esc(notionWhy(c)) : "")
-    : `No. It is not in the “📚 From Supabase” box in Notion. Press Send to Notion to add it.` + esc(notionShared(c)) + (c.kind==="info" ? esc(notionWhy(c)) : ""));
+    : !k ? `No.` + refHtml(notionWhy(c))
+    : yes ? `Yes. It goes to Notion, in the “📚 From Supabase” box at the top of the book's page.` + esc(notionShared(c)) + (c.kind==="info" ? refHtml(notionWhy(c)) : "")
+    : `No. It is not in the “📚 From Supabase” box in Notion. Press Send to Notion to add it.` + esc(notionShared(c)) + (c.kind==="info" ? refHtml(notionWhy(c)) : ""));
   const tg = $("#nttoggle");
   tg.hidden = !k || k==="shared" || k==="story";
   tg.disabled = false;
@@ -1527,6 +1532,28 @@ $("#ntlist").addEventListener("contextmenu", e=>{
   m.addEventListener("click", ev=>{ const b = ev.target.closest("button[data-a]"); if (!b) return; ev.stopPropagation(); closeCtx(); setNotion(id, false); });
   $("#ntdlg").appendChild(m); ctxMenu = m;
 });
+// right-click a column named in a message (Min Age: "send Rating instead", and the like) → Send to Notion / Stop sending to Notion,
+// or Does this go to Notion? for that column. Works in any dialog (the menu goes inside it so it shows on top).
+document.addEventListener("contextmenu", e=>{
+  const it = e.target.closest(".colref[data-col]"); if (!it) return;
+  e.preventDefault(); e.stopPropagation(); closeCtx(); qmClose();
+  const id = it.dataset.col, c = COLMAP[id]; if (!c) return;
+  const k = notionKey(c), yes = notionYes(c);
+  const m = document.createElement("div"); m.className = "ctx";
+  m.innerHTML = (k==="shared" || k==="story"
+      ? `<button type="button" disabled>${esc(c.label)}: always goes to Notion (${k==="shared" ? "Shared section" : "Story details"})</button>`
+      : `<button type="button" data-a="${yes?"off":"on"}">${yes ? "Stop sending" : "Send"} ${esc(c.label)} to Notion</button>`)
+    + `<button type="button" data-a="ask">Does ${esc(c.label)} go to Notion?</button>`;
+  m.style.position = "fixed";
+  m.style.left = Math.min(e.clientX, innerWidth-300)+"px"; m.style.top = Math.min(e.clientY, innerHeight-90)+"px";
+  m.addEventListener("click", ev=>{
+    const b = ev.target.closest("button[data-a]"); if (!b) return; ev.stopPropagation(); closeCtx();
+    if (b.dataset.a==="ask"){ if ($("#hdlg").open) $("#hdlg").close(); showNotion(id); return; }
+    if (!$("#ntdlg").open){ if ($("#hdlg").open) $("#hdlg").close(); showNotion(id); }   // the result shows in the Notion dialog
+    setNotion(id, b.dataset.a==="on");
+  });
+  (it.closest("dialog") || document.body).appendChild(m); ctxMenu = m;
+}, true);
 $("#ntclose").onclick = ()=>$("#ntdlg").close();
 $("#howdoi").onclick = ()=>$("#hdlg").showModal();
 $("#hclose").onclick = ()=>$("#hdlg").close();
