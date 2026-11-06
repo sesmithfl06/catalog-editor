@@ -1524,7 +1524,7 @@ function notionWhy(c){
   if (c.kind==="slc") return " The Books2Read store count is only used here; the " + colRef("sl:Books2Read|eBook|Universal Link", "Books2Read link") + " goes, in the Shared section.";
   if (c.kind==="one" && c.t==="edition_awards") return " The award badge (an image) has no place on the Notion page; the " + colRef("one:edition_awards:award", "award text") + " goes, in the Shared section.";
   if (c.col==="translation_cache") return " It is only used inside the Catalog Editor.";
-  return " The Notion page has no place for it.";
+  return " The Notion page has no field for this because it is a worked-out/calculated column, edition difference, or image.";
 }
 // a column named inside a message ("send Rating instead"): shown underlined; right-click it → Send to Notion / Stop sending to Notion.
 // colRef marks it in plain text; refHtml escapes the text and turns each mark into its span (plain text when the column isn't loaded).
@@ -1613,7 +1613,7 @@ function ntListMenu(e){
   const id = it.dataset.col, c = COLMAP[id], k = notionKey(c), no = !notionYes(c);
   const m = document.createElement("div"); m.className = "ctx";
   m.innerHTML = no
-    ? (k ? `<button type="button" data-a="on">Send to Notion</button>` : `<button type="button" disabled title="${esc(notionWhy(c).replace(/[\u0001\u0003]/g,"").replace(/\u0002/g,"").trim())}">The Notion page has no place for it</button>`)
+    ? (k ? `<button type="button" data-a="on">Send to Notion</button>` : `<button type="button" disabled title="${esc(notionWhy(c).replace(/[\u0001\u0003]/g,"").replace(/\u0002/g,"").trim())}">The Notion page has no field for this because it is a worked-out/calculated column, edition difference, or image.</button>`)
     : (k==="shared" || k==="story")
     ? `<button type="button" disabled title="${k==="shared" ? "Shared items sync both ways and always go" : "Story details always go"}">Always goes to Notion (${k==="shared" ? "Shared section" : "Story details"})</button>`
     : `<button type="button" data-a="off">Don't go to Notion</button>`;
