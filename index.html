@@ -218,6 +218,26 @@ dialog#sldlg{border:1px solid var(--line);border-radius:12px;background:var(--pa
 dialog#sldlg::backdrop{background:#0006}
 dialog#nfdlg,dialog#ntdlg,dialog#dfdlg,dialog#prdlg,dialog#rndlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:820px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
 dialog#rndlg::backdrop,dialog#nfdlg::backdrop,dialog#ntdlg::backdrop,dialog#dfdlg::backdrop,dialog#prdlg::backdrop,dialog#sydlg::backdrop{background:#0006}
+/* Release checklist */
+dialog#rldlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:1200px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
+dialog#rldlg::backdrop{background:#0006}
+#rldlg .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
+#rldlg .row .grow{flex:1}
+#rldlg label.chk{display:flex;gap:6px;align-items:center;font-size:13px}
+.rlbook{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0}
+.rlbook h3{margin:0;font-size:15px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.rlbook h3 a{color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--muted);cursor:pointer}
+.rlbook .meta{color:var(--muted);font-size:12px;font-weight:400}
+.rlbook .meta .late{color:var(--bad);font-weight:600}
+.rlstages{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:8px}
+.rlstage h4{margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.rlstep{display:flex;gap:6px;align-items:flex-start;padding:3px 0;font-size:13px}
+.rlstep input{margin-top:2px}
+.rlstep .mark{width:16px;text-align:center;flex:none;margin-top:1px}
+.rlstep.done .mark{color:var(--ok)} .rlstep.late .mark,.rlstep.late .due{color:var(--bad)}
+.rlstep.done .what{color:var(--muted)}
+.rlstep .ev{color:var(--muted);font-size:12px}
+.rlstep .due{color:var(--muted);font-size:12px;white-space:nowrap}
 /* Long Synopsis popup: one box per part, in the order the Long Synopsis uses */
 dialog#sydlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:1500px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
 #syparts{display:flex;gap:10px;align-items:stretch;margin-top:10px}
@@ -363,6 +383,20 @@ dialog#ncdlg::backdrop{background:#0006}
   <div class="row"><span class="hint" id="slmsg"></span></div>
   <div id="sllist"><div class="empty">Looking up…</div></div>
   <div class="row"><span class="grow"></span><button id="slsaveall" class="primary" type="button" disabled>Save all</button><button id="slclose" type="button">Done</button></div>
+</dialog>
+
+<!-- ============ Release checklist ============ -->
+<dialog id="rldlg">
+  <h2>Release checklist</h2>
+  <p class="hint">Every book not released yet or released in the last 60 days, with each step of its release. Most steps tick themselves from the catalog (blank details, ISBNs, page count, Payhip status, story bible, store links) and the Distribution app ticks “Uploaded” when it finishes a distributor. Tick the others yourself; untick to undo. A step with nothing in the catalog to show it (Vellum, cover, subscription post) counts as done once its date has passed. Click a title to open that book in the grid.</p>
+  <div class="row">
+    <label class="chk"><input type="checkbox" id="rlshown"> Only books shown in the grid</label>
+    <label class="chk"><input type="checkbox" id="rlopen" checked> Only books with something left to do</label>
+    <span class="grow"></span>
+    <span class="hint" id="rlmsg"></span>
+  </div>
+  <div id="rllist"><div class="empty">Loading…</div></div>
+  <div class="row"><span class="grow"></span><button id="rlreload" type="button">Refresh</button><button id="rlclose" class="primary" type="button">Done</button></div>
 </dialog>
 
 <!-- ============ New column ============ -->
@@ -549,6 +583,16 @@ dialog#ncdlg::backdrop{background:#0006}
     </ul>
   </details>
 
+  <details><summary>…see where each new book is in its release?</summary>
+    <ul>
+      <li>Press <b>Release</b> at the top. Each book not released yet (or released in the last 60 days) shows its steps in order. <b>English</b>: Before Subsc Pub → Payhip → Wide release. <b>Other languages</b>: Before release → Release and after (Payhip is part of the release).</li>
+      <li>✓ steps are done; a red ! step is late. <b>Get ISBNs</b> is due by Subsc Pub (English) or the release date (other languages). <b>Get store links</b> is due 2 days after that format's date (eBook and paperback from the Pub Date, hardcover and audiobook from their own dates) and stays open until every link is in.</li>
+      <li>Steps tick themselves from the catalog: Book details (the script check and your inputs), ISBNs, page count, Payhip product Live, story bible approved, Vellum link created, store links. <b>Uploaded to the stores</b> is ticked by the Distribution app when it finishes a distributor (or when all the eBook and paperback links are in).</li>
+      <li>Formatted in Vellum, Cover done and Added to the subscription post have a box to tick (Cover also ticks itself when the cover image link is filled). They count as done once their date has passed. Unticking removes your tick.</li>
+      <li>Ticks are kept in Supabase (table release_steps) and logged in the change log.</li>
+    </ul>
+  </details>
+
   <details><summary>…send books to Notion, and what exactly happens?</summary>
     <h3>Sending</h3>
     <ul>
@@ -605,6 +649,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <button id="notionShown" title="Sync the books shown in the grid (after your filters) to Notion">Send shown to Notion</button>
     <span class="helptip" tabindex="0" role="note" aria-label="Help: Send shown to Notion" data-tip="Sends all prearranged columns to Notion for each visible row.">?</span>
     <button id="storelinks" title="List the blank store links of the books shown in the grid (after your filters). Apple and Google Play are looked up for you; the other stores get a Search link">Find store links for shown books</button>
+    <button id="release" title="Each book in progress and every step of its release, ticked from the catalog: what is done, what is due and what is late">Release</button>
   </header>
 
   <aside>
@@ -3466,6 +3511,92 @@ $("#slclose").onclick = ()=>{
   $("#sldlg").close();
   if (slChanged) setStatus(`${slChanged} store link(s) added.`, "ok");
 };
+
+/* ---------- Release checklist (view release_checklist, ticks in release_steps; see release-workflow.sql) ---------- */
+let rlRows = [], rlBusy = false;
+const rlMsg = t => { $("#rlmsg").textContent = t || ""; };
+const rlDay = d => d ? new Date(d + "T12:00:00").toLocaleDateString(undefined, {month:"short", day:"numeric", year: d.slice(0,4) === String(new Date().getFullYear()) ? undefined : "numeric"}) : "";
+const RL_HOW = {"data":"from the catalog", "date passed":"its date has passed", "Catalog Editor":"ticked", "Distribution app":"Distribution app"};
+async function rlLoad(){
+  if (rlBusy) return;
+  rlBusy = true; rlMsg("Loading…");
+  try{
+    rlRows = await getAll("release_checklist", "sheet_order,stage,step_order");
+    rlRender();
+  }catch(err){
+    rlRows = [];
+    $("#rllist").innerHTML = `<div class="empty">${/release_checklist|relation|schema cache/i.test(err.message||"")
+      ? "The release checklist isn't in Supabase yet: run release-workflow.sql (catalog-editor repo) once in the Supabase SQL Editor."
+      : esc(friendly(err))}</div>`;
+    rlMsg("");
+  }finally{ rlBusy = false; }
+}
+function rlRender(){
+  const shownOnly = $("#rlshown").checked, openOnly = $("#rlopen").checked;
+  const shown = shownOnly ? new Set(visibleRows().map(ed=>ed.file_name)) : null;
+  const books = new Map();
+  for (const r of rlRows){
+    if (shown && !shown.has(r.file_name)) continue;
+    if (!books.has(r.file_name)) books.set(r.file_name, {r, steps:[]});
+    books.get(r.file_name).steps.push(r);
+  }
+  let list = [...books.values()].map(b=>{
+    const open = b.steps.filter(s=>!s.done);
+    const late = open.filter(s=>s.overdue).length;
+    const next = open.map(s=>s.due).filter(Boolean).sort()[0] || "9999";
+    return Object.assign(b, {open, late, next});
+  });
+  const all = list.length;
+  if (openOnly) list = list.filter(b=>b.open.length);
+  list.sort((a,b)=> (b.late>0) - (a.late>0) || a.next.localeCompare(b.next) || (a.r.sheet_order||0) - (b.r.sheet_order||0));
+  rlMsg(`${list.length} book(s)` + (openOnly && all > list.length ? ` (${all - list.length} with nothing left hidden)` : "") +
+    `, ${list.reduce((n,b)=>n+b.late,0)} late step(s).`);
+  if (!list.length){ $("#rllist").innerHTML = `<div class="empty">${shownOnly ? "None of the books shown in the grid is in progress." : "Nothing in progress."}</div>`; return; }
+  $("#rllist").innerHTML = list.map(b=>{
+    const r = b.r, stages = new Map();
+    for (const s of b.steps){ if (!stages.has(s.stage)) stages.set(s.stage, {name:s.stage_name, steps:[]}); stages.get(s.stage).steps.push(s); }
+    const dates = [r.subscription_publication && "Subsc Pub " + rlDay(r.subscription_publication), r.publication_date && "Pub " + rlDay(r.publication_date)].filter(Boolean).join(" · ");
+    return `<div class="rlbook" data-f="${esc(r.file_name)}">
+      <h3><a data-a="open" title="Open this book in the grid">${esc(r.title || r.file_name)}</a>
+        <span class="meta">${esc(r.language)}${dates ? " · " + esc(dates) : ""} · ${b.steps.length - b.open.length} of ${b.steps.length} done${b.late ? ` · <span class="late">${b.late} late</span>` : ""}</span></h3>
+      <div class="rlstages">${[...stages.values()].map(st=>`<div class="rlstage"><h4>${esc(st.name)}</h4>${st.steps.map(rlStep).join("")}</div>`).join("")}</div>
+    </div>`;
+  }).join("");
+}
+function rlStep(s){
+  const ticked = !!s.done_on;   // done_on comes only from a release_steps row for this step, so it can be unticked
+  const box = s.can_tick
+    ? `<input type="checkbox" data-step="${esc(s.step_key)}" ${s.done ? "checked" : ""} ${s.done && !ticked ? "disabled" : ""} title="${s.done && !ticked ? "Done " + esc(RL_HOW[s.done_how] || s.done_how || "") : s.done ? "Untick to undo" : "Tick when done"}">`
+    : `<span class="mark">${s.done ? "✓" : s.overdue ? "!" : "○"}</span>`;
+  const how = s.done ? (RL_HOW[s.done_how] || s.done_how || "") + (s.done_on ? " " + rlDay(s.done_on) : "") + (s.done_by && ticked ? " by " + s.done_by : "") : "";
+  const due = !s.done && s.due ? `<span class="due">${s.overdue ? "late, due " : "due "}${esc(rlDay(s.due))}</span>` : "";
+  const ev = [how, s.detail].filter(Boolean).join(" · ");
+  return `<div class="rlstep${s.done ? " done" : ""}${s.overdue ? " late" : ""}">${box}
+    <div><span class="what">${esc(s.step)}</span> ${due}${ev ? `<div class="ev">${esc(ev)}</div>` : ""}</div></div>`;
+}
+$("#release").onclick = ()=>{ $("#rldlg").showModal(); rlLoad(); };
+$("#rlreload").onclick = ()=>rlLoad();
+$("#rlclose").onclick = ()=>$("#rldlg").close();
+$("#rlshown").onchange = $("#rlopen").onchange = ()=>rlRender();
+$("#rllist").addEventListener("click", ev=>{
+  const a = ev.target.closest("a[data-a=open]"); if (!a) return;
+  const f = a.closest(".rlbook").dataset.f;
+  $("#rldlg").close();
+  location.hash = "book=" + encodeURIComponent(f);
+});
+$("#rllist").addEventListener("change", async ev=>{
+  const box = ev.target.closest("input[data-step]"); if (!box) return;
+  const f = box.closest(".rlbook").dataset.f, step = box.dataset.step;
+  box.disabled = true;
+  try{
+    if (box.checked) await api("POST", "release_steps", {file_name:f, step, source:"Catalog Editor"}, PATCH);
+    else{
+      const gone = await api("DELETE", `release_steps?file_name=eq.${encodeURIComponent(f)}&step=eq.${encodeURIComponent(step)}`, null, PATCH);
+      if (!gone || !gone.length) throw new Error("0 rows changed (no permission, or the tick is gone)");
+    }
+    await rlLoad();
+  }catch(err){ box.checked = !box.checked; box.disabled = false; rlMsg(friendly(err)); }
+});
 $("#sllist").addEventListener("click", async ev=>{
   const btn = ev.target.closest("button[data-a]"); if (!btn) return;
   const tr = btn.closest("tr");
