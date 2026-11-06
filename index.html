@@ -645,7 +645,7 @@ dialog#ncdlg::backdrop{background:#0006}
       <li>Press <b>Story workflow</b> or <b>Story bible workflow</b> at the top. Each step says which app it happens in. Pick a book at the top of the list to put its name and file name in the prompts; for a story, <b>English book</b> or <b>Translation</b> switches the steps (picking a book sets it for you).</li>
       <li>With a book picked, each step shows whether it is done: ✓ green when done, red ! when late, and the next step to do is outlined. Most steps check themselves from the catalog and the Release checklist (book details, ISBNs, cover, Vellum, page count, Payhip, uploads, Vellum link, Notion, store links, the story bible's details and links); what is still missing is written under the step. Steps nothing in the catalog can show (Bob's pictures and covers, the NYT line on a story bible cover, Vellum for a story bible…) have a <b>Done</b> box; ticks are kept in Supabase (release_steps, logged in the change log) and untick to undo.</li>
       <li>In <b>Release</b>, each book's card has <b>Story workflow</b> (and <b>Story bible workflow</b> for English books): it opens that book's list at the next step to do.</li>
-      <li>The Vellum, cover, Bob and Payhip steps show the values they need from the catalog (ISBNs, copyright page genres, end-of-book promo, bestseller line, the story's cover, Long Synopsis, the Reasons to Love heading and Reasons to Love), each with a <b>Copy</b> button. A value in red is still blank in the catalog.</li>
+      <li>The Vellum, cover, Bob and Payhip steps show the values they need from the catalog (ISBNs, copyright page genres, end-of-book promo, bestseller line, the story's cover, Long Synopsis, the heading “Discover your new love!” and Reasons to Love), each with a <b>Copy</b> button. A value in red is still blank in the catalog.</li>
       <li><b>Open Claude with the prompt</b> opens claude.ai in a new tab with the prompt already in the message box; it is also copied, so ⌘V works if the box is empty. Attach the file the step names, then send. <b>Open Bob with the prompt</b> does the same in ChatGPT. Open <b>Prompt</b> to read it first.</li>
     </ul>
   </details>
@@ -3836,7 +3836,7 @@ $("#rllist").addEventListener("change", async ev=>{
    (tick: a 'wf:<key>' row in release_steps, the same table the Release panel ticks). Release opens a book's workflow from its card. */
 const WF_SQL = "https://supabase.com/dashboard/project/qurcnkeqxfqqfnygkpmd/sql/new";
 const WF_BOOKLINKS = "Dropbox-Sesmithfl/Sesmithfl Team Folder/0 Book Series/0Vellum/For Bob/booklinks copy.vellum";
-const WF_RTL_HEADING = {English:"Reasons to Love"};   // the heading pasted above Reasons to Love on Payhip, by language
+const WF_RTL_HEADING = {English:"Discover your new love!"};   // the heading pasted above Reasons to Love on Payhip, by language
 let wfKind = "story", wfCur = [], wfVals = null, wfValsFor = "", wfScroll = false;
 function wfBook(){ const f = $("#wfbook").value; return f ? data.editions.find(e=>e.file_name===f) || null : null; }
 function wfEnglish(ed){ return !ed ? null : ed.language === "English" ? ed : data.editions.find(e=>e.story_id && e.story_id === ed.story_id && e.language === "English") || null; }
