@@ -1318,7 +1318,7 @@ async function loadAll(){
   ]);
   const dbxUrl = p => "https://www.dropbox.com/home/" + ["Sesmithfl Team Folder", ...String(p).split("/")].map(encodeURIComponent).join("/");
   for (const r of dbxR) (data.dbx[r.file_name+"|"+r.label] = data.dbx[r.file_name+"|"+r.label] || []).push(dbxUrl(r.path));
-  const DBX_LABELS = ["Covers","Exports","Vellum-Process","Audiobooks","Book Series files"];   // always shown, in this order; any other kind of folder after them
+  const DBX_LABELS = ["Covers","Exports","Vellum-Process","Audiobooks","Original-Layout folder"];   // always shown, in this order; any other kind of folder after them
   AFF_REGIONS = affR;
   COLNAMES = parseColNames(cnames);
   PROSE_AUTHORS = parseColNames(authR);
