@@ -645,7 +645,7 @@ dialog#ncdlg::backdrop{background:#0006}
       <li>Press <b>Story workflow</b> or <b>Story bible workflow</b> at the top. Each step says which app it happens in. Pick a book at the top of the list to put its name and file name in the prompts; for a story, <b>English book</b> or <b>Translation</b> switches the steps (picking a book sets it for you).</li>
       <li>With a book picked, each step shows whether it is done: ✓ green when done, red ! when late, and the next step to do is outlined. Most steps check themselves from the catalog and the Release checklist (book details, ISBNs, cover, Vellum, page count, Payhip, uploads, Vellum link, Notion, store links, the story bible's details and links); what is still missing is written under the step. Steps nothing in the catalog can show (Bob's pictures and covers, the NYT line on a story bible cover, Vellum for a story bible…) have a <b>Done</b> box; ticks are kept in Supabase (release_steps, logged in the change log) and untick to undo.</li>
       <li>In <b>Release</b>, each book's card has <b>Story workflow</b> (and <b>Story bible workflow</b> for English books): it opens that book's list at the next step to do.</li>
-      <li>The Vellum, cover, Bob and Payhip steps show the values they need from the catalog (ISBNs, copyright page genres, end-of-book promo, bestseller line, the story's cover, Long Synopsis, the heading “Discover your new love!” and Reasons to Love), each with a <b>Copy</b> button. A value in red is still blank in the catalog.</li>
+      <li>The Vellum, cover, Bob and Payhip steps show the values they need from the catalog (ISBNs, copyright page genres, end-of-book promo, bestseller line, the story's cover, Long Synopsis, the heading “Discover your new love!” and Reasons to Love for a story; the story bible description for a story bible), each with a <b>Copy</b> button. A value in red is still blank in the catalog.</li>
       <li><b>Open Claude with the prompt</b> opens claude.ai in a new tab with the prompt already in the message box; it is also copied, so ⌘V works if the box is empty. Attach the file the step names, then send. <b>Open Bob with the prompt</b> does the same in ChatGPT. Open <b>Prompt</b> to read it first.</li>
     </ul>
   </details>
@@ -3855,7 +3855,7 @@ async function wfLoadVals(ed){
     api("GET", `release_steps?select=step,done_on,done_by&file_name=eq.${F}&step=like.wf:*`).catch(()=>[]),
     api("GET", `formats?select=format,isbn,not_offered&file_name=eq.${F}`).catch(()=>[]),
     api("GET", `edition_info?select=copyright_page_genres,end_of_story_promo,new_end_of_story_promo,cover_image_link,long_synopsis,reasons_to_love&file_name=eq.${F}`).catch(()=>[]),
-    api("GET", "story_bibles?select=file_name,isbn,bible_md,word_count,status,publication_date").catch(()=>[]),
+    api("GET", "story_bibles?select=file_name,isbn,bible_md,word_count,status,publication_date,has_pictures,has_creatures,has_places,has_family_lines,has_alliances,has_pronunciations,has_culture_words,has_timeline,has_book_connections,has_book_club_questions").catch(()=>[]),
     api("GET", `bestseller_lines?select=bestseller_line&language=eq.${encodeURIComponent(ed.language || "English")}`).catch(()=>[]),
     api("GET", `store_links?select=format,link_or_id&file_name=eq.${F}&store=eq.Payhip`).catch(()=>[]),
     api("GET", `notion_pages?select=last_synced_at&file_name=eq.${F}`).catch(()=>[])
@@ -3871,6 +3871,23 @@ async function wfLoadVals(ed){
     genres:i.copyright_page_genres || "", promo:i.end_of_story_promo || "", newPromo:i.new_end_of_story_promo || "", cover:i.cover_image_link || "",
     synopsis:i.long_synopsis || "", rtl:i.reasons_to_love || "", best:((bl || [])[0] || {}).bestseller_line || "", payhip, synced,
     prev:wfPrev(ed), prevBible:wfPrev(ed, bibles)};
+}
+// The story bible's Payhip description: the standard text, leaving out what this bible doesn't have (its has_… sections in story_bibles).
+function wfBibleBlurb(sb){
+  if (!sb || [sb.has_pictures, sb.has_creatures, sb.has_places].every(x=>x == null)) return "";
+  const pic = !!sb.has_pictures;
+  const two = (a, b, both, onlyA, onlyB) => a && b ? both : a ? onlyA : b ? onlyB : "";
+  const inside = [`Inside you will find detailed ${pic ? "portraits" : "profiles"} of the people${sb.has_creatures ? " and creatures" : ""} you have been reading about` +
+      (sb.has_places ? ", their characteristics, and the places they live." : " and their characteristics."),
+    two(sb.has_family_lines, sb.has_alliances, "Family lines and alliances are", "Family lines are", "Alliances are"),
+    two(sb.has_pronunciations, sb.has_culture_words, "Pronunciations and words specific to particular cultures help", "Pronunciations help", "Words specific to particular cultures help"),
+    two(sb.has_timeline, sb.has_book_connections, "Timelines and connections to other books help", "Timelines help", "Connections to other books help")];
+  if (inside[1]) inside[1] += " a useful reference when you have a question and can’t remember where to look in the story to find the answer.";
+  if (inside[2]) inside[2] += " these worlds come to life.";
+  if (inside[3]) inside[3] += " you find your place in the S.E. Smith universe.";
+  return [`A gorgeous companion to the story! Every character, every world, every thread of the story gathered in one ${pic ? "illustrated " : ""}volume.`,
+    inside.filter(Boolean).join(" "),
+    `Written for the reader who ${pic ? "loves images and " : ""}wants a quick reference to all the details of the story!${sb.has_book_club_questions ? " Great for book club discussions." : ""}`].join("\n\n");
 }
 function wfSteps(kind, lang, ed, v){
   const f = ed ? ed.file_name : "";
@@ -3919,8 +3936,8 @@ function wfSteps(kind, lang, ed, v){
           `Export the eBooks and the PDF, then export Word (.docx) as ${F}-Bible-vellum.docx.`],
         vals: v ? [["SB ISBN", v.bibleIsbn]].concat(promoVals) : []},
       {stage:"Vellum", app:"Update md files", text:`Open Update md files (Dropbox: 05_Scripts_and_Tools/Scripts/Update md files) so Story-Bibles-md/${F}-bible.md matches the Vellum export.`, tick:"bible_md"},
-      {stage:"Payhip", app:"Payhip", text:"Put the story bible on Payhip with its Bundle (eBook + Story Bible) and set them Live. Description: paste the Long Synopsis, then the heading, then Reasons to Love.", links:[["Open Payhip", "https://payhip.com/"]],
-        chk: v=>v ? (has(v.payhip["Story Bible"]) ? {done:true, detail:"Story bible link in the catalog"} : null) : null, tick:"bible_payhip", vals:payVals},
+      {stage:"Payhip", app:"Payhip", text:"Put the story bible on Payhip with its Bundle (eBook + Story Bible) and set them Live. Description: paste the story bible description below (the standard text, with only the sections this story bible has).", links:[["Open Payhip", "https://payhip.com/"]],
+        chk: v=>v ? (has(v.payhip["Story Bible"]) ? {done:true, detail:"Story bible link in the catalog"} : null) : null, tick:"bible_payhip", vals: v ? [["Story bible description", wfBibleBlurb(sb)]] : []},
       {stage:"Payhip", app:"Catalog Editor", text:"Paste the story bible's Payhip link in the Payhip Story Bible URL column and the Bundle link in the Payhip Bundle URL column, set the story bible's status to Approved and fill SB Pub. Find store links for shown books also lists the blank links.", act:"open",
         chk: v=>{ if (!v) return null; const miss = [!has(v.payhip["Story Bible"]) && "Payhip Story Bible URL", !has(v.payhip.Bundle) && "Payhip Bundle URL",
           !(sb && sb.status === "Approved") && "status Approved", !(sb && sb.publication_date) && "SB Pub"].filter(Boolean);
