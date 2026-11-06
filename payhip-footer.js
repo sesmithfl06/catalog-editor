@@ -38,7 +38,7 @@ function () {
        moved on every build: the first page view after a paste throws away what
        the old code stored and reads the store fresh, so a fix is on screen the
        moment it is in the store rather than when a reader's week runs out. */
-    cacheVersion: "b2026-11-05e",
+    cacheVersion: "b2026-11-06a",
     clean: (text) => (text || "").replace(/\s+/g, " ").trim(),
     flatten: (text) => (text || "").replace(/[\u2018\u2019\u02BC`]/g, "'").toLowerCase(),
     normalize: (text) => (text || "")
@@ -6826,7 +6826,7 @@ function () {
     "Un Vent de Libert\u00e9"
   ];
   /* ---------- The French books that are on the store ----------
-     Six of the catalogue's ninety-nine French rows are actually for sale here.
+     Only some of the catalogue's French rows are actually for sale here.
      The rest are translations that exist but are not sold on this store, and
      walking them cost a search apiece that could only come back empty. Worse
      than the cost: this module does not read a whole series, it looks through a
@@ -6844,10 +6844,12 @@ function () {
      from the catalogue's Payh eBk column, and it is what settles which product a
      card points at, so a card can never resolve to the wrong edition.
 
-     When a French book goes live, add a line here. When another format of one
-     already listed goes live \u2014 Payh P, Payh Aud, Payh B, Payh Bund \u2014 nothing
-     needs to change: a line names the story, and the picker on that story's page
-     offers its other formats.
+     The lines written here are only the fallback, for a visit where Supabase
+     does not answer: the table is rebuilt from the catalogue snapshot just below
+     (every French book with an eBook product on the store whose Payhip day has
+     come), so a French book that goes live needs nothing added by hand. Another
+     format of one already listed needs nothing either: a line names the story,
+     and the picker on that story's page offers its other formats.
 
      The keys are flattened the way every other title on the page is: lowercased,
      with everything that is not a letter or a digit becoming a gap, which leaves
@@ -6872,6 +6874,45 @@ function () {
     "amour et dragons": "Amour et Dragons",
     "le voyage du defiance": "Le Voyage du Defiance"
   };
+  /* The table above, rebuilt from the catalogue snapshot. A French book counts
+     as on the store when it has an eBook product (not Archived or Draft) and its
+     Payhip day has come; its line is [series, number, Payhip day, eBook code],
+     the same shape as the lines written above. A series the list above does not
+     name yet is added to the end of FRENCH_SERIES, so it still counts as French.
+     If the snapshot holds no French book at all, the written lines stand. */
+  window.se.guard("snapshot: French books on the store", () => {
+    const books = ((window.seSnapshot && window.seSnapshot.books) || [])
+      .filter((book) => book.l === "French");
+    const today = new Date().toISOString().slice(0, 10);
+    const seriesAt = (name) => {
+      if (!name) return null;
+      const wantedName = name.toLowerCase();
+      let at = FRENCH_SERIES.findIndex((series) => series.toLowerCase() === wantedName);
+      if (at < 0) {
+        FRENCH_SERIES.push(name);
+        at = FRENCH_SERIES.length - 1;
+      }
+      return at;
+    };
+    const live = {};
+    const titles = {};
+    books.forEach((book) => {
+      if (!book.d || book.d > today) return;
+      const ebook = (book.p || []).find((product) => product[0] === "eBook" && product[1]
+        && product[4] !== "Archived" && product[4] !== "Draft");
+      const key = normalize(book.t);
+      if (!ebook || !key) return;
+      live[key] = [seriesAt(book.s), book.n === undefined ? null : book.n, book.d, ebook[1]];
+      titles[key] = book.t;
+    });
+    if (!Object.keys(live).length) return;
+    Object.keys(FRENCH_LIVE).forEach((key) => {
+      delete FRENCH_LIVE[key];
+      delete FRENCH_LIVE_TITLES[key];
+    });
+    Object.assign(FRENCH_LIVE, live);
+    Object.assign(FRENCH_LIVE_TITLES, titles);
+  });
   /* The books of each French series in reading order, worked out from the table
      rather than written out a second time \u2014 one list to keep up to date, not two. */
   const FRENCH_SERIES_BOOKS = Object.keys(FRENCH_LIVE)
