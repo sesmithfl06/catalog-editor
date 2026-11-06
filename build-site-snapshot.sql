@@ -63,9 +63,7 @@ as $fn$
              JOIN edition_info e USING (file_name)
           WHERE e.publication_date <= CURRENT_DATE AND (EXISTS ( SELECT 1
                    FROM store_links l
-                  WHERE l.file_name = b.file_name AND l.store = 'Payhip'::text AND (l.format = ANY (ARRAY['eBook'::text, 'Audiobook'::text, 'Paperback'::text, 'Hardcover'::text])) AND l.link_or_id ~ '/b/'::text AND NOT (EXISTS ( SELECT 1
-                           FROM payhip_products p
-                          WHERE p.code = "substring"(l.link_or_id, '/b/([A-Za-z0-9]+)'::text) AND p.status <> 'Live'::text)))) AND b.file_name !~ '(BX|\+|TWOSES)'::text
+                  WHERE l.file_name = b.file_name AND l.store = 'Payhip'::text AND (l.format = ANY (ARRAY['eBook'::text, 'Audiobook'::text, 'Paperback'::text, 'Hardcover'::text])) AND l.link_or_id ~ '/b/'::text)) AND b.file_name !~ '(BX|\+|TWOSES)'::text
         ), tg0 AS (
          SELECT DISTINCT b.file_name,
             lower(btrim(t.t)) AS tag
