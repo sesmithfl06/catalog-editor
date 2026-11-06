@@ -3560,26 +3560,32 @@ function rlClosest(){
 }
 async function rlMostActive(){
   const since = new Date(Date.now() - 30*864e5).toISOString();
-  const log = await api("GET", `change_log?select=new_values,old_values&changed_at=gte.${encodeURIComponent(since)}&order=changed_at.desc&limit=1000`);
+  // Only the file names come back (not the whole logged rows, which were megabytes), newest first by id.
+  const log = await api("GET", `change_log?select=nf:new_values->>file_name,of:old_values->>file_name&changed_at=gte.${encodeURIComponent(since)}&order=id.desc&limit=1000`);
   const ok = new Set(rlInProgress().map(ed=>ed.file_name)), n = new Map();
   for (const r of log || []){
-    const f = (r.new_values && r.new_values.file_name) || (r.old_values && r.old_values.file_name);
+    const f = r.nf || r.of;
     if (f && ok.has(f)) n.set(f, (n.get(f) || 0) + 1);
   }
   let best = null, bn = 0;
   for (const [f, k] of n) if (k > bn){ bn = k; best = f; }
   return best ? data.editions.find(ed=>ed.file_name === best) : null;
 }
-async function rlLoad(){
+let rlNames = [];   // the books last picked, so a tick reloads only their checklist
+async function rlLoad(again){
   if (rlBusy) return;
   const scope = (document.querySelector("input[name=rlscope]:checked") || {}).value;
   if (!scope) return;
   rlBusy = true; rlMsg("Loading…");
   try{
+    if (again && rlNames.length){
+      rlRows = (await api("POST", "rpc/release_checklist_for", {p_files:rlNames}) || []).sort((a,b)=> (a.sheet_order||0) - (b.sheet_order||0) || a.stage - b.stage || a.step_order - b.step_order);
+      rlRender(); return;
+    }
     const picks = [];
     if (scope === "closest" || scope === "both"){ const e = rlClosest(); if (e) picks.push(["closest release to today", e]); }
     if (scope === "active" || scope === "both"){ const e = await rlMostActive(); if (e) picks.push(["most recent activity", e]); }
-    const names = [...new Set(picks.map(p=>p[1].file_name))];
+    const names = rlNames = [...new Set(picks.map(p=>p[1].file_name))];
     rlWhy = picks.map(p=>`${p[0]}: ${p[1].title || p[1].file_name}`).join(" · ");
     if (!names.length){
       rlRows = [];
@@ -3665,7 +3671,7 @@ $("#rllist").addEventListener("change", async ev=>{
       const gone = await api("DELETE", `release_steps?file_name=eq.${encodeURIComponent(f)}&step=eq.${encodeURIComponent(step)}`, null, PATCH);
       if (!gone || !gone.length) throw new Error("0 rows changed (no permission, or the tick is gone)");
     }
-    await rlLoad();
+    await rlLoad(true);
   }catch(err){ box.checked = !box.checked; box.disabled = false; rlMsg(friendly(err)); }
 });
 $("#sllist").addEventListener("click", async ev=>{

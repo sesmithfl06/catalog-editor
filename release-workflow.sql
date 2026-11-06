@@ -5,7 +5,7 @@
 --     removal is in change_log, so undo_change / undo_transaction can reverse it.
 --  2. release_checklist: every book in progress (not released or released in the last 60 days) with each step
 --     of its workflow, done or not, how it was done, its due date and what is still missing. Most steps tick
---     themselves from the catalog (new_book_passes, store_link_blanks, ISBNs, payhip_products, story_bibles).
+--     themselves from the catalog (new_book_passes, store_link_blanks, ISBNs, the Payhip eBook link, story_bibles).
 --       English: Before Subsc Pub -> Payhip -> Wide release. Other languages: Before release -> Release and after
 --       (Payhip is part of the release). Get ISBNs is due by Subsc Pub (English) or release (other languages);
 --       store links are due 2 days after the date of that format.
@@ -89,9 +89,10 @@ fmt as (
     from public.formats where file_name in (select file_name from b) group by 1
 ),
 payhip as (
-  select l.file_name, bool_or(p.status = 'Live') as live, string_agg(distinct p.status, ', ') as statuses
+  -- payhip_products is no longer refreshed, so a filled Payhip eBook link is what shows the product is up.
+  -- 'n/a' means the book is not sold on Payhip, so the step does not apply.
+  select l.file_name, bool_or(lower(btrim(l.link_or_id)) <> 'n/a') as live
     from public.store_links l
-    left join public.payhip_products p on p.code = substring(l.link_or_id from '/b/([A-Za-z0-9]+)')
    where l.store = 'Payhip' and l.format = 'eBook' and l.file_name in (select file_name from b)
      and not public.needs_value(l.link_or_id)
    group by 1
@@ -127,9 +128,9 @@ steps as (
          not public.needs_value(b.cover_image_link), case when b.english then coalesce(b.sub, b.pub) else b.pub end, null),
       (1, 60, 'subscription_post', 'Added to the subscription post', b.english,
          false, b.sub, case when b.sub is null then 'No Subsc Pub date yet' end),
-      (case when b.english then 2 else 3 end, 25, 'payhip_live', 'Payhip product Live', not b.ku,
-         coalesce(ph.live, false), b.pub,
-         case when ph.file_name is null then 'No Payhip eBook link yet' when not ph.live then 'Payhip says ' || coalesce(ph.statuses, 'nothing') end),
+      (case when b.english then 2 else 3 end, 25, 'payhip_live', 'Payhip product Live', not b.ku and coalesce(ph.live, true),
+         ph.file_name is not null, b.pub,
+         case when ph.file_name is null then 'No Payhip eBook link yet' end),
       (case when b.english then 2 else 3 end, 26, 'story_bible', 'Story bible approved', sb.file_name is not null,
          sb.status = 'Approved', sb.publication_date, case when sb.status is not null and sb.status <> 'Approved' then 'Status ' || sb.status end),
       (3, 10, 'distribution', 'Uploaded to the stores (Distribution app)', true,
