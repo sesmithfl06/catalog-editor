@@ -3905,7 +3905,7 @@ function wfSteps(kind, lang, ed, v){
   const pages = {app:"Vellum", text:"Enter the print file's page count and page size in the grid.", rk:"pages", act:"open"};
   const heading = ed ? WF_RTL_HEADING[ed.language] || "" : "";
   const payVals = v ? [["Long Synopsis", v.synopsis], ["Heading", heading], ["Reasons to Love", v.rtl]] : [];
-  const live = {app:"Payhip", text:"Set the eBook product to Live. Its description: paste the Long Synopsis, then the heading, then Reasons to Love. The Distribution app offers to save the product's link when you finish its Payhip section, which ticks this step (or paste it in the Payhip eBook column). Kindle Unlimited books skip this.",
+  const live = {app:"Payhip", text:"Set the eBook product to Live. Its description: paste the Long Synopsis, then the heading, then Reasons to Love. At the end of the Payhip section in the Distribution app, copy the product's link and press Resume: it is sent to Supabase and ticks this step (or paste it in the Payhip eBook column). Kindle Unlimited books skip this.",
     links:[["Open Payhip", "https://payhip.com/"]], rk:"payhip_live", vals:payVals};
   const dist = {app:"Distribution app", text:"Upload to every distributor. Finishing a distributor ticks this step.", rk:"distribution"};
   const vlink = {app:"Vellum", text:"Save the complete store link in booklinks copy.vellum, then tick the Vellum link column in the grid.", rk:"vellum_link", act:"open"};
