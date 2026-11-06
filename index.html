@@ -531,7 +531,7 @@ dialog#ncdlg::backdrop{background:#0006}
       <li>Right-click a cell in a Formats column with no format yet → “Add … for this book”; right-click a story bible cell with none → “Add a story bible for this book”.</li>
       <li>Right-click a column heading (or its name in the column list) → <b>Rename column…</b>. Choose <b>Nickname</b> to show a shorter name (right-click → <b>Show full name</b> shows the original), or <b>Change the name permanently</b>. <b>Back to the original name</b> undoes either. Everyone sees the new name, on any device. Many columns start with a built-in short nickname (BN Bk#, Pb $, U-link, Store #…); rename them the same way.</li>
       <li>Right-click a cell that holds a web address (store links, Website book post, affiliate links…) → <b>Open link in new tab</b>.</li>
-      <li>Right-click a cell in a column you edit in Notion (Reviews, Marketing copy, and the story lists such as Main characters) → <b>Open this book's Notion page</b>. The menu names the section to scroll to (“🔄 Shared with Supabase” or Story details); Notion can't jump to a heading by itself.</li>
+      <li>Right-click a cell in a column you edit in Notion (Reviews, Marketing copy, and the story lists such as Main characters) → <b>Open this book's Notion page</b>. It opens at the heading of that column's section (“🔄 Shared with Supabase” or Story details). A page not synced since this was added opens at the top until its next sync.</li>
     </ul>
   </details>
 
@@ -1647,14 +1647,19 @@ function proseAuthorRule(ed, c){
   const shortOnes = t.split(/\n+/).map(x=>x.trim()).filter(x=>x && /[.!?…]["”’]?$/.test(x) && x.split(/\s+/).length <= 12).length;
   return shortOnes >= 3 ? "Written by Ai" : "Written by a human";
 }
-// right-click a cell of a column that is edited in Notion → opens that book's Notion page (the page link is in notion_pages).
-// Notion can't link to a heading without its block id, which the editor doesn't keep, so the menu says which section to scroll to.
-async function openNotionPage(ed){
+// right-click a cell of a column that is edited in Notion → opens that book's Notion page (the page link is in notion_pages)
+// at the heading of its section: the notion-sync Edge Function saves the block ids of the "🔄 Shared with Supabase" and
+// Story details headings (shared_heading_id, story_heading_id) at every sync, and the link ends with #<block id>.
+// A page not synced since then has no id yet: it opens at the top and the status line says which section to scroll to.
+async function openNotionPage(ed, sec){
   const w = window.open("about:blank", "_blank");   // opened now so the browser doesn't block it after the lookup
   try{
-    const rows = await api("GET", `notion_pages?select=notion_page_url,is_main&file_name=eq.${encodeURIComponent(ed.file_name)}&order=is_main.desc.nullslast&limit=1`) || [];
-    const url = rows[0] && rows[0].notion_page_url;
+    const rows = await api("GET", `notion_pages?select=*&file_name=eq.${encodeURIComponent(ed.file_name)}&order=is_main.desc.nullslast&limit=1`) || [];
+    let url = rows[0] && rows[0].notion_page_url;
     if (!url) throw new Error("This book has no Notion page yet. Use Send shown to Notion to create it.");
+    const head = rows[0][sec==="story" ? "story_heading_id" : "shared_heading_id"];
+    if (head) url = url.replace(/#.*$/, "") + "#" + String(head).replace(/-/g, "");
+    else setStatus(`Notion page opened at the top: scroll to ${sec==="story" ? "Story details" : "“🔄 Shared with Supabase”"}. It will open at that heading after the book's next sync.`, "ok");
     if (w){ w.opener = null; w.location.href = url; } else window.open(url, "_blank");
   }catch(err){ if (w) w.close(); setStatus("Notion page: " + friendly(err), "bad"); }
 }
@@ -1669,13 +1674,13 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     const addSB = !!(cc && cc.kind==="sb" && !data.sb[ed.file_name]);
     const offF = cc && !addF && colFormat(cc) && FMT_NAMES.has(colFormat(cc)) && (colFormat(cc)==="eBook" || data.fmt[ed.file_name+"|"+colFormat(cc)]) ? colFormat(cc) : null;
     const offNow = offF ? formatOffered(ed, offF) : false;
-    const nk = cc && cc.kind==="list" ? notionKey(cc) : "", notionSec = nk==="shared" ? "edit under “🔄 Shared with Supabase”" : nk==="story" ? "edit under Story details" : "";   // columns edited in Notion, not in the grid
+    const nk = cc && cc.kind==="list" ? notionKey(cc) : "", notionSec = nk==="shared" ? "at “🔄 Shared with Supabase”" : nk==="story" ? "at Story details" : "";   // columns edited in Notion, not in the grid
     let cellUrl = ""; try{ const mu = String(cc ? valueOf(ed, cc) ?? "" : "").match(/https?:\/\/[^\s;,"'<>]+/); if (mu) cellUrl = mu[0]; }catch(_){}
     const m = document.createElement("div"); m.className = "ctx";
     const who = proseAuthor(ed, cc), whoOwn = who ? PROSE_AUTHORS[authorKey(ed, cc)] : "";
-    m.innerHTML = (who ? `<div class="hint" style="margin:0;padding:4px 10px">${who}</div><button type="button" data-a="who">Change to ${who==="Written by Ai" ? "Written by a human" : "Written by Ai"}</button>` + (whoOwn ? `<button type="button" data-a="whorule">Go back to the rule of thumb</button>` : "") : "") + (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (notionSec ? `<button type="button" data-a="notionpage">Open this book's Notion page (${notionSec})</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + (offF ? `<button type="button" data-a="offer">Mark ${esc(offF)} as ${offNow ? "not offered" : "offered"} for this book</button>` : "") + `<button type="button" data-a="edit">Edit${canEd?"":" (not editable: click to see why and how)"}</button>${cc && cc.id==="info:long_synopsis" ? '<button type="button" data-a="promo">Change promo line…</button>' : ""}<button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
+    m.innerHTML = (who ? `<div class="hint" style="margin:0;padding:4px 10px">${who}</div><button type="button" data-a="who">Change to ${who==="Written by Ai" ? "Written by a human" : "Written by Ai"}</button>` + (whoOwn ? `<button type="button" data-a="whorule">Go back to the rule of thumb</button>` : "") : "") + (cellUrl ? `<button type="button" data-a="openurl">Open link in new tab</button>` : "") + (notionSec ? `<button type="button" data-a="notionpage">Open this book's Notion page ${notionSec}</button>` : "") + (addF ? `<button type="button" data-a="addfmt">Add ${esc(addF)} for this book</button>` : "") + (addSB ? `<button type="button" data-a="addsb">Add a story bible for this book</button>` : "") + (offF ? `<button type="button" data-a="offer">Mark ${esc(offF)} as ${offNow ? "not offered" : "offered"} for this book</button>` : "") + `<button type="button" data-a="edit">Edit${canEd?"":" (not editable: click to see why and how)"}</button>${cc && cc.id==="info:long_synopsis" ? '<button type="button" data-a="promo">Change promo line…</button>' : ""}<button type="button" data-a="hide">Hide row</button>${pinned.includes(ed.file_name) ? `<button type="button" data-a="unpin">Remove from list</button>` : ""}<button type="button" data-a="end">Hide from here to end</button>` + (hiddenRows.size ? `<button type="button" data-a="show">Show hidden rows (${hiddenRows.size})</button>` : "");
     m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
-    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="who"){ setProseAuthor(ed, cc, who==="Written by Ai" ? "human" : "ai"); return; } if (b.dataset.a==="whorule"){ setProseAuthor(ed, cc, null); return; } if (b.dataset.a==="openurl"){ window.open(cellUrl, "_blank", "noopener"); return; } if (b.dataset.a==="notionpage"){ openNotionPage(ed); return; } if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="offer"){ setOffered(ed, offF, !offNow); return; } if (b.dataset.a==="edit"){ if (!canEd){ showWhyNoEdit(ed, cc); return; } openEditor(td); return; } if (b.dataset.a==="promo"){ openPromoDlg(ed); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
+    m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b || b.disabled) return; closeCtx(); if (b.dataset.a==="who"){ setProseAuthor(ed, cc, who==="Written by Ai" ? "human" : "ai"); return; } if (b.dataset.a==="whorule"){ setProseAuthor(ed, cc, null); return; } if (b.dataset.a==="openurl"){ window.open(cellUrl, "_blank", "noopener"); return; } if (b.dataset.a==="notionpage"){ openNotionPage(ed, nk); return; } if (b.dataset.a==="addfmt"){ addFormat(ed, addF); return; } if (b.dataset.a==="addsb"){ addStoryBible(ed); return; } if (b.dataset.a==="offer"){ setOffered(ed, offF, !offNow); return; } if (b.dataset.a==="edit"){ if (!canEd){ showWhyNoEdit(ed, cc); return; } openEditor(td); return; } if (b.dataset.a==="promo"){ openPromoDlg(ed); return; } if (b.dataset.a==="unpin"){ unpin(ed.file_name); return; } b.dataset.a==="hide" ? hideRow(ed.file_name) : b.dataset.a==="end" ? hideRowsFrom(+td.dataset.r) : showAllRows(); });
     document.body.appendChild(m); ctxMenu = m;
     return;
   }
