@@ -1109,7 +1109,7 @@ const GROUP_ITEMS = {
   "Links": [],
   "Translations": ["ed:ai_translations","info:translation_cache","calc:bestseller_line"]
 };
-const KIND_GROUP = {tsr:"Marketing", calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
+const KIND_GROUP = {dbx:"Links", tsr:"Marketing", calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
 const FORMAT_RANK = {"eBook":0,"Paperback":1,"Hardcover":2,"Audiobook":3,"Story Bible":4};
 function placeCol(c){
   for (const g of GROUP_ORDER){ const i = GROUP_ITEMS[g].indexOf(c.id); if (i>=0){ c.group = g; c.so = i; return; } }
@@ -1166,6 +1166,10 @@ function buildCatalog(sample){
   SB_FIELDS.forEach((c,i)=>addCol({id:"sb:"+c, kind:"sb", col:c, table:"story_bibles", label:`Story Bible · ${regLabel("story_bibles",c)}`, group:SB_GROUP, order:7800+i, ro:false}));
   for (const k of sample.slKeys){ const [s,f,lt]=k.split("|"); addCol({id:"sl:"+k, kind:"sl", s, f, lt, table:"store_links", label:`${s} ${f} ${lt}`, group:"Store links: "+s, order:8000, ro:false}); }
   if (sample.slKeys.includes("Books2Read|eBook|Universal Link")) addCol({id:"slc:Books2Read|eBook|Universal Link", kind:"slc", s:"Books2Read", f:"eBook", lt:"Universal Link", col:"store_count", table:"store_links", label:"Books2Read store count", group:"Store links: Books2Read", order:8000.5, ro:false});
+  // Dropbox: one read-only column per kind of folder (Covers, Exports …) holding the link(s) to the book's folder; right-click → Open link.
+  // From dropbox_book_folders, which the Mac's daily Dropbox listing keeps current (see the Dropbox-Organization repo).
+  (sample.dbxLabels||[]).forEach((l,i)=>addCol({id:"dbx:"+l, kind:"dbx", lbl:l, table:"dropbox_book_folders", label:"Dropbox " + l, group:"Links", order:i, ro:true,
+    note:"The book's folder in the team Dropbox, worked out every day from the Dropbox listing. It follows the folder when it moves; right-click → Open link."}));
   addCol({id:"diff:all", kind:"diffall", table:"edition_differences", label:"Edition differences", group:"Edition differences", order:regOrder("editions","anthology_only") + 0.5, ro:false});
   for (const c of ["series_synopsis","series_url","series_note"]) addCol({id:"ser:"+c, kind:"ser", col:c, table:"series", label:regLabel("series",c), group:"Series (shared by the whole series)", order:9000+regOrder("series",c), ro:false});
   // Story details kept as lists per book (read-only here)
@@ -1296,8 +1300,8 @@ async function loadAll(){
   for (const k in condTypes) delete condTypes[k];
   appReady = false;
   setStatus("Loading…");
-  loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","promo","diff","bl","tsr"]) data[k]={}; data.one={};
-  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols, affR, cnames, authR] = await Promise.all([
+  loaded.clear(); for (const k of ["stories","est","ml","fmt","sb","sl","ser","info","lists","promo","diff","bl","tsr","dbx"]) data[k]={}; data.one={};
+  const [reg, refs, eds, storyOne, estF, mlT, fmts, slK, lcols, affR, cnames, authR, dbxR] = await Promise.all([
     api("GET","field_registry?select=*").catch(()=>[]),
     api("GET","reference_lists?select=list_name,value,note,sort_order&order=list_name.asc,sort_order.asc&limit=5000").catch(()=>[]),
     getAll("editions","sheet_order.asc.nullslast,file_name.asc"),
@@ -1309,8 +1313,12 @@ async function loadAll(){
     api("GET","list_columns?select=list_name,table_name,column_name").catch(()=>[]),
     api("GET","store_url_regions?select=store,region,language,base_url,affiliate_param,affiliate_code&active=is.true").catch(()=>[]),
     api("GET","settings?select=value&key=eq."+COLNAMES_KEY).catch(()=>[]),
-    api("GET","settings?select=value&key=eq."+AUTHORS_KEY).catch(()=>[])
+    api("GET","settings?select=value&key=eq."+AUTHORS_KEY).catch(()=>[]),
+    getAll("dropbox_book_folders","file_name.asc,sort.asc").catch(()=>[])
   ]);
+  const dbxUrl = p => "https://www.dropbox.com/home/" + ["Sesmithfl Team Folder", ...String(p).split("/")].map(encodeURIComponent).join("/");
+  for (const r of dbxR) (data.dbx[r.file_name+"|"+r.label] = data.dbx[r.file_name+"|"+r.label] || []).push(dbxUrl(r.path));
+  const DBX_LABELS = ["Covers","Exports","Vellum-Process","Audiobooks","Book Series files"];   // always shown, in this order; any other kind of folder after them
   AFF_REGIONS = affR;
   COLNAMES = parseColNames(cnames);
   PROSE_AUTHORS = parseColNames(authR);
@@ -1323,7 +1331,8 @@ async function loadAll(){
   const fmtOrder = ["eBook","Paperback","Hardcover","Audiobook","Story Bible"];
   buildCatalog({editions:eds, storyCols:Object.keys((storyOne||[])[0]||{}), estFields:uniq(estF,"field"), mlTypes:uniq(mlT,"link_type"),
     formats:uniq(fmts,"format").sort((a,b)=>fmtOrder.indexOf(a)-fmtOrder.indexOf(b)),
-    slKeys:[...new Set(slK.map(r=>`${r.store}|${r.format}|${r.link_type}`))].sort()});
+    slKeys:[...new Set(slK.map(r=>`${r.store}|${r.format}|${r.link_type}`))].sort(),
+    dbxLabels:[...new Set([...DBX_LABELS, ...dbxR.map(r=>r.label).sort()])]});
   await ensureLoaded([{kind:"sb"}, {kind:"fmt"}]);   // lines on format, store link and story bible cells need both, whatever columns are shown
   fillFilters();
   await loadPresetsDb();
@@ -1936,6 +1945,7 @@ function valueOf(ed, c){
     case "promo": r = data.promo[ed.promo_line_id]; return r ? r.promo_line : null;
     case "list": return (data.lists[c.col]||{})[ed.file_name] || null;
     case "tsr": return teaserText(ed.file_name);
+    case "dbx": return (data.dbx[ed.file_name+"|"+c.lbl]||[]).join("\n") || null;
   }
 }
 // Teasers (marketing_copy rows of type Teaser): shown and edited as one text, each teaser after its own "Teaser N" line (as on the Notion page)
@@ -1971,6 +1981,7 @@ function whyNoEdit(ed, c){
   if (c.kind==="aff") return "Affiliate links are worked out from the store IDs. Change the store link or ID columns they come from and this updates by itself.";
   if (c.kind==="list") return "Story details are kept as lists in Supabase and can't be edited in the grid. Change them in Supabase → Table Editor → the story details tables (or in Notion if they sync from there).";
   if (c.kind==="calc" && c.col==="min_age") return "Min Age is worked out from Rating. Change Rating (right-click the Rating column to send it to Notion) and this updates by itself.";
+  if (c.kind==="dbx") return "Dropbox links come from the daily Dropbox listing. Move or rename the folder in Dropbox and this follows by itself the next day; right-click → Open link to open the folder.";
   if (c.kind==="info") return "This is worked out in Supabase (view edition_info) from other columns. Change the columns it comes from and it updates by itself.";
   return "This column is read-only in the Catalog Editor. To change it, edit it in Supabase → Table Editor → " + (c.table || "its table") + ".";
 }
@@ -2153,6 +2164,7 @@ function hasRow(ed, c){
     case "sb": return !!data.sb[ed.file_name];
     case "sl": case "slc": return !!data.sl[rowKey(ed,c)] || offeredHere(ed,c);
     case "ser": return !!data.ser[rowKey(ed,c)];
+    case "dbx": return !!data.dbx[ed.file_name+"|"+c.lbl];   // no such folder for this book: a line, not a blank
     default: return true;
   }
 }
