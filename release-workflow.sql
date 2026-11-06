@@ -89,6 +89,7 @@ payhip as (
 ),
 dist as (
   select file_name, max(done_on) as done_on,
+         bool_or(step !~* '^dist:bowker') as uploaded,   -- Bowker registers ISBNs; it is not a store
          string_agg(substr(step, 6) || ' ' || to_char(done_on, 'Mon DD'), ', ' order by done_on, step) as which
     from public.release_steps where step like 'dist:%' group by 1
 ),
@@ -123,7 +124,7 @@ steps as (
       (case when b.english then 2 else 3 end, 26, 'story_bible', 'Story bible approved', sb.file_name is not null,
          sb.status = 'Approved', sb.publication_date, case when sb.status is not null and sb.status <> 'Approved' then 'Status ' || sb.status end),
       (3, 10, 'distribution', 'Uploaded to the stores (Distribution app)', true,
-         d.file_name is not null
+         coalesce(d.uploaded, false)
            or (b.pub is not null and not exists (select 1 from blanks x where x.file_name = b.file_name and x.grp = 'main')),
          b.pub, d.which),
       (3, 20, 'vellum_link', 'Vellum link created', true,
