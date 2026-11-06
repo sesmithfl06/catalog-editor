@@ -1517,10 +1517,10 @@ function notionWhy(c){
   if (c.kind==="info") return " It is worked out in Supabase, so the sync sends the finished value. Change it through the columns it comes from; an edit made to it in Notion is kept under “Changed in Notion” in the Shared section.";
   if (c.kind==="promo") return " The promo line is part of " + colRef("info:long_synopsis", "Long Synopsis") + ", which goes to Notion.";
   if (c.kind==="calc" && c.col==="min_age") return " Min Age is worked out from Rating; send " + colRef("st:rating", "Rating") + " instead.";
-  if (c.kind==="calc") return " It is read from another Supabase table (bestseller_lines), and the Notion page has no place for it.";
+  if (c.kind==="calc") return " It is read from another Supabase table (bestseller_lines), and the Notion page has no field for this because it is a worked-out/calculated column, edition difference, or image.";
   if (c.kind==="aff"){ const sl = COLS.find(x=>x.kind==="sl" && x.id.startsWith("sl:"+c.id.slice(4).split("|")[0]+"|")); return " Affiliate links are worked out from the store IDs; the " + (sl ? colRef(sl.id, "store links") : "store links") + " themselves go, in the Shared section."; }
   if (c.kind==="est") return " English text on a translation is shown automatically beside the translated field in the box.";
-  if (c.kind==="diff" || c.kind==="diffall") return " The Notion page has no place for edition differences.";
+  if (c.kind==="diff" || c.kind==="diffall") return " The Notion page has no field for this because it is a worked-out/calculated column, edition difference, or image.";
   if (c.kind==="slc") return " The Books2Read store count is only used here; the " + colRef("sl:Books2Read|eBook|Universal Link", "Books2Read link") + " goes, in the Shared section.";
   if (c.kind==="one" && c.t==="edition_awards") return " The award badge (an image) has no place on the Notion page; the " + colRef("one:edition_awards:award", "award text") + " goes, in the Shared section.";
   if (c.col==="translation_cache") return " It is only used inside the Catalog Editor.";
