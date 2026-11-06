@@ -380,8 +380,8 @@ dialog#ncdlg::backdrop{background:#0006}
 <!-- ============ Find store links ============ -->
 <dialog id="sldlg">
   <h2>Find store links for shown books</h2>
-  <p class="hint">Apple and Google Play are looked up for you: a match on the eBook ISBN is saved on its own, a match on the title only is filled in for you to check. For the rest, press Search, open the right book, copy its address and paste it in the box (for Apple and Amazon the ID is taken out of the link for you). The list covers every format: eBook, paperback, hardcover (when offered), audiobook (when offered) and story bible. Type n/a for a store the book isn't on.</p>
-  <div class="row"><span class="hint" id="slmsg"></span></div>
+  <p class="hint">Apple and Google Play are looked up for you: a match on the eBook ISBN is saved on its own, a match on the title only is filled in for you to check. For the rest, press Search, open the right book, copy its address and paste it in the box (for Apple and Amazon the ID is taken out of the link for you). The list covers every format: eBook, paperback, hardcover (only once it is on sale; Payhip has no hardcover), audiobook (when offered) and story bible. Type n/a for a store the book isn't on.</p>
+  <div class="row"><span class="hint" id="slmsg"></span><span class="grow"></span><button id="slcheck" type="button" hidden></button></div>
   <div id="sllist"><div class="empty">Looking up…</div></div>
   <div class="row"><span class="grow"></span><button id="slsaveall" class="primary" type="button" disabled>Save all</button><button id="slclose" type="button">Done</button></div>
 </dialog>
@@ -3365,7 +3365,15 @@ $("#ncgo").onclick = async ()=>{
 const SL_CC = { English:"us", French:"fr", German:"de", Italian:"it", Spanish:"es" };
 const SL_LANG = { English:"en", French:"fr", German:"de", Italian:"it", Spanish:"es" };
 const SL_AMZ = { English:"amazon.com", French:"amazon.fr", German:"amazon.de", Italian:"amazon.it", Spanish:"amazon.es" };
-let slRows = [], slChanged = 0, slBusy = false;
+let slRows = [], slChanged = 0, slBusy = false, slOnlyCheck = false;
+// Left out of the list: Payhip has no hardcover, and a hardcover is only listed once its own publication date has come
+function slSkip(b){
+  if (b.format!=="Hardcover") return false;
+  if (b.store==="Payhip") return true;
+  const d = (data.fmt[b.file_name+"|Hardcover"]||{}).publication_date;
+  return !d || String(d).slice(0,10) > new Date().toISOString().slice(0,10);
+}
+const slToCheck = b => !!b.value && !b.done;   // filled in from a title-only match or a Payhip product: wants a look
 function slMsg(t){ $("#slmsg").textContent = t||""; }
 // file_name=in.(...) in chunks, so a long list of books still fits in the address
 async function slIn(path, files){
@@ -3501,17 +3509,17 @@ async function slAutoFind(files){
   slAutoQueue.push(...files);
   if (slAutoRunning) return;
   slAutoRunning = true;
-  const saved = [], toCheck = [];
+  const saved = [];
   try{
     while (slAutoQueue.length){
       const batch = [...new Set(slAutoQueue.splice(0))];
       let blanks = [];
-      try{ blanks = (await slIn("store_link_blanks?select=*&limit=5000", batch)).filter(slCanLook); }catch(_){ return; }
+      try{ blanks = (await slIn("store_link_blanks?select=*&limit=5000", batch)).filter(b=>slCanLook(b) && !slSkip(b)); }catch(_){ return; }
       for (const b of blanks){
         if (slAutoDone.has(slKey(b))) continue;
         const f = await slLook(b);
         if (!f) continue;
-        if (!f.sure){ toCheck.push(`${b.store} for ${b.title}`); continue; }
+        if (!f.sure) continue;   // title-only matches are shown to check in the Find store links popup, not here
         slAutoDone.add(slKey(b));
         const ed = data.editions.find(e=>e.file_name===b.file_name); if (!ed) continue;
         const k = slKey(b), old = data.sl[k] ? data.sl[k].link_or_id : null;
@@ -3520,16 +3528,20 @@ async function slAutoFind(files){
     }
   }finally{
     slAutoRunning = false;
-    if (saved.length || toCheck.length)
-      setStatus((saved.length ? `Found by eBook ISBN and saved: ${saved.join(", ")}. ` : "") +
-        (toCheck.length ? `Matched by title only, check in “Find store links for shown books”: ${toCheck.join(", ")}.` : ""), "ok");
+    if (saved.length) setStatus(`Found by eBook ISBN and saved: ${saved.join(", ")}.`, "ok");
   }
 }
 function slRender(){
+  const nCheck = slRows.filter(slToCheck).length;
+  if (!nCheck) slOnlyCheck = false;
+  const cb = $("#slcheck");
+  cb.hidden = !nCheck;
+  cb.textContent = slOnlyCheck ? "Show all blank links" : `Show the ${nCheck} to check`;
   if (!slRows.length){ $("#sllist").innerHTML = `<div class="empty">${slBusy ? "Looking up…" : "No blank store links left for the books shown (books marked not released are not checked)."}</div>`; $("#slsaveall").disabled = true; return; }
   $("#slsaveall").disabled = false;
   $("#sllist").innerHTML = `<table><thead><tr><th>Book</th><th>Store</th><th>Look it up</th><th>Paste the link or ID</th><th></th></tr></thead><tbody>` +
     slRows.map((b,i)=>{
+      if (slOnlyCheck && !slToCheck(b)) return "";
       const s = slSearch(b);
       return `<tr data-i="${i}">
         <td>${esc(b.title||b.file_name)}<div class="ev">${esc(b.file_name)}</div></td>
@@ -3544,13 +3556,13 @@ async function slRun(){
   if (slBusy) return;
   const btn = $("#storelinks");
   const shown = visibleRows().map(ed=>ed.file_name);
-  slChanged = 0; slRows = []; slBusy = true; btn.disabled = true;
+  slChanged = 0; slRows = []; slOnlyCheck = false; slBusy = true; btn.disabled = true;
   slMsg(""); slRender(); $("#sldlg").showModal();
   let auto = 0;
   try{
     if (!shown.length){ slMsg("No books are shown in the grid."); return; }
     slMsg("Checking which shown books have blank store links…");
-    const blanks = await slIn("store_link_blanks?select=*&order=file_name,store,format&limit=5000", shown);
+    const blanks = (await slIn("store_link_blanks?select=*&order=file_name,store,format&limit=5000", shown)).filter(b=>!slSkip(b));
     const products = blanks.some(b=>b.store==="Payhip") ? (await api("GET","payhip_products?select=code,name,status") || []) : [];
     const look = blanks.filter(slCanLook);
     for (const [n, b] of look.entries()){
@@ -3573,7 +3585,9 @@ async function slRun(){
     }
   }catch(err){ slMsg(friendly(err)); return; }
   finally{ slBusy = false; btn.disabled = false; slRender(); }
+  const nCheck = slRows.filter(slToCheck).length;
   slMsg(`${shown.length} book(s) shown. ` + (auto ? `${auto} link(s) found on Apple or Google Play by the eBook ISBN and saved. ` : "") +
+    (nCheck ? `${nCheck} link(s) were filled in from a title match or a Payhip product and need a look: press “Show the ${nCheck} to check”. ` : "") +
     (slRows.length ? `${slRows.length} blank link(s) below: press Search, open the right book, copy its link from the address bar, paste it here, then Save or Save all.` : "No blank store links left (books marked not released are not checked)."));
 }
 async function slSaveRow(tr){
@@ -3585,6 +3599,7 @@ async function slSaveRow(tr){
 }
 function slPrune(){ slRows = slRows.filter(b=>!b.done); slRender(); }
 $("#storelinks").onclick = ()=>slRun();
+$("#slcheck").onclick = ()=>{ slOnlyCheck = !slOnlyCheck; slRender(); };
 $("#slsaveall").onclick = async ()=>{
   const trs = [...$("#sllist").querySelectorAll("tr[data-i]")].filter(tr=>tr.querySelector("input").value.trim());
   if (!trs.length){ slMsg("Nothing pasted yet."); return; }
