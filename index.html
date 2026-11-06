@@ -421,7 +421,7 @@ dialog#ncdlg::backdrop{background:#0006}
 <!-- ============ Release checklist ============ -->
 <dialog id="rldlg">
   <h2>Release checklist</h2>
-  <p class="hint">Choose which book to look at first (loading every book at once times out). Each book not released yet or released in the last 60 days shows each step of its release. Most steps tick themselves from the catalog (blank details, ISBNs, page count, Payhip status, story bible, store links) and the Distribution app ticks “Uploaded” when it finishes a distributor. Tick the others yourself; untick to undo. A step with nothing in the catalog to show it (Vellum, cover, subscription post) counts as done once its date has passed. Click a title to open that book in the grid.</p>
+  <p class="hint">Choose which book to look at first (loading every book at once times out). Each book not released yet or released in the last 60 days shows each step of its release. Most steps tick themselves from the catalog (blank details, ISBNs, page count, Payhip status, story bible, store links) and the Distribution app ticks “Uploaded” when it finishes a distributor and “Payhip product Live” when it finishes the Payhip section. Tick the others yourself; untick to undo. A step with nothing in the catalog to show it (Vellum, cover, subscription post) counts as done once its date has passed. Click a title to open that book in the grid.</p>
   <div class="row" id="rlscope">
     <b>Which books?</b>
     <label class="chk"><input type="radio" name="rlscope" value="closest"> Closest release to today</label>
@@ -656,7 +656,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <ul>
       <li>Press <b>Release</b> at the top, then choose <b>Closest release to today</b>, <b>Most recent activity</b> (most edits logged in the last 30 days) or <b>Both</b>; only those book(s) load, so it doesn't time out. Each book not released yet (or released in the last 60 days) shows its steps in order. <b>English</b>: Before Subsc Pub → Payhip → Wide release. <b>Other languages</b>: Before release → Release and after (Payhip is part of the release).</li>
       <li>✓ steps are done; a red ! step is late. <b>Get ISBNs</b> is due by Subsc Pub (English) or the release date (other languages). <b>Get store links</b> is due 2 days after that format's date (eBook and paperback from the Pub Date, hardcover and audiobook from their own dates) and stays open until every link is in.</li>
-      <li>Steps tick themselves from the catalog: Book details (the script check and your inputs), ISBNs, page count, Payhip product Live, story bible approved, Vellum link created, store links. <b>Uploaded to the stores</b> is ticked by the Distribution app when it finishes a distributor (or when all the eBook and paperback links are in).</li>
+      <li>Steps tick themselves from the catalog: Book details (the script check and your inputs), ISBNs, page count, Payhip product Live, story bible approved, Vellum link created, store links. <b>Uploaded to the stores</b> is ticked by the Distribution app when it finishes a distributor (or when all the eBook and paperback links are in), and <b>Payhip product Live</b> when it finishes the Payhip section.</li>
       <li>Formatted in Vellum, Cover done and Added to the subscription post have a box to tick (Cover also ticks itself when the cover image link is filled). They count as done once their date has passed. Unticking removes your tick.</li>
       <li>Ticks are kept in Supabase (table release_steps) and logged in the change log.</li>
     </ul>
@@ -3905,7 +3905,7 @@ function wfSteps(kind, lang, ed, v){
   const pages = {app:"Vellum", text:"Enter the print file's page count and page size in the grid.", rk:"pages", act:"open"};
   const heading = ed ? WF_RTL_HEADING[ed.language] || "" : "";
   const payVals = v ? [["Long Synopsis", v.synopsis], ["Heading", heading], ["Reasons to Love", v.rtl]] : [];
-  const live = {app:"Payhip", text:"Set the eBook product to Live. Its description: paste the Long Synopsis, then the heading, then Reasons to Love. Paste the product's link in the Payhip eBook column. Kindle Unlimited books skip this.",
+  const live = {app:"Payhip", text:"Set the eBook product to Live. Its description: paste the Long Synopsis, then the heading, then Reasons to Love. Paste the product's link in the Payhip eBook column. Kindle Unlimited books skip this. Finishing the Payhip section in the Distribution app ticks this step.",
     links:[["Open Payhip", "https://payhip.com/"]], rk:"payhip_live", vals:payVals};
   const dist = {app:"Distribution app", text:"Upload to every distributor. Finishing a distributor ticks this step.", rk:"distribution"};
   const vlink = {app:"Vellum", text:"Save the complete store link in booklinks copy.vellum, then tick the Vellum link column in the grid.", rk:"vellum_link", act:"open"};
