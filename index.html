@@ -2171,8 +2171,9 @@ function cmpSortVals(av, bv){
 // so the rows end up grouped by language, inside each language by series (its own name), inside each series by book #.
 function defaultSortRows(rows){
   const num = ed => { const n = parseFloat(ed.number_in_series); return isFinite(n) ? n : null; };
-  // The most recent release in English and in French goes to the very top (English first); everything else keeps the order below.
-  const newest = lang => rows.filter(ed=>ed.language===lang && ed.publication_date).reduce((m,ed)=> !m || String(ed.publication_date) > String(m.publication_date) ? ed : m, null);
+  // The most recent release already out in English and in French goes to the very top (English first); everything else keeps the order below.
+  const today = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);   // only books already out (publication date today or earlier)
+  const newest = lang => rows.filter(ed=>ed.language===lang && ed.publication_date && String(ed.publication_date) <= today).reduce((m,ed)=> !m || String(ed.publication_date) > String(m.publication_date) ? ed : m, null);
   const top = [newest("English"), newest("French")].filter(Boolean);
   const sorted = defaultSortRows0(rows.filter(ed=>!top.includes(ed)), num);
   return top.concat(sorted);
