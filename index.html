@@ -680,13 +680,13 @@ dialog#ncdlg::backdrop{background:#0006}
           <button id="presetsave" type="button" title="Saved in Supabase, works on any device">Save view</button>
           <button id="presetupd" type="button" disabled title="Overwrite the selected view with the columns, sort and filters you have now">Update view</button>
           <button id="presetdel" type="button" disabled>Delete view</button>
+          <button id="none" type="button" title="Untick every column and go back to the default columns">Clear column view</button>
         </div>
         <label class="chk" title="Shows the title plus every column that has a blank to fill for at least one book shown. Striped cells are empty because the book isn't part of that table (no award, no subtitle, no such format…), so they don't count."><input type="checkbox" id="fcolblank"> Blanks</label>
         <div class="hint" style="margin-top:2px">This may take a minute to load.</div>
         <input id="colsearch" type="search" placeholder="Find a column…">
         <button id="checkshown" type="button" hidden title="Ticks every column the search above is showing">Check all shown</button>
         <div class="btns">
-          <button id="none" title="Untick everything">Clear</button>
           <button id="expand">Open all</button>
           <button id="collapse">Close all</button>
           <button id="newcol" title="Add a new column to Supabase and the editor">New column</button>
