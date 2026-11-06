@@ -3937,7 +3937,7 @@ function wfSteps(kind, lang, ed, v){
         vals: v ? [["The story's cover", v.cover]] : []},
       {stage:"Pictures and cover", app:"Photoshop", text:"Add the NYT line to the story bible cover.", tick:"bible_cover", vals: v ? [["Bestseller line", v.best]] : []},
       {stage:"Vellum", app:"Vellum", text:"Format the story bible:", tick:"bible_vellum", sub:[
-          "Use the saved story bible format (not the story format) and import the pre-vellum file.",
+          "Use the Vellum style Bible 2 (not the story style) and import the pre-vellum file.",
           "Copyright page: paste the values below. Make sure the genre is reference-related.",
           reuse,
           "Add the end-of-book promo below.",
@@ -3961,7 +3961,7 @@ function wfSteps(kind, lang, ed, v){
       {stage:"Before release", app:"Bowker", text:"Get the ISBNs and paste each one in its cell (the buttons below open each cell).", links:[["Open Bowker", "https://www.myidentifiers.com/"]], cells:isbnCells, rk:"isbns"},
       {stage:"Before release", app:"Claude", text:"Get the copyright page, synopsis, cover text lines and Vellum checklist with the non-english-edition skill.", tick:"non_english",
         claude:`Use the non-english-edition skill for ${ed ? f : `the ${L} edition of ${of}`}: give me the copyright page, synopsis, cover text lines and the Vellum checklist.`},
-      {stage:"Before release", app:"Vellum", text:`Duplicate the ${L} template${ed ? `, name it ${f},` : ""} and use the saved story format. Follow the Vellum checklist from step 4. Export the eBooks and the PDF.`, rk:"vellum"},
+      {stage:"Before release", app:"Vellum", text:`Duplicate the ${L} template${ed ? `, name it ${f},` : ""} and use the style Subhead Center or Obsidian. Save it in Dropbox: Sesmithfl Team Folder/02_Manuscripts/Large Catalog/Vellum-Process/${ed && ed.series ? ed.series : "<full series name>"}. Follow the Vellum checklist from step 4. Export the eBooks and the PDF.`, rk:"vellum"},
       Object.assign({stage:"Before release"}, pages),
       {stage:"Before release", app:"Photoshop", text:"Make the cover with the cover text lines from step 4. Fill the Cover image link in the grid.", rk:"cover", act:"open"},
       Object.assign({stage:"Release and after"}, live),
@@ -3985,7 +3985,8 @@ function wfSteps(kind, lang, ed, v){
         (desc ? ` About the book: ${desc}` : "")},
     {stage:"Before Subsc Pub", app:"Photoshop", text:"Add the NYT line to the cover, then fill the Cover image link in the grid.", rk:"cover", act:"open", vals: v ? [["Bestseller line", v.best]] : []},
     {stage:"Before Subsc Pub", app:"Vellum", text:"Format the book:", rk:"vellum", sub:[
-        "Use the saved story format and import the manuscript.",
+        `Duplicate the Vellum template and save the copy in Dropbox: Sesmithfl Team Folder/02_Manuscripts/Large Catalog/Vellum-Process/${ed && ed.series ? ed.series : "<full series name>"}.`,
+        "Style: Subhead Center or Obsidian (same layout; they differ only in the graphic each chapter starts with and the subhead: all caps in Subhead Center, sentence case in Obsidian). Import the manuscript.",
         "Copyright page: paste the values below.",
         reuse,
         "Add the end-of-book promo below.",
