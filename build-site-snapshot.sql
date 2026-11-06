@@ -2,8 +2,8 @@
 -- Plan: supabase-snapshot-plan.md in the Make-Payhip-Footer repo.
 --
 --  1. Fixes "You might also like" being slow (also_like took ~37 s; now ~0.6 s), same suggestions, same order.
---     One change on purpose: a book is recommended on other books' pages from its Payhip publication day,
---     and from its release day when that is empty (it used to use the subscription day before the release day),
+--     One change on purpose: a book is recommended on other books' pages from its release day
+--     (it used to use the subscription day before the release day),
 --     so a book put up early only for its link is not recommended before it is out.
 --  2. Two views the public key could read (print_id_check, store_link_blanks) now follow the reader's own rights.
 --     "Find store links for shown books" also lists blank hardcover, audiobook, story bible and bundle links.
@@ -61,7 +61,7 @@ as $fn$
             b.is_explicit
            FROM b
              JOIN edition_info e USING (file_name)
-          WHERE COALESCE(e.payhip_publication, e.publication_date) <= CURRENT_DATE AND (EXISTS ( SELECT 1
+          WHERE e.publication_date <= CURRENT_DATE AND (EXISTS ( SELECT 1
                    FROM store_links l
                   WHERE l.file_name = b.file_name AND l.store = 'Payhip'::text AND (l.format = ANY (ARRAY['eBook'::text, 'Audiobook'::text, 'Paperback'::text, 'Hardcover'::text])) AND l.link_or_id ~ '/b/'::text AND NOT (EXISTS ( SELECT 1
                            FROM payhip_products p
@@ -328,7 +328,7 @@ begin
       select ef.file_name, ef.sheet_order, ef.language, ef.title, ef.series, ef.number_in_series,
              ef.paperback_pages, ef.paperback_page_size, ef.rating, ef.word_count,
              ef.simplified_award, ef.display_tags, ef.anthology_only,
-             coalesce(ef.payhip_publication, ef.subscription_publication, ef.publication_date) as day
+             coalesce(ef.subscription_publication, ef.publication_date) as day
         from public.editions_full ef
        where ef.not_released_reason is null
     ),

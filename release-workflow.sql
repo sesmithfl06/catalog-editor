@@ -50,7 +50,7 @@ drop view if exists public.release_checklist;
 create view public.release_checklist with (security_invoker = true) as
 with b as (
   select e.file_name, e.title, e.language, e.sheet_order, e.series, e.number_in_series,
-         e.publication_date as pub, e.subscription_publication as sub, e.payhip_publication as php,
+         e.publication_date as pub, e.subscription_publication as sub,
          coalesce(e.kindle_unlimited, false) as ku, e.cover_image_link, coalesce(e.vellum_link_created, false) as vellum_link,
          e.language = 'English' as english
     from public.edition_info e
@@ -119,7 +119,7 @@ steps as (
       (1, 60, 'subscription_post', 'Added to the subscription post', b.english,
          false, b.sub, case when b.sub is null then 'No Subsc Pub date yet' end),
       (case when b.english then 2 else 3 end, 25, 'payhip_live', 'Payhip product Live', not b.ku,
-         coalesce(ph.live, false), coalesce(b.php, b.pub),
+         coalesce(ph.live, false), b.pub,
          case when ph.file_name is null then 'No Payhip eBook link yet' when not ph.live then 'Payhip says ' || coalesce(ph.statuses, 'nothing') end),
       (case when b.english then 2 else 3 end, 26, 'story_bible', 'Story bible approved', sb.file_name is not null,
          sb.status = 'Approved', sb.publication_date, case when sb.status is not null and sb.status <> 'Approved' then 'Status ' || sb.status end),
