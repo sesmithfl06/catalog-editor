@@ -1064,7 +1064,7 @@ const DEFAULT_ORDER = [
   "info:whole_book_number","info:series_and_book_number","est:title","est:subtitle","ed:story_id","st:story_id","ed:sheet_order",
   "ser:series_synopsis","est:series_synopsis","ser:series_url","ser:series_note",
   "ed:tagline","info:long_synopsis","est:long_synopsis","ed:archived_long_synopsis","ed:essential_description",
-  "ed:medium_synopsis","est:medium_synopsis","ed:short_synopsis","est:short_synopsis","ed:archived_short_synopsis",
+  "ed:medium_synopsis","est:medium_synopsis","ed:short_synopsis","est:short_synopsis","ed:archived_short_synopsis","ed:alt_short_synopsis","ed:alt_medium_synopsis","ed:alt_long_synopsis",
   "ed:reasons_to_love","ed:loglines","est:loglines","one:edition_awards:award","one:edition_awards:badge",
   "st:main_plot","st:subplots","one:projects:plot",
   "info:publisher","info:author","info:author_bio","ed:translator","ed:proofreader",
@@ -1098,7 +1098,7 @@ function applyDefaultOrder(){
 const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Store IDs","Links","Translations"];
 const GROUP_ITEMS = {
   "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","ed:language","ed:series","ed:number_in_series","info:series_and_book_number","one:projects:plot",
-    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:essential_description","ed:archived_short_synopsis","ed:archived_long_synopsis",
+    "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:essential_description","ed:archived_short_synopsis","ed:archived_long_synopsis","ed:alt_short_synopsis","ed:alt_medium_synopsis","ed:alt_long_synopsis",
     "st:rating","st:explicit_content","st:spice","calc:min_age","st:age_max","st:audience","st:main_genre_differentiated",
     "ed:word_count","ed:audio_files","ed:chapter_notes","ed:paperback_pages","ed:paperback_page_size","ed:character_sheet_included","ed:publication_date","ed:anthology_only",
     "diff:all","one:edition_release_notes:subscription_publication","info:publisher","one:edition_release_notes:collection_publication",
@@ -1699,7 +1699,7 @@ $("#showrows").onclick = showAllRows;
 /* Right-click on a prose cell shows who most likely wrote it (a rule of thumb, not stored anywhere):
    Reasons to Love: AI. Loglines: a human when the book came out more than two years ago, AI when newer.
    Series synopsis: a human. Other synopses: a human, unless three or more paragraphs are one short sentence each (an AI habit). */
-const SYN_FIELDS = new Set(["short_synopsis","medium_synopsis","long_synopsis","essential_description","archived_short_synopsis","archived_long_synopsis"]);
+const SYN_FIELDS = new Set(["short_synopsis","medium_synopsis","long_synopsis","essential_description","archived_short_synopsis","archived_long_synopsis","alt_short_synopsis","alt_medium_synopsis","alt_long_synopsis"]);
 const AUTHORS_KEY = "editor_prose_authors";   // settings row: {"<column id>|<file name or series>": "ai" | "human"}, set by right-click → Change to …
 let PROSE_AUTHORS = {};
 const authorKey = (ed, c) => c.id + "|" + (c.kind==="ser" ? ed.series : ed.file_name);
