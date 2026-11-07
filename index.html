@@ -1339,9 +1339,7 @@ async function loadAll(){
   await ensureLoaded([{kind:"sb"}, {kind:"fmt"}]);   // lines on format, store link and story bible cells need both, whatever columns are shown
   fillFilters();
   await loadPresetsDb();
-  const startView = PRESETS.find(p=>p.editor_view && p.preset_name==="Distribute");   // the editor opens on the Distribute view
-  if (startView && !pendingJump){ renderPresetMenu("id:"+startView.id); await applyPreset(presetToView(startView)); }
-  else { renderColumnList(); await ensureLoaded(ticked()); renderGrid(); }
+  renderColumnList(); await ensureLoaded(ticked()); renderGrid();   // the editor opens on the plain column grid, not a saved view
   setStatus("Ready", "ok");
   warnDuplicateLabels();   // after "Ready" so the warning stays visible
   queueCount();
