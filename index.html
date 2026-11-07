@@ -682,7 +682,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <h3>What a book's Notion page looks like</h3>
     <ul>
       <li><b>📚 From Supabase</b> (a box at the top): every field marked as going to Notion (right-click any column → “Does this go to Notion?” lists them, and its <b>Send to Notion</b> / <b>Stop sending to Notion</b> button changes it). Blank fields (empty, n/a, n/d) are left out, and Translator and Proofreader show only for translations. A translation shows its English beside a field when the two differ. The box is rebuilt at every sync: edit these in the Catalog Editor. If someone changes a “Label: value” line inside the box in Notion, that field moves to the Shared section (“Other shared details”), its new value is saved here, and from then on it syncs both ways for that book. Any other line changed inside the box is kept in the Shared section under “Changed in Notion”.</li>
-      <li><b>🔄 Shared with Supabase</b>: Loglines, Excerpts, Teasers, Awards, Links (series page, SES Store = Payhip links, BookFunnel, store links, cover image and alt text, website book post and the other marketing links), Store IDs (Amazon ASINs and Apple ID), Reviews and every kind of marketing copy. It syncs <b>both ways</b>: a change made in Notion is saved here, a change made here shows there; additions from both sides are kept; when both sides changed the same link, Notion's wins. A new “Label: link” line adds a new marketing link; a new heading adds a new kind of marketing copy. Saves from Notion are logged in the change log as “Notion sync”, so they can be undone.</li>
+      <li><b>🔄 Shared with Supabase</b>: Loglines, Teasers and Excerpts (one Teasers section: the teasers first, then the excerpts), Awards, Links (series page, SES Store = Payhip links, BookFunnel, store links, cover image and alt text, website book post and the other marketing links), Store IDs (Amazon ASINs and Apple ID), Reviews and every kind of marketing copy. It syncs <b>both ways</b>: a change made in Notion is saved here, a change made here shows there; additions from both sides are kept; when both sides changed the same link, Notion's wins. A new “Label: link” line adds a new marketing link; a new heading adds a new kind of marketing copy. Saves from Notion are logged in the change log as “Notion sync”, so they can be undone.</li>
       <li><b>📝 Notion only</b>: never copied here. A duplicate always ends up once, in the Shared section: a field from the box typed or pasted into Notion only moves to the Shared section (“Other shared details”, two-way from then on), and anything that repeats the Shared section is removed from Notion only. Old-system sections (Loglines, Teasers, Awards, buy links, Website, BookFunnel, Book Cover, Reviews, “Archived Notion …”) are merged into the Shared section.</li>
       <li><b>Clearing out the old system</b> happens only once per page, at its first sync with this layout: lines with nothing after the “:”, empty list items, leftover dividers and the old template lines (“Title:”, “Release Date:”, “Keywords:”, “Digital Price:” …) are removed. After that, an empty line or a “Label:” someone types in Notion only is left alone.</li>
       <li><b>Long Synopsis</b> goes to Notion. It is put together in Supabase from Award line + Series intro + Essential synopsis + Promo line, and the sync sends the finished text (under its own heading in the box). Notion doesn't put it back together: change its parts here. If its text is changed in the box or pasted into Notion only, Long Synopsis moves to the Shared section (still showing the text Supabase builds) and the Notion edit is kept under “Changed in Notion”. Other worked-out columns (Series & book number, Book # with no decimals, Author, Publisher) work the same way.</li>
@@ -934,7 +934,7 @@ const RENAMED = {"ed:long_synopsis_lead_in":["info:long_synopsis"], "ed:long_syn
 // The award line, series intro and promo line are no longer columns (right-click the Long Synopsis → Edit shows them, with the Essential Description): a saved view that showed one shows the Long Synopsis; its filter, sort or width on that part is dropped.
 const SYN_GONE = new Set(["ed:long_synopsis_lead_in","ed:long_synopsis_closing_line","promo:text","ed:long_synopsis_award_line","ed:long_synopsis_series_intro","promo:line"]);
 function renamed(id){ if (RENAMED[id]) return RENAMED[id]; const m = /^fmt:Story Bible:(.+)$/.exec(id||""); return m ? ["sb:"+m[1]] : [id]; }
-const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id","audio_files","long_synopsis_award_line","long_synopsis_series_intro"]);   // audio_files stays in Supabase for the script; the editor does not show it. The award line and series intro are edited in the Long Synopsis popup.
+const SKIP_ED = new Set(["id","created_at","updated_at","promo_line_id","audio_files","long_synopsis_award_line","long_synopsis_series_intro","excerpts"]);   // audio_files stays in Supabase for the script; the editor does not show it. The award line and series intro are edited in the Long Synopsis popup. Excerpts are shown and edited in the Teasers & Excerpts column.
 const SKIP_ST = new Set(["created_at","updated_at","english_title"]);   // Supabase's automatic row stamps; the editor does not show them (same as Editions). english_title always matches the English edition's title (shown with "Add the corresponding English book"); it stays in Supabase.
 let COLS = [], COLMAP = {};
 let REG = {};   // field_registry by "table.column"
@@ -993,7 +993,7 @@ function ownHelp(c){
   if (c.kind==="ml") return ML_HELP[c.lt] || "";
   if (c.kind==="est") return "The English text kept next to the translation, so you can compare them.";
   if (c.kind==="diffall") return "Everything that is different for this one book, merged: extra or omitted stories, not released reason, paperback price note, audiobook parts, and this book's own author bio, series synopsis, series URL, rating and so on. Right-click → Edit to add, change or remove one.";
-  if (c.kind==="tsr") return "Teasers: a couple of lines (300 characters or less) used as marketing snippets, kept in Supabase as marketing_copy rows of type Teaser. Each teaser starts with its own line “Teaser 1”, “Teaser 2”…; to add one, type a new “Teaser N” line and the teaser under it. A longer passage (several paragraphs) is an excerpt: put it in Excerpts.";
+  if (c.kind==="tsr") return "Teasers & Excerpts: the teasers first, then the excerpts, as in the Teasers section of the Notion page. A teaser is a couple of lines (300 characters or less) used as a marketing snippet, kept in Supabase as a marketing_copy row of type Teaser; it starts with its own line “Teaser 1”, “Teaser 2”…. An excerpt is a longer passage (several paragraphs), kept in Supabase in editions.excerpts; it starts with its own line “Excerpt 1”, “Excerpt 2”… (a note after the number, such as “Excerpt 2 (chapter 3)”, is kept). To add one, type a new “Teaser N” or “Excerpt N” line and the text under it.";
   let h = HELP[({ed:"editions", st:"stories", one:c.t, ser:"series", fmt:"formats", sb:"story_bibles", info:"info", list:"list"}[c.kind]) + "." + col] || "";
   return h;
 }
@@ -1074,7 +1074,7 @@ const DEFAULT_ORDER = [
   "fmt:eBook:price_usd","fmt:eBook:library_price_usd","fmt:eBook:isbn","fmt:eBook:*",
   "fmt:Paperback:*","fmt:Hardcover:*","fmt:Audiobook:*","fmt:*",
   "ed:keywords","est:keywords","ed:seo","st:tags","st:display_tags","st:main_genre_differentiated",
-  "ed:excerpts","est:excerpts","tsr:Teaser","list:reviews","est:reviews","list:copy",
+  "tsr:Teaser","est:excerpts","list:reviews","est:reviews","list:copy",
   "ed:end_of_story_promo","est:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule",
   "info:translation_cache","calc:bestseller_line",
   "ed:bisac","ed:thema","ed:copyright_page_genres","est:copyright_page_genres","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres",
@@ -1105,7 +1105,7 @@ const GROUP_ITEMS = {
     "list:authors_note","info:author","info:author_bio","ed:translator","ed:proofreader","ed:sheet_order","ed:story_id","st:story_id"],
   "Story": ["st:main_plot","st:subplots","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
   "Series": ["ser:series_synopsis","ser:series_url","ser:series_note"],
-  "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","ed:excerpts","tsr:Teaser","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
+  "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","tsr:Teaser","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
   "Story Bible (companion book)": ["sl:Payhip|Story Bible|URL","sb:price_usd","sl:BookFunnel|Story Bible|URL","sb:isbn","sb:publication_date","sb:word_count","sb:description","list:bookclub"],
   "Store IDs": ["sl:Amazon|eBook|ASIN","sl:Amazon|Paperback|ASIN","sl:Amazon|Hardcover|ASIN","sl:Apple|eBook|ID"],   // IDs, not links
@@ -1181,8 +1181,8 @@ function buildCatalog(sample){
     ["technology","Technology"],["language","Pet names & invented words"],["rare","Rare details"],["bookclub","Book club questions"],
     ["reviews","Reviews (edit in Notion)"],["copy","Marketing copy (edit in Notion)"],["pron","Pronunciations"],["scenes","Scene image prompts"],["authors_note","Author's Note"]];
   LISTS.forEach(([k,l],i)=>addCol({id:"list:"+k, kind:"list", col:k, table:"story details", label:l, group:"Story", order:9800+i, ro:true}));
-  // Teasers: marketing_copy rows of type Teaser (editable here, one "Teaser N" line before each)
-  addCol({id:"tsr:Teaser", kind:"tsr", col:"teasers", table:"marketing_copy", label:"Teasers", group:"Marketing", order:regOrder("editions","excerpts") + 0.5, ro:false});
+  // Teasers & Excerpts: marketing_copy rows of type Teaser, then editions.excerpts (editable here, a "Teaser N" / "Excerpt N" line before each)
+  addCol({id:"tsr:Teaser", kind:"tsr", col:"teasers", table:"marketing_copy + editions.excerpts", label:"Teasers & Excerpts", group:"Marketing", order:regOrder("editions","excerpts"), ro:false});
   // Min Age: worked out from Rating (read-only), sits next to Age Max
   addCol({id:"calc:min_age", kind:"calc", col:"min_age", table:"stories", label:"Min Age", group:"Book Basics", order:regOrder("stories","age_max")-0.5, ro:true, note:"Worked out from Rating: G = 10, T = 13, M = 17, E = 18. Change the Rating to change it."});
   // Bestselling author line in the edition's language: read from the Supabase table bestseller_lines (one line per language)
@@ -1962,21 +1962,60 @@ function valueOf(ed, c){
       r = data.stories[ed.story_id]; return r ? ({G:10,T:13,M:17,E:18}[r.rating] ?? null) : null;   // Min Age, worked out from the story's Rating
     case "promo": r = data.promo[ed.promo_line_id]; return r ? r.promo_line : null;
     case "list": return (data.lists[c.col]||{})[ed.file_name] || null;
-    case "tsr": return teaserText(ed.file_name);
+    case "tsr": return teaserExcerptText(ed);
     case "dbx": return (data.dbx[ed.file_name+"|"+c.lbl]||[]).join("\n") || null;
   }
 }
-// Teasers (marketing_copy rows of type Teaser): shown and edited as one text, each teaser after its own "Teaser N" line (as on the Notion page)
+// Teasers & Excerpts: one text, the teasers first (marketing_copy rows of type Teaser, each after its own "Teaser N" line), then the
+// excerpts (editions.excerpts, each after its own "Excerpt N" line), as in the Teasers section of the Notion page
 const TEASER_MAX = 300;
 const TEASER_LABEL = /^\s*\**\s*teasers?\s*#?\s*\d+\s*:?\s*\**\s*$/i;
+const EXCERPT_ONLY = /^\s*\**\s*excerpts?\s*#?\s*(\d+)(\s*[:(\t—–-][^\n]*)?\s*\**\s*$/i;   // "Excerpt 2", "Excerpt 2 (chapter 3)", "Excerpt 3: mid ch 7"
+const EXCERPT_LABEL = /^\s*\**\s*(?:teaser|excerpt)s?\s*#?\s*(\d+)(\s*[:(\t—–-][^\n]*)?\s*\**\s*$/i;   // older excerpt text: "Teaser #1:"
 const teaserRows = fn => Object.values(data.tsr).filter(r=>r.file_name===fn).sort((a,b)=>(a.sort_order ?? 1e9) - (b.sort_order ?? 1e9) || a.id - b.id);
-function teaserText(fn){ const rows = teaserRows(fn); return rows.length ? rows.map((r,i)=>`Teaser ${i+1}\n${r.copy_text}`).join("\n\n") : null; }
-function splitTeasers(text){
+/** editions.excerpts as items; an item starts at its label line (kept in the item). Same as the Notion sync. */
+function splitExcerpts(text){
   const items = []; let cur = [];
-  const flush = () => { const t = cur.join("\n").trim(); if (t) items.push(t); cur = []; };
-  for (const l of String(text ?? "").split("\n")){ if (TEASER_LABEL.test(l)) flush(); else cur.push(l); }
-  flush();
+  for (const l of String(text ?? "").split("\n")){ if (EXCERPT_LABEL.test(l) && cur.join("").trim()){ items.push(cur.join("\n").trim()); cur = []; } cur.push(l); }
+  if (cur.join("").trim()) items.push(cur.join("\n").trim());
   return items;
+}
+/** "Excerpt N" plus the note after the number, if any */
+function excerptHead(i, m){
+  const note = (m?.[2] ?? "").replace(/^[\s:]+/, "").replace(/\**\s*$/, "").trim();
+  return `Excerpt ${i+1}` + (!note ? "" : /^[(—–-]/.test(note) ? " " + note : ": " + note);
+}
+function teaserExcerptText(ed){
+  const t = teaserRows(ed.file_name).map((r,i)=>`Teaser ${i+1}\n${r.copy_text}`);
+  const x = splitExcerpts(ed.excerpts).map((it,i)=>{ const l = it.split("\n"), m = EXCERPT_LABEL.exec(l[0]); return [excerptHead(i,m), ...(m ? l.slice(1) : l)].join("\n"); });
+  const all = [...t, ...x];
+  return all.length ? all.join("\n\n") : null;
+}
+/** The typed text → {teasers, excerpts}. An "Excerpt N" line starts an excerpt (the line is kept); a "Teaser N" line starts a
+ *  teaser. Text before the first label is a teaser when it is short enough, otherwise an excerpt. */
+function splitTeasersExcerpts(text){
+  const teasers = [], excerpts = []; let cur = [], kind = null;
+  const flush = () => { const body = cur.slice(kind==="x" ? 1 : 0).join("\n").trim();
+    if (body){ if (kind==="x") excerpts.push(cur.join("\n").trim()); else if (kind===null && body.length > TEASER_MAX) excerpts.push(body); else teasers.push(body); }
+    cur = []; };
+  for (const l of String(text ?? "").split("\n")){
+    if (TEASER_LABEL.test(l)){ flush(); kind = "t"; }
+    else if (EXCERPT_ONLY.test(l)){ flush(); kind = "x"; cur.push(l.trim()); }
+    else cur.push(l);
+  }
+  flush();
+  return {teasers, excerpts};
+}
+/** The excerpts as editions.excerpts keeps them: two or more each start with "Excerpt 1", "Excerpt 2"…; one excerpt keeps its
+ *  label only when it has a note or the saved text had a label. */
+function excerptsToSave(items, oldText){
+  const oldLabelled = EXCERPT_LABEL.test(String(oldText ?? "").trim().split("\n")[0] || "");
+  const out = items.map((it,i)=>{
+    const l = it.split("\n"), m = EXCERPT_LABEL.exec(l[0]), body = (m ? l.slice(1) : l).join("\n").trim();
+    if (items.length === 1 && !oldLabelled && excerptHead(0,m) === "Excerpt 1") return body;
+    return excerptHead(i,m) + "\n" + body;
+  });
+  return out.length ? out.join("\n\n") : null;
 }
 function canEdit(ed, c){
   if (c.ro) return false;
@@ -3037,16 +3076,20 @@ async function write(ed, c, v){
     }
     case "ser": { const k = rowKey(ed,c); data.ser[k] = await patchOne("series", `series=eq.${q(ed.series)}&language=eq.${q(ed.language)}`, {[c.col]:v}); return; }
     case "tsr": {
-      // the teasers in the order typed: row 1 gets the first, and so on; new ones are added, leftover rows are deleted
-      const items = splitTeasers(v), cur = teaserRows(ed.file_name);
+      // the teasers in the order typed: row 1 gets the first, and so on; new ones are added, leftover rows are deleted.
+      // The excerpts after them are saved in editions.excerpts.
+      const {teasers:items, excerpts} = splitTeasersExcerpts(v), cur = teaserRows(ed.file_name);
       const long = items.findIndex(t=>t.length > TEASER_MAX);
-      if (long >= 0) throw new Error(`Teaser ${long+1} is ${items[long].length} characters. A teaser is ${TEASER_MAX} characters or less; put a longer passage in Excerpts.`);
+      if (long >= 0) throw new Error(`Teaser ${long+1} is ${items[long].length} characters. A teaser is ${TEASER_MAX} characters or less; for a longer passage, change its “Teaser ${long+1}” line to an “Excerpt N” line.`);
+      const exText = excerptsToSave(excerpts, ed.excerpts);
       for (let i = 0; i < items.length; i++){
         const r = cur[i];
         if (!r){ const n = await insertOne("marketing_copy", {file_name:ed.file_name, copy_type:"Teaser", sort_order:i+1, copy_text:items[i]}); data.tsr[n.id] = n; }
         else if (r.copy_text !== items[i] || r.sort_order !== i+1) data.tsr[r.id] = await patchOne("marketing_copy", "id=eq."+r.id, {copy_text:items[i], sort_order:i+1});
       }
       for (const r of cur.slice(items.length)){ await delWhere("marketing_copy", "id=eq."+r.id); delete data.tsr[r.id]; }
+      const shownEx = splitTeasersExcerpts(teaserExcerptText(ed)).excerpts;   // excerpts left as shown are not rewritten
+      if (JSON.stringify(shownEx) !== JSON.stringify(excerpts) && (exText ?? "") !== String(ed.excerpts ?? "").trim()){ const r = await patchOne("editions", fn, {excerpts:exText}); Object.assign(ed, r); }
       return;
     }
   }
