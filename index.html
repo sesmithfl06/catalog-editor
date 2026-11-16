@@ -4057,7 +4057,7 @@ function wfSteps(kind, lang, ed, v){
   const coverArt = {app:"ChatGPT", text: xx ? "" : `Make the eBook${aud ? " and square audiobook" : ""} covers and draft print covers, with text and with no text.`, sub:[
       `With text (leave space for the NYT line): eBook${aud ? ", audiobook square" : ""}${pb ? ", paperback draft" : ""}${pb && hc ? ", hardcover draft" + hcIf : ""}.`,
       `No text: eBook, square (Payhip${aud ? " and audiobook" : ""})${pb ? ", paperback draft" : ""}.`,
-      ...(pb ? [`Draft sizes: ${draft.short}`] : [])], tick:"cover_art",
+      ...(pb ? [`Draft sizes: ${draft.short}`] : [])], tick:"cover_art", hidePrompt:true,
     attach: prev ? `The cover of ${wfName(prev)}.` : "Another cover from the series, if there is one.",
     bob:`Make the covers for ${t}${series}. ` +
       (prev ? `Place the title, series name and author name the same way as on the attached cover of the previous book in the series, ${wfName(prev)}.` : `Place the title, series name and author name so the same placement can be used for every book in the series${ed && ed.series ? "; if I attached another book's cover from the series, match its placement" : ""}.`) +
@@ -4251,7 +4251,7 @@ function wfRender(){
       ${s.fields ? `<div class="wffields">${s.fields.map(([k, id])=>{ const c = COLMAP[id], cur = ed && c ? show(valueOf(ed, c)) : "";
         return `<label for="wff${i}_${esc(id)}">${esc(k)}</label><input id="wff${i}_${esc(id)}" type="text" data-col="${esc(id)}" value="${esc(cur)}" ${ed ? "" : "disabled placeholder=\"pick the book first\""}>`; }).join("")}</div>` : ""}
       ${s.attach ? `<div class="att">Attach: ${esc(s.attach)}</div>` : ""}
-      ${text && s.text ? `<details><summary class="hint" style="cursor:pointer">Prompt</summary><pre>${esc(text)}</pre></details>` : ""}
+      ${text && s.text && !s.hidePrompt ? `<details><summary class="hint" style="cursor:pointer">Prompt</summary><pre>${esc(text)}</pre></details>` : ""}
       ${acts.length ? `<div class="acts">${acts.join("")}</div>` : ""}</div></div>`;
   }).join("");
   if (wfScroll && v){ wfScroll = false; const n = $("#wflist .wfstep.next"); if (n) n.scrollIntoView({block:"center"}); }
@@ -4328,7 +4328,7 @@ $("#wflist").addEventListener("click", async ev=>{
     try{ await copyText(p); }catch(e){}
     msg(`${a === "claude" ? "Claude" : "ChatGPT"} opened with the prompt in the message box (also copied).${s.attach ? " Attach: " + s.attach : ""}`);
   } else if (a === "copy"){
-    try{ await copyText(s.claude || s.bob); msg("Prompt copied."); }catch(e){ msg("Copy was blocked: open Prompt and copy it from there."); }
+    try{ await copyText(s.claude || s.bob); msg("Prompt copied."); }catch(e){ msg("Copy was blocked."); }
   } else if (a === "val"){
     const [k, val] = s.vals[+b.dataset.j];
     try{ await copyText(val); msg(k + " copied."); }catch(e){ msg("Copy was blocked: select the value and copy it."); }
