@@ -4040,12 +4040,9 @@ function wfSteps(kind, lang, ed, v){
       const miss = [!has(sb.word_count) && "story bible word count", !has(sb.description) && "Story Bible Synopsis"].filter(Boolean);
       return miss.length ? {done:false, detail:"Still blank: " + miss.join(", ")} : {done:true, detail:"Book and story bible in the catalog"}; }
     : ()=>ed ? {done:true, detail:"In the catalog"} : null;
-  const meta = xx ? {app:"Claude", text:"Run the new-book-metadata skill on the translator's .docx. The book shows up here when it's added.", rk:"details", chk:()=>ed ? {done:true, detail:"In the catalog"} : null,
-      attach:"The translator's .docx.",
+  const meta = xx ? {app:"Claude", text:"", rk:"details", chk:()=>ed ? {done:true, detail:"In the catalog"} : null,
       claude:`Use the new-book-metadata skill. I've attached the translator's docx for the ${ed ? ed.language : "<language>"} edition of ${(()=>{ const en = wfEnglish(ed); return en ? wfName(en) : ed ? `“${ed.title || f}”` : "my book"; })()}${ed ? `; its file name is ${f}` : ""}. Fill in or add this edition in the Supabase catalog with the Supabase Write connector.`}
-    : {app:"Claude", text:"Run the new-book-metadata skill on the final manuscript" + (db ? " (it also makes the story bible)" : "") + ". The book shows up here when it's added." +
-        (db && plan.late ? " Give it the Subsc Pub date when it asks." : ""), rk:"details", chk:metaChk,
-      attach:"The final manuscript.",
+    : {app:"Claude", text:"", rk:"details", chk:metaChk,
       claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. ` +
         (!db ? "It is not a Dragon Box book, so it has no Subsc Pub date. " : plan.set ? `It is a Dragon Box book: its Subsc Pub date is ${plan.date}. ` :
           plan.late ? "It is a Dragon Box book. Ask me for its Subsc Pub date before writing it. " :
@@ -4081,13 +4078,13 @@ function wfSteps(kind, lang, ed, v){
   const bundleCover = {opt:o, app:"Photoshop", text:"Make the bundle cover.", tick:"bundle_cover"};
 
   // ---- story bible ----
-  const bibleWrite = {opt:o, app:"Claude", text:"Run the story-bible-editorial-stager skill on the final manuscript.", attach:"The final manuscript.",
+  const bibleWrite = {opt:o, app:"Claude", text:"",
     claude:`Use the story-bible-editorial-stager skill to make the story bible for ${t}. I've attached the story's final manuscript. Check names and continuity against it, save the draft as a DOCX whose name ends in pre-images and its md copy, then fill in its details in Supabase.`,
     chk: v=>{ if (!v || !sb) return null; const miss = [!has(sb.word_count) && "word count", !has(sb.description) && "Story Bible Synopsis"].filter(Boolean);
       return miss.length ? {done:false, detail:"Still blank: " + miss.join(", ")} : {done:true, detail:"Story bible in the catalog"}; }};
   const bibleIsbn = {opt:o, app:"Bowker", text:"Assign the story bible ISBN.", links:bowkerLink, chk: v=>v && sb ? {done:has(v.bibleIsbn), detail:has(v.bibleIsbn) ? "" : "SB ISBN is blank"} : null};
   const bibleIsbnPaste = {opt:o, app:"Catalog Editor", text:"Paste the story bible ISBN.", fields:[["Story bible ISBN", "sb:isbn"]]};
-  const biblePics = {opt:o, app:"ChatGPT", text:"Run the story bible creation skill on the pre-images file.", attach:"The pre-images .docx and the final manuscript.", tick:"bible_pictures",
+  const biblePics = {opt:o, app:"ChatGPT", text:"", attach:"The pre-images .docx and the final manuscript.", tick:"bible_pictures",
     bob:`Use my story bible creation skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum.`};
   const bibleVellum = {opt:o, app:"Vellum", text:"Format the story bible.", tick:"bible_vellum", sub:[
       "Style: Bible 2. Import the pre-vellum file.",
@@ -4145,7 +4142,7 @@ function wfSteps(kind, lang, ed, v){
   const S = (stage, list) => list.map(s=>Object.assign({stage}, s));
   if (xx) return [
     ...S("Before release", [meta, {app:"Bowker", text:"Assign the eBook ISBN.", links:bowkerLink, rk:"isbns"}, {app:"Catalog Editor", text:"Paste the eBook ISBN.", fields:[["eBook ISBN", "fmt:eBook:isbn"]], rk:"isbns"},
-      {app:"Claude", text:"Run the non-english-edition skill.", tick:"non_english",
+      {app:"Claude", text:"", tick:"non_english",
         claude:`Use the non-english-edition skill for ${ed ? f : "the <language> edition of my book"}: give me the copyright page, synopsis, cover text lines and the Vellum checklist.`},
       vellum, pages, coverPs, coverLink, printSpecs, printCover]),
     ...S("Release and after", [live, dist, printIsbns, vlink, notion, links])
