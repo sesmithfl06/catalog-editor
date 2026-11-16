@@ -4055,11 +4055,7 @@ function wfSteps(kind, lang, ed, v){
   const isbnPaste = {app:"Catalog Editor", text:"Paste the ISBNs.", fields:isbnFields, rk:"isbns"};
 
   // ---- covers ----
-  const coverArt = {app:"ChatGPT", text: xx ? "" : `Make the eBook${aud ? " and square audiobook" : ""} covers and draft print covers, with text and with no text.`, sub:[
-      `With text (leave space for the NYT line): eBook${aud ? ", audiobook square" : ""}${pb ? ", paperback draft" : ""}${pb && hc ? ", hardcover draft" + hcIf : ""}.`,
-      `No text: eBook, square (Payhip${aud ? " and audiobook" : ""})${pb ? ", paperback draft" : ""}.`,
-      ...(pb ? [`Draft sizes: ${draft.short}`] : [])], tick:"cover_art", hidePrompt:true,
-    attach: prev ? `The cover of ${wfName(prev)}.` : "Another cover from the series, if there is one.",
+  const coverArt = {app:"ChatGPT", text:"", tick:"cover_art",
     bob:`Make the covers for ${t}${series}. ` +
       (prev ? `Place the title, series name and author name the same way as on the attached cover of the previous book in the series, ${wfName(prev)}.` : `Place the title, series name and author name so the same placement can be used for every book in the series${ed && ed.series ? "; if I attached another book's cover from the series, match its placement" : ""}.`) +
       ` On the covers with text, leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. I need: the eBook cover with text` + (aud ? ", the square audiobook cover with text" : "") +
@@ -4070,8 +4066,7 @@ function wfSteps(kind, lang, ed, v){
   const coverPs = {app:"Photoshop", text: xx ? "Add the cover text lines from the non-english-edition skill to the cover." : `Add the NYT line to the ${aud ? "eBook and audiobook covers" : "eBook cover"}.`, tick:"cover_nyt",
     vals: v && !xx ? [["Bestseller line", v.best]] : []};
   const coverLink = {app:"Catalog Editor", text:"Paste the Cover image link.", fields:[["Cover image link", "ml:Cover image:url"]], rk:"cover"};
-  const bibleCoverArt = {opt:o, app:"ChatGPT", text:"Make the story bible cover from the story cover.",
-    attach:`The story's cover${v && v.prevBible ? ` and the story bible cover of ${wfName(v.prevBible)}` : " and the previous story bible's cover"}.`, tick:"bible_cover_art",
+  const bibleCoverArt = {opt:o, app:"ChatGPT", text:"", tick:"bible_cover_art",
     bob:`Make the story bible cover for ${t} from the attached cover of the story. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
       (v && v.prevBible ? `Place the title, the words Story Bible and the author name the same way as on the attached story bible cover of ${wfName(v.prevBible)}.` : `Place the title, the words Story Bible and the author name the same way as on the attached cover of the previous story bible.`),
     vals: v ? [["The story's cover", v.cover]] : []};
@@ -4085,7 +4080,7 @@ function wfSteps(kind, lang, ed, v){
       return miss.length ? {done:false, detail:"Still blank: " + miss.join(", ")} : {done:true, detail:"Story bible in the catalog"}; }};
   const bibleIsbn = {opt:o, app:"Bowker", text:"Assign the story bible ISBN.", links:bowkerLink, chk: v=>v && sb ? {done:has(v.bibleIsbn), detail:has(v.bibleIsbn) ? "" : "SB ISBN is blank"} : null};
   const bibleIsbnPaste = {opt:o, app:"Catalog Editor", text:"Paste the story bible ISBN.", fields:[["Story bible ISBN", "sb:isbn"]]};
-  const biblePics = {opt:o, app:"ChatGPT", text:"", attach:"The pre-images .docx and the final manuscript.", tick:"bible_pictures",
+  const biblePics = {opt:o, app:"ChatGPT", text:"", tick:"bible_pictures",
     bob:`Use my story bible creation skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum.`};
   const bibleVellum = {opt:o, app:"Vellum", text:"Format the story bible.", tick:"bible_vellum", sub:[
       "Style: Bible 2. Import the pre-vellum file.",
@@ -4124,8 +4119,7 @@ function wfSteps(kind, lang, ed, v){
   const printSpecs = {opt:"print", app:"KDP and B&N Press", text:`Get the real print cover templates (paperback${hc ? ", hardcover" + hcIf : ""}).`,
     links:[["KDP cover calculator", "https://kdp.amazon.com/cover-calculator"], ["Open B&N Press", "https://press.barnesandnoble.com/"]], tick:"print_specs",
     vals: v ? [["Page count", ed.paperback_pages], ["Page size", ed.paperback_page_size]] : []};
-  const printArt = {opt:"print", app:"ChatGPT", text:`Adjust the paperback drafts${hc ? " and the hardcover draft" + hcIf : ""} to the real templates.`, tick:"print_cover_art",
-    attach:`The draft print covers and the KDP and B&N templates${hc ? " (paperback and hardcover)" : ""}.`,
+  const printArt = {opt:"print", app:"ChatGPT", text:"", tick:"print_cover_art",
     bob:`Adjust the attached draft print covers for ${t} to the attached KDP and B&N templates: resize the canvas and spine and move anything that sits outside the safe areas. Make one file that works for both: KDP's overall size and B&N's margins (keep text and important art 0.25" inside the trim and spine edges). Keep the art and text placement otherwise the same, and keep the space for the NYT line on the covers with text. I need: the paperback with text, the paperback with no text${hc ? ", and the hardcover with text" : ""}.`};
   const printCover = xx ? {opt:"print", app:"Photoshop", text:"Make the print cover with the skill's cover text lines.", tick:"print_cover"}
     : {opt:"print", app:"Photoshop", text:`Add the NYT line to the paperback cover${hc ? " and the hardcover cover" + hcIf : ""}.`, tick:"print_cover", vals: v ? [["Bestseller line", v.best]] : []};
@@ -4167,7 +4161,7 @@ function wfSteps(kind, lang, ed, v){
       {app:"BookFunnel", text:"Set up the Sales Action.", tick:"sales_action"}]),
     ...S("Audiobook (when the narrator delivers)", audioSteps),
     ...S("6. Dragon Box content", [
-      {app:"Claude", text:"Write the intro letter with the bundle link.", tick:"intro_letter", attach:"Last month's intro letter.",
+      {app:"Claude", text:"", tick:"intro_letter",
         claude:`Write the Dragon Box intro letter${month ? ` for ${month}` : " for this month"} for ${t}, in the same layout and voice as last month's letter, which I've attached. Insert the BookFunnel bundle link${v && v.bf.Bundle ? `: ${v.bf.Bundle}` : " (I'll paste it)"}.` + (v && v.short ? ` About the book: ${v.short}` : ""),
         vals: v ? [["BookFunnel bundle link", v.bf.Bundle]] : []},
       {app:"Google Drive", text:`File the intro in Dragon Box Subscriptions › ${month || "this month"}.`, tick:"drive"},
