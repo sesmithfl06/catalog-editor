@@ -674,6 +674,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <ul>
       <li>Press <b>Release workflow</b> and pick the book in the dropdown (or <b>Closest release</b> / <b>Most recent activity</b> / <b>Search for a book…</b>). Each step shows ✓ when done and its due date; red when late. ISBNs are due by Subsc Pub (English) or the release date (translations); store links 2 days after that format's date.</li>
       <li>Ticks are kept in Supabase (table release_steps) and logged in the change log; untick to undo.</li>
+      <li>The cover steps list each cover; tick each one when it is made. They are kept in Supabase (table covers), so every device and person sees them. In Supabase, the view cover_status lists every cover each book in progress needs and whether it is done.</li>
     </ul>
   </details>
 
@@ -3969,7 +3970,7 @@ function wfSubPlan(){
 // Everything the steps check or show for one book: the Release checklist rows, workflow ticks, ISBNs, promo, synopsis, story bible, Payhip links, Notion.
 async function wfLoadVals(ed){
   const F = encodeURIComponent(ed.file_name);
-  const [rel, ticks, fm, info, sbs, bl, links, notion, notes, sets] = await Promise.all([
+  const [rel, ticks, fm, info, sbs, bl, links, notion, notes, sets, cov] = await Promise.all([
     api("POST", "rpc/release_checklist_for", {p_files:[ed.file_name]}).catch(()=>null),
     api("GET", `release_steps?select=step,done_on,done_by&file_name=eq.${F}&step=like.wf:*`).catch(()=>[]),
     api("GET", `formats?select=format,isbn,not_offered&file_name=eq.${F}`).catch(()=>[]),
@@ -3979,7 +3980,8 @@ async function wfLoadVals(ed){
     api("GET", `store_links?select=store,format,link_or_id&file_name=eq.${F}&store=in.(Payhip,BookFunnel,Amazon,Apple,Barnes%20%26%20Noble,Kobo,Google%20Play,Books2Read)`).catch(()=>[]),
     api("GET", `notion_pages?select=last_synced_at&file_name=eq.${F}`).catch(()=>[]),
     api("GET", `edition_release_notes?select=subscription_publication&file_name=eq.${F}`).catch(()=>[]),
-    api("GET", "settings?select=key,value&key=in.(paperback_min_words,hardcover_min_words)").catch(()=>[])
+    api("GET", "settings?select=key,value&key=in.(paperback_min_words,hardcover_min_words)").catch(()=>[]),
+    api("GET", `covers?select=cover,stage,done_on,done_by&file_name=eq.${F}`).catch(()=>[])
   ]);
   const rules = {}; for (const r of sets || []) rules[r.key] = r.value;
   const bibles = new Set((sbs || []).map(r=>r.file_name));
@@ -3995,6 +3997,7 @@ async function wfLoadVals(ed){
   const offered = new Set((fm || []).filter(r=>!r.not_offered).map(r=>r.format));
   const synced = (notion || []).map(r=>r.last_synced_at).filter(Boolean).sort().pop() || "";
   return {rel: rel ? new Map(rel.map(r=>[r.step_key, r])) : null, ticks: new Map((ticks || []).map(r=>[r.step, r])),
+    covers: new Map((cov || []).map(r=>[r.cover + "|" + r.stage, r])),
     isbn, offered, print: offered.has("Paperback") || offered.has("Hardcover"), sb, bibleIsbn:(sb && sb.isbn) || isbn["Story Bible"] || "",
     sub:String(((notes || [])[0] || {}).subscription_publication || "").slice(0,10), bf, short:i.short_synopsis || "", rules,
     genres:i.copyright_page_genres || "", promo:i.end_of_story_promo || "", newPromo:i.new_end_of_story_promo || "", cover:i.cover_image_link || "",
@@ -4022,6 +4025,7 @@ function wfBibleBlurb(sb){
 // "nondb" = released without the Dragon Box, lang "en" = English book, "xx" = translation.
 // Step fields: stage, app, text (what the step is for), sub (list), prompts ([{who: "claude" | "bob", label, text}]), attach, links, cells ([label, column id]), vals ([label, value]),
 // rk (Release checklist step key(s)), chk (check from the catalog), tick (a 'wf:<key>' tick), act ("open" = show the book in the grid),
+// cov (covers to tick one by one, saved in Supabase: [{label, cover, stage}] in table covers, or [{label, step}] a 'wf:' tick in release_steps),
 // opt ("bible": only when the book has a story bible; "print": only when a paperback or hardcover is offered; "audio": only when an audiobook is offered).
 function wfSteps(kind, lang, ed, v){
   const f = ed ? ed.file_name : "";
@@ -4078,11 +4082,15 @@ function wfSteps(kind, lang, ed, v){
 
   // ---- covers ----
   const hasBible = !xx && (db || !v || !!sb);
-  // Steps that used to be ticked one by one count as done when all of their old ticks are in.
-  const legacy = keys => v=>{ if (!v) return null; const ks = typeof keys === "function" ? keys(v) : keys;
-    return ks.every(k=>v.ticks.get("wf:" + k)) ? {done:true, detail:"Ticked earlier"} : null; };
-  const covers = {app:"ChatGPT", text:`creates the first-stage covers${hasBible ? ", the story bible pictures, and the story bible cover" : ""}.`, tick:"chatgpt_art",
-    chk: legacy(["cover_art"].concat(hasBible ? ["bible_cover_art", "bible_pictures"] : [])),
+  // Cover lists (cov): each cover is ticked on its own and saved in Supabase (table covers: cover + stage); the story bible pictures as a 'wf:' tick.
+  const ifOff = v ? "" : " (if offered)";
+  const C = (label, cover, stage) => ({label, cover, stage});
+  const covers = {app:"ChatGPT", text:`creates the first-stage covers${hasBible ? ", the story bible pictures, and the story bible cover" : ""}.`,
+    cov: [C("eBook cover with text", "eBook", "created")].concat(aud ? [C("Square audiobook cover with text", "Audiobook", "created")] : [],
+      [C("eBook-size art with no text", "eBook art (no text)", "created"), C("Square art with no text", "Square art (no text)", "created")],
+      pb ? [C("Draft paperback cover with text" + ifOff, "Paperback", "created"), C("Draft paperback cover with no text" + ifOff, "Paperback (no text)", "created")] : [],
+      hc ? [C("Draft hardcover cover with text" + ifOff, "Hardcover", "created")] : [],
+      hasBible ? [{label:"Story bible pictures (pre-vellum DOCX)", step:"wf:bible_pictures"}, C("Story bible cover", "Story bible", "created")] : []),
     attach: hasBible ? "Attach the story bible Claude gave you." : undefined,
     prompts:[{who:"bob", text:
       `Make the covers for ${t}${series}. ` +
@@ -4095,14 +4103,13 @@ function wfSteps(kind, lang, ed, v){
       (hasBible ? ` Then use my story bible creation skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum. Finally make the story bible cover from the story's cover you just made. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
         (v && v.prevBible ? `Place the title, the words Story Bible, and the author name the same way as on the attached story bible cover of ${wfName(v.prevBible)}.` : `Place the title, the words Story Bible, and the author name the same way as on the attached cover of the previous story bible.`) : "")}]};
   // One Photoshop step for every format that gets the line.
-  const ifOff = v ? "" : " (if offered)";
-  const nytList = xx ? ["eBook cover"].concat(pb || hc ? ["Print cover" + ifOff] : [])
-    : ["eBook cover"].concat(aud ? ["Audiobook cover"] : [], pb ? ["Paperback cover" + ifOff] : [], hc ? ["Hardcover cover" + ifOff] : [], hasBible ? ["Story bible cover"] : []);
-  const nyt = {app:"Photoshop", text: xx ? "Add the cover text lines from the non-english-edition skill to these covers:" : "Add the NYT line to these covers:", tick:"nyt_lines", sub:nytList,
-    chk: legacy(v=>["cover_nyt"].concat(hasBible ? ["bible_cover"] : [], v.print ? ["print_cover"] : [])),
+  const nytList = xx ? [C("eBook cover", "eBook", "line")].concat(pb || hc ? [C("Print cover" + ifOff, "Print", "line")] : [])
+    : [C("eBook cover", "eBook", "line")].concat(aud ? [C("Audiobook cover", "Audiobook", "line")] : [], pb ? [C("Paperback cover" + ifOff, "Paperback", "line")] : [],
+      hc ? [C("Hardcover cover" + ifOff, "Hardcover", "line")] : [], hasBible ? [C("Story bible cover", "Story bible", "line")] : []);
+  const nyt = {app:"Photoshop", text: xx ? "Add the cover text lines from the non-english-edition skill to these covers:" : "Add the NYT line to these covers:", cov:nytList,
     vals: v && !xx ? [["Bestseller line", v.best]] : []};
   const coverLink = {app:"Catalog Editor", text:"Paste the Cover image link.", fields:[["Cover image link", "ml:Cover image:url"]], rk:"cover"};
-  const bundleCover = {opt:o, app:"Photoshop", text:"Make the bundle cover.", tick:"bundle_cover"};
+  const bundleCover = {opt:o, app:"Photoshop", text:"Make the bundle cover.", cov:[C("Bundle cover", "Bundle", "created")]};
 
   // ---- story bible ----
   const bibleIsbn = {opt:o, app:"Bowker", text:"Assign the story bible ISBN.", links:bowkerLink, chk: v=>v && sb ? {done:has(v.bibleIsbn), detail:has(v.bibleIsbn) ? "" : "SB ISBN is blank"} : null};
@@ -4142,7 +4149,9 @@ function wfSteps(kind, lang, ed, v){
   const printSpecs = {opt:"print", app:"KDP and B&N Press", text:`Get the real print cover templates (paperback${hc ? ", hardcover" + hcIf : ""}).`,
     links:[["KDP cover calculator", "https://kdp.amazon.com/cover-calculator"], ["Open B&N Press", "https://press.barnesandnoble.com/"]], tick:"print_specs",
     vals: v ? [["Page count", ed.paperback_pages], ["Page size", ed.paperback_page_size]] : []};
-  const printArt = {opt:"print", app:"ChatGPT", text:"fits the draft print covers to the KDP and B&N templates.", tick:"print_cover_art",
+  const printArt = {opt:"print", app:"ChatGPT", text:"fits the draft print covers to the KDP and B&N templates.",
+    cov: [].concat(pb ? [C("Paperback cover with text", "Paperback", "print_fit"), C("Paperback cover with no text", "Paperback (no text)", "print_fit")] : [],
+      hc ? [C("Hardcover cover with text", "Hardcover", "print_fit")] : []),
     prompts:[{who:"bob", text:`Adjust the attached draft print covers for ${t} to the attached KDP and B&N templates: resize the canvas and spine and move anything that sits outside the safe areas. Make one file that works for both: KDP's overall size and B&N's margins (keep text and important art 0.25" inside the trim and spine edges). Keep the art and text placement otherwise the same, and keep the space for the NYT line on the covers with text. I need: the paperback with text, the paperback with no text${hc ? ", and the hardcover with text" : ""}.`}]};
 
   // ---- release ----
@@ -4217,6 +4226,11 @@ function wfStatus(s, v){
     if (!parts.includes(true) || ticked) parts.push(ticked);
     if (ticked) notes.push("ticked " + rlDay(tickRow.done_on) + (tickRow.done_by ? " by " + tickRow.done_by : ""));
   }
+  if (s.cov && s.cov.length){
+    const got = s.cov.filter(c=>wfCovRow(v, c)).length;
+    parts.push(got === s.cov.length);
+    if (got < s.cov.length) notes.push(`${got} of ${s.cov.length} done`);
+  }
   if (s.fields){
     const ed = wfBook();
     if (ed){
@@ -4228,6 +4242,9 @@ function wfStatus(s, v){
   const done = s.tick && !s.rk ? parts.includes(true) : parts.every(Boolean);
   return {done, late: late && !done, note: notes.filter(Boolean).join(" · "), tickKey, ticked, locked: done && !ticked};
 }
+// A cover in a cov list: its row in covers (or its 'wf:' tick), or null when not done yet.
+function wfCovRow(v, c){ return !v ? null : c.step ? v.ticks.get(c.step) || null : v.covers.get(c.cover + "|" + c.stage) || null; }
+function wfCovKey(c){ return c.step || c.cover + "|" + c.stage; }
 // Ticks on the bulleted sub-steps (Vellum steps): yours alone, kept in this browser per book.
 function wfSubKey(s, k){ const ed = wfBook(); return (ed ? ed.file_name : "new") + "|" + ([].concat(s.rk || [])[0] || s.tick || s.app) + "|" + k; }
 function wfSubAll(){ try{ return JSON.parse(localStorage.getItem("wfsubs") || "{}") || {}; }catch(e){ return {}; } }
@@ -4266,6 +4283,8 @@ function wfRender(){
     return head + `<div class="${cls}" data-i="${i}"><span class="n">${st && st.done ? "✓" : st && st.late ? "!" : i+1}</span><div class="body">
       <div>${s.text && !aiStep ? `<span class="app">${esc(s.app)}:</span> ${wfRich(s.text)}` : ""}${i === next ? ` <span class="nexttag">Next</span>` : ""}</div>
       ${st && st.note ? `<div class="stnote">${esc(st.note)}</div>` : ""}
+      ${s.cov && s.cov.length ? `<ul class="wfsub">${s.cov.map(c=>{ const r = wfCovRow(v, c);
+        return `<li><label class="chk"><input type="checkbox" data-cov="${esc(wfCovKey(c))}" ${r ? "checked" : ""} ${v ? "" : "disabled"} title="${!v ? "Pick the book first" : r ? esc("Done " + rlDay(r.done_on) + (r.done_by ? " by " + r.done_by : "") + ". Untick to undo") : "Tick when done"}"> <span>${esc(c.label)}</span></label></li>`; }).join("")}</ul>` : ""}
       ${s.sub ? `<ul class="wfsub">${s.sub.map((x, k)=>{ const key = wfSubKey(s, k); return `<li><label class="chk"><input type="checkbox" data-sub="${esc(key)}" ${wfSubGet(key) ? "checked" : ""}> <span>${wfRich(x)}</span></label></li>`; }).join("")}</ul>` : ""}
       ${vals ? `<div class="wfvals">${vals}</div>` : ""}
       ${s.fields ? `<div class="wffields">${s.fields.map(([k, id])=>{ const c = COLMAP[id], cur = ed && c ? show(valueOf(ed, c)) : "";
@@ -4282,8 +4301,21 @@ async function wfBookChanged(force){
   const f = ed.file_name;
   try{ const v = await wfLoadVals(ed); if ($("#wfbook").value !== f) return; wfVals = v; wfValsFor = f;
     if (wfAuto){ wfAuto = false; wfKind = ed.language !== "English" ? "xx" : v.sub ? "db" : "en"; }
-    wfRender(); }
+    wfRender(); wfCovMigrate(ed, v); }
   catch(err){ $("#wfmsg").textContent = "Couldn't load this book: " + friendly(err); }
+}
+// Cover line ticks this browser kept before covers were saved in Supabase: moved to Supabase once, then removed here.
+async function wfCovMigrate(ed, v){
+  const all = wfSubAll(), pre = ed.file_name + "|nyt_lines|";
+  const ks = Object.keys(all).filter(k=>k.startsWith(pre)); if (!ks.length) return;
+  const st = wfCur.find(s=>s.cov && s.cov.some(c=>c.stage === "line")); if (!st) return;
+  let n = 0;
+  for (const k of ks){
+    const c = st.cov[+k.slice(pre.length)];
+    try{ if (c && !wfCovRow(v, c)){ await api("POST", "covers", {file_name:ed.file_name, cover:c.cover, stage:c.stage, source:"Catalog Editor"}, PATCH); n++; }
+      wfSubSet(k, false); }catch(e){ return; }
+  }
+  if (n && $("#wfbook").value === ed.file_name) wfBookChanged(true);
 }
 // kind "db" / "nondb"; "auto" (from a Release card or the Distribution app) picks it from the book once its Subsc Pub date is loaded.
 let wfAuto = false;
@@ -4387,6 +4419,23 @@ $("#wflist").addEventListener("click", async ev=>{
 });
 $("#wflist").addEventListener("change", ev=>{
   const sb = ev.target.closest("input[data-sub]"); if (sb) wfSubSet(sb.dataset.sub, sb.checked);
+});
+// A cover ticked in a cover list: saved in Supabase (covers, or release_steps for a 'wf:' tick), so every device and person sees it.
+$("#wflist").addEventListener("change", async ev=>{
+  const box = ev.target.closest("input[data-cov]"); if (!box) return;
+  const ed = wfBook(); if (!ed) return;
+  const f = encodeURIComponent(ed.file_name), key = box.dataset.cov, tick = key.startsWith("wf:");
+  const [cover, stage] = key.split("|");
+  box.disabled = true;
+  try{
+    if (box.checked) await api("POST", tick ? "release_steps" : "covers", tick ? {file_name:ed.file_name, step:key, source:"Catalog Editor"} : {file_name:ed.file_name, cover, stage, source:"Catalog Editor"}, PATCH);
+    else{
+      const gone = await api("DELETE", tick ? `release_steps?file_name=eq.${f}&step=eq.${encodeURIComponent(key)}`
+        : `covers?file_name=eq.${f}&cover=eq.${encodeURIComponent(cover)}&stage=eq.${encodeURIComponent(stage)}`, null, PATCH);
+      if (!gone || !gone.length) throw new Error("0 rows changed (no permission, or the tick is gone)");
+    }
+    await wfBookChanged(true);
+  }catch(err){ box.checked = !box.checked; box.disabled = false; $("#wfmsg").textContent = friendly(err); }
 });
 $("#wflist").addEventListener("change", async ev=>{
   const box = ev.target.closest("input[data-tick]"); if (!box) return;
