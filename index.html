@@ -4017,13 +4017,15 @@ function wfSteps(kind, lang, ed, v){
       (!db ? " (no Subsc Pub date: it isn't a Dragon Box book)" : plan.set ? ` (Subsc Pub ${rlDay(plan.date)})` :
         plan.late ? ", asking you for its Subsc Pub date" :
         `, with its Subsc Pub date on ${rlDay(plan.date)} (the ${plan.month} box: the month after the last Dragon Box book)`) +
-      ", its formats (no paperback under 20,000 words; a hardcover only from 40,000 words), the md copy and the word count. Then pick the book above.", sub:[written],
+      ", its formats (no paperback under 20,000 words; a hardcover only from 40,000 words), the md copy and the word count" +
+      (db ? ". In the same chat it makes the story bible from the same manuscript: the pre-images .docx, the bible's md copy and its details in Supabase (story-bible-editorial-stager skill)" : "") + ". Then pick the book above.", sub:[written],
     attach:"The final manuscript (.docx). The skill also saves the story's md copy from it, so no md refresh is needed after Vellum.",
     claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. ` +
       (!db ? "It is not a Dragon Box book, so it has no Subsc Pub date. " : plan.set ? `It is a Dragon Box book: its Subsc Pub date is ${plan.date}. ` :
         plan.late ? "It is a Dragon Box book. Ask me for its Subsc Pub date before writing it. " :
         `It is a Dragon Box book for the ${plan.month} box: its Subsc Pub date is ${plan.date}. `) +
-      `Fill in or add this book in the Supabase catalog with the Supabase Write connector.`}, newBook);
+      `Fill in or add this book in the Supabase catalog with the Supabase Write connector.` +
+      (db ? " Then make its story bible from the same manuscript (pre-images DOCX, md copy and its details in Supabase)." : "")}, newBook);
   const isbnCells = [["eBook ISBN cell", "fmt:eBook:isbn"]].concat(offered("Audiobook") ? [["Audiobook ISBN cell", "fmt:Audiobook:isbn"]] : [])
     .concat(db ? [["SB ISBN cell", "sb:isbn"]] : []);
   const bowker = {app:"Bowker", text:`Get the ISBNs from Bowker: eBook${offered("Audiobook") ? ", audiobook" : ""}${db ? " and the story bible" : ""}. Paste each one in its cell (the buttons open each cell). Paperback and hardcover numbers are not bought from Bowker: KDP and B&N give their own when the print book is published (step under Wide release).`,
@@ -4150,13 +4152,13 @@ function wfSteps(kind, lang, ed, v){
   // ---- Dragon Box ----
   const bfCells = ed ? [["BookFunnel eBook cell", "sl:BookFunnel|eBook|BookFunnel URL"], ["BookFunnel Story Bible cell", "sl:BookFunnel|Story Bible|BookFunnel URL"], ["BookFunnel Bundle cell", "sl:BookFunnel|Bundle|BookFunnel URL"]] : [];
   const S = (stage, s) => Object.assign({stage}, s);
-  const s1 = "1. Story, catalog and ISBNs", s2 = "2. Covers", s3 = "3. Story bible and narrator", s4 = "4. Vellum and print covers",
+  const s1 = "1. Story, catalog and ISBNs", s2 = "2. Covers", s3 = "3. Story bible pictures and narrator", s4 = "4. Vellum and print covers",
     s5 = "5. Payhip and BookFunnel", s6 = "6. Dragon Box content", s7 = "7. Communications and print", s8 = "8. Release check",
     s9 = "Payhip (Pub date)", s10 = "Wide release";
   return [
-    S(s1, final), S(s1, meta), S(s1, bowker),
+    S(s1, final), S(s1, Object.assign({}, meta, {chk: bibleWrite.chk})), S(s1, bowker),
     S(s2, coverArt), S(s2, coverPs), S(s2, bibleCoverArt), S(s2, bibleCoverPs), S(s2, bundleCover),
-    S(s3, bibleWrite), S(s3, biblePics), S(s3, narrator),
+    S(s3, biblePics), S(s3, narrator),
     S(s4, vellum), S(s4, bibleVellum), S(s4, pages), S(s4, printSpecs), S(s4, printCover),
     S(s5, {app:"Payhip", text:"Make the products for the eBook, the story bible and the bundle: descriptions below (Long Synopsis, heading, Reasons to Love; Story Bible Synopsis), product images (covers, the text-free cover, the bundle graphic), and upload the generic EPUB and Kindle EPUB of both titles. They go Live at the Payhip step below.",
       links:[["Open Payhip", "https://payhip.com/"]], tick:"payhip_products", vals: payVals.concat(sbVal)}),
