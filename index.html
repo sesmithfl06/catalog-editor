@@ -451,8 +451,8 @@ dialog#ncdlg::backdrop{background:#0006}
   <div class="row">
     <b>Book</b>
     <select id="wfbook" aria-label="Book"></select>
-    <button id="wfclosest" type="button" title="The book in progress whose release date is nearest today">Closest release</button>
-    <button id="wfactive" type="button" title="The book in progress with the most edits in the last 30 days">Most recent activity</button>
+    <input id="wfsearch" type="search" list="wfsearchlist" placeholder="Type part of a title or file name, then pick the book" aria-label="Search for a book" hidden style="min-width:280px">
+    <datalist id="wfsearchlist"></datalist>
   </div>
   <div class="row">
     <label class="chk"><input type="radio" name="wfkind" value="db" checked> Dragon Box</label>
@@ -655,7 +655,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…follow the release of a book, step by step?</summary>
     <ul>
-      <li>Press <b>Release workflow</b>. Pick the book, or press <b>Closest release</b> or <b>Most recent activity</b>. For a book that isn't in the catalog yet, leave it on <b>New book</b>: when Claude adds it, it is picked by itself.</li>
+      <li>Press <b>Release workflow</b>. Pick the book from the dropdown, or choose <b>Closest release</b>, <b>Most recent activity</b> or <b>Search for a book…</b> in it. For a book that isn't in the catalog yet, leave it on <b>New book</b>: when Claude adds it, it is picked by itself.</li>
       <li>The workflow (Dragon Box, Non-Dragon Box English book, or translation) is picked from the book; the choices under the book switch it.</li>
       <li>Each step is one thing to do. ✓ = done, red = late (with its due date), the outlined step is next. Steps that check themselves tick themselves; the others have a <b>Done</b> box. Grey steps don't apply to this book.</li>
       <li>Type values (ISBNs, links, page count…) into the step and press <b>Save</b>: they go straight to Supabase. Changes made elsewhere (Claude's skills, the Distribution app) show up in the workflow by themselves; no reload needed.</li>
@@ -665,7 +665,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…see where each new book is in its release?</summary>
     <ul>
-      <li>Press <b>Release workflow</b> and pick the book (or <b>Closest release</b> / <b>Most recent activity</b>). Each step shows ✓ when done and its due date; red when late. ISBNs are due by Subsc Pub (English) or the release date (translations); store links 2 days after that format's date.</li>
+      <li>Press <b>Release workflow</b> and pick the book in the dropdown (or <b>Closest release</b> / <b>Most recent activity</b> / <b>Search for a book…</b>). Each step shows ✓ when done and its due date; red when late. ISBNs are due by Subsc Pub (English) or the release date (translations); store links 2 days after that format's date.</li>
       <li>Ticks are kept in Supabase (table release_steps) and logged in the change log; untick to undo.</li>
     </ul>
   </details>
@@ -3916,7 +3916,7 @@ const WF_SQL = "https://supabase.com/dashboard/project/qurcnkeqxfqqfnygkpmd/sql/
 const WF_BOOKLINKS = "Dropbox-Sesmithfl/Sesmithfl Team Folder/0 Book Series/0Vellum/For Bob/booklinks copy.vellum";
 const WF_RTL_HEADING = {English:"Discover your new love!"};   // the heading pasted above Reasons to Love on Payhip, by language
 let wfKind = "db", wfCur = [], wfVals = null, wfValsFor = "", wfScroll = false;
-function wfBook(){ const f = $("#wfbook").value; return f ? data.editions.find(e=>e.file_name===f) || null : null; }
+function wfBook(){ const f = $("#wfbook").value; return f && f[0] !== "@" ? data.editions.find(e=>e.file_name===f) || null : null; }
 function wfEnglish(ed){ return !ed ? null : ed.language === "English" ? ed : data.editions.find(e=>e.story_id && e.story_id === ed.story_id && e.language === "English") || null; }
 // The book before this one in the same series and language (highest lower book number); with `among`, only books in that set.
 function wfPrev(ed, among){
@@ -4279,9 +4279,11 @@ function wfOpen(kind, file){
     .sort((a,b)=> String(a.title || a.file_name).localeCompare(String(b.title || b.file_name)) || a.file_name.localeCompare(b.file_name));
   const vis = visibleRows();
   const pick = eds.some(e=>e.file_name === keep) ? keep : vis.length === 1 ? vis[0].file_name : "";
-  sel.innerHTML = `<option value="">New book (not in the catalog yet: the prompts say “my new book”)</option>` +
+  sel.innerHTML = `<option value="">New book</option><option value="@closest">Closest release</option><option value="@active">Most recent activity</option><option value="@search">Search for a book…</option><option disabled>──────────</option>` +
     eds.map(e=>`<option value="${esc(e.file_name)}">${esc((e.title || e.file_name) + " — " + e.file_name)}</option>`).join("");
   sel.value = eds.some(e=>e.file_name === pick) ? pick : "";
+  $("#wfsearch").hidden = true; $("#wfsearch").value = "";
+  $("#wfsearchlist").innerHTML = eds.map(e=>`<option value="${esc((e.title || e.file_name) + " — " + e.file_name)}"></option>`).join("");
   $("#wfmsg").textContent = "";
   wfValsFor = ""; wfVals = null; wfScroll = true;   // reload each time the list opens, so new values and ticks show
   api("GET", "edition_release_notes?select=subscription_publication&subscription_publication=not.is.null&order=subscription_publication.desc&limit=1")
@@ -4306,12 +4308,19 @@ function wfLive(p){
 }
 $("#wfopen").onclick = ()=>wfOpen("auto");
 document.querySelectorAll("input[name=wfkind]").forEach(r=>r.onchange = ()=>{ wfKind = r.value; wfAuto = false; wfRender(); });
-$("#wfclosest").onclick = ()=>{ const ed = rlClosest(); if (!ed){ $("#wfmsg").textContent = "No book in progress has a release date."; return; } $("#wfbook").value = ed.file_name; wfScroll = true; wfAuto = true; wfBookChanged(); };
-$("#wfactive").onclick = async ()=>{ $("#wfmsg").textContent = "Looking at the last 30 days of edits…";
-  try{ const ed = await rlMostActive(); if (!ed){ $("#wfmsg").textContent = "No book in progress was edited in the last 30 days."; return; } $("#wfbook").value = ed.file_name; wfScroll = true; wfAuto = true; wfBookChanged(); }
-  catch(err){ $("#wfmsg").textContent = friendly(err); } };
+function wfPick(ed){ $("#wfbook").value = ed.file_name; $("#wfsearch").hidden = true; wfScroll = true; wfAuto = true; wfBookChanged(); }
+$("#wfsearch").oninput = ()=>{ const v = $("#wfsearch").value;
+  const ed = data.editions.find(e=>e.file_name && (e.title || e.file_name) + " — " + e.file_name === v); if (ed) wfPick(ed); };
 $("#wfclose").onclick = ()=>$("#wfdlg").close();
-$("#wfbook").onchange = ()=>{ wfScroll = true; wfAuto = true; wfBookChanged(); };
+$("#wfbook").onchange = async ()=>{
+  const v = $("#wfbook").value, msg = t=>{ $("#wfmsg").textContent = t; };
+  $("#wfsearch").hidden = v !== "@search";
+  if (v === "@search"){ $("#wfsearch").focus(); return; }
+  if (v === "@closest"){ const ed = rlClosest(); if (!ed){ msg("No book in progress has a release date."); $("#wfbook").value = ""; return; } wfPick(ed); return; }
+  if (v === "@active"){ msg("Looking at the last 30 days of edits…");
+    try{ const ed = await rlMostActive(); if (!ed){ msg("No book in progress was edited in the last 30 days."); $("#wfbook").value = ""; return; } wfPick(ed); }
+    catch(err){ msg(friendly(err)); } return; }
+  wfScroll = true; wfAuto = true; wfBookChanged(); };
 $("#wflist").addEventListener("click", async ev=>{
   const b = ev.target.closest("button[data-a]"); if (!b) return;
   const a = b.dataset.a, s = wfCur[+b.dataset.i];
