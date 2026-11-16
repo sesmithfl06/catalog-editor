@@ -4073,20 +4073,17 @@ function wfSteps(kind, lang, ed, v){
     return ks.every(k=>v.ticks.get("wf:" + k)) ? {done:true, detail:"Ticked earlier"} : null; };
   const covers = {app:"ChatGPT", text:`creates the first-stage covers${hasBible ? ", the story bible pictures and the story bible cover" : ""}.`, tick:"chatgpt_art",
     chk: legacy(["cover_art"].concat(hasBible ? ["bible_cover_art", "bible_pictures"] : [])),
-    vals: hasBible && v ? [["The story's cover", v.cover]] : [],
-    prompts:[{who:"bob", label:"Story covers", text:
+    attach: hasBible ? "the story bible's pre-images file" : undefined,
+    prompts:[{who:"bob", text:
       `Make the covers for ${t}${series}. ` +
       (prev ? `Place the title, series name and author name the same way as on the attached cover of the previous book in the series, ${wfName(prev)}.` : `Place the title, series name and author name so the same placement can be used for every book in the series${ed && ed.series ? "; if I attached another book's cover from the series, match its placement" : ""}.`) +
       ` On the covers with text, leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. I need: the eBook cover with text` + (aud ? ", the square audiobook cover with text" : "") +
       `, the eBook-size art with no text at all, the square art with no text at all (for Payhip${aud ? " and the audiobook" : ""})` +
       (pb ? `, and draft print covers: the paperback with text and with no text${hc ? ", and the hardcover with text" : ""}. ${draft.prompt}` : ".") +
       ` The no-text versions should still look good on their own as product images.` +
-      (desc ? ` About the book: ${desc}` : "")}].concat(hasBible ? [
-      {who:"bob", label:"Story bible pictures and maps (attach the pre-images file)", text:
-        `Use my story bible creation skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum.`},
-      {who:"bob", label:"Story bible cover (attach the story's cover made by the first prompt)", text:
-        `Make the story bible cover for ${t} from the attached cover of the story. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
-        (v && v.prevBible ? `Place the title, the words Story Bible and the author name the same way as on the attached story bible cover of ${wfName(v.prevBible)}.` : `Place the title, the words Story Bible and the author name the same way as on the attached cover of the previous story bible.`)}] : [])};
+      (desc ? ` About the book: ${desc}` : "") +
+      (hasBible ? ` Then use my story bible creation skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum. Finally make the story bible cover from the story's cover you just made. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
+        (v && v.prevBible ? `Place the title, the words Story Bible and the author name the same way as on the attached story bible cover of ${wfName(v.prevBible)}.` : `Place the title, the words Story Bible and the author name the same way as on the attached cover of the previous story bible.`) : "")}]};
   // One Photoshop step for every format that gets the line.
   const ifOff = v ? "" : " (if offered)";
   const nytList = xx ? ["eBook cover"].concat(pb || hc ? ["Print cover" + ifOff] : [])
