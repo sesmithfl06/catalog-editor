@@ -4111,8 +4111,6 @@ function wfSteps(kind, lang, ed, v){
     vals: v ? [["SB ISBN", v.bibleIsbn]].concat(promoVals) : []};
   const biblePayhip = {opt:o, app:"Payhip", text:"Add the story bible and bundle. Set them Live. Description: paste the value below.", links:payhipLink, tick:"bible_payhip", vals:sbVal};
   const bibleLinks = {opt:o, app:"Catalog Editor", text:"Paste the story bible and bundle Payhip links.", fields:[["Payhip story bible link", "sl:Payhip|Story Bible|URL"], ["Payhip bundle link", "sl:Payhip|Bundle|URL"]]};
-  const bibleApprove = {opt:o, app:"Catalog Editor", text:"Approve the story bible.", btn:["approve", "Set the story bible to Approved"], rk:"story_bible",
-    chk: v=>v && sb ? {done: sb.status === "Approved", detail: sb.status === "Approved" ? "" : "Status " + (sb.status || "blank")} : null};
 
   // ---- narrator and audiobook ----
   const narrator = {opt:ao, app:"Email", text: db ? "Send the story and story bible to the narrator." : "Send the story to the narrator.", tick:"narrator",
@@ -4161,7 +4159,7 @@ function wfSteps(kind, lang, ed, v){
   if (!db) return [
     ...S("Before release", [final, meta, bowker, isbnPaste, covers, vellum, pages, printSpecs, printArt, nyt, coverLink]),
     ...S("Audiobook (only if one is offered)", [narrator, ...audioSteps]),
-    ...S("Story bible (only if this book gets one)", [bibleIsbn, bibleIsbnPaste, bundleCover, bibleVellum, biblePayhip, bibleLinks, bibleApprove]),
+    ...S("Story bible (only if this book gets one)", [bibleIsbn, bibleIsbnPaste, bundleCover, bibleVellum, biblePayhip, bibleLinks]),
     ...S("Release and after", [live, dist, printIsbns, vlink, notion, links])
   ];
   // ---- Dragon Box ----
@@ -4187,7 +4185,7 @@ function wfSteps(kind, lang, ed, v){
       {app:"Canva", text:"Make the monthly flyer.", tick:"flyer"},
       {app:"Canva", text:"Make the inside-box QR sticker (after the link is ready).", tick:"sticker"}]),
     ...S("8. Release check", [{app:"Every app", text:"Test every link, download, and the QR code.", tick:"tested"}]),
-    ...S("Payhip (Pub date)", [live, bibleLinks, bibleApprove]),
+    ...S("Payhip (Pub date)", [live, bibleLinks]),
     ...S("Wide release", [dist, printIsbns, vlink, links])
   ];
 }
@@ -4350,7 +4348,7 @@ $("#wflist").addEventListener("click", async ev=>{
     const [k, val] = s.vals[+b.dataset.j];
     try{ await copyText(val); msg(k + " copied."); }catch(e){ msg("Copy was blocked: select the value and copy it."); }
   }
-  else if (a === "save" || a === "approve" || a === "vlink" || a === "notion" || a === "links"){
+  else if (a === "save" || a === "vlink" || a === "notion" || a === "links"){
     const ed = wfBook(); if (!ed) return;
     b.disabled = true;
     try{
@@ -4368,10 +4366,6 @@ $("#wflist").addEventListener("click", async ev=>{
           n++;
         }
         msg(n ? `Saved ${n} value${n === 1 ? "" : "s"}.` : "Nothing changed.");
-      } else if (a === "approve"){
-        const r = await api("PATCH", `story_bibles?file_name=eq.${encodeURIComponent(ed.file_name)}`, {status:"Approved"}, PATCH);
-        if (!r || !r.length) throw new Error("this book has no story bible in the catalog yet");
-        msg("Story bible approved.");
       } else if (a === "vlink"){
         const c = COLMAP["ed:vellum_link_created"];
         if (!c){ msg("The Vellum link column isn't in the catalog."); return; }

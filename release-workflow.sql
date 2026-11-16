@@ -132,8 +132,6 @@ steps as (
       (case when b.english then 2 else 3 end, 25, 'payhip_live', 'Payhip product Live', not b.ku and coalesce(ph.live, true),
          ph.file_name is not null, b.pub,
          case when ph.file_name is null then 'No Payhip eBook link yet' end),
-      (case when b.english then 2 else 3 end, 26, 'story_bible', 'Story bible approved', sb.file_name is not null,
-         sb.status = 'Approved', sb.publication_date, case when sb.status is not null and sb.status <> 'Approved' then 'Status ' || sb.status end),
       (3, 10, 'distribution', 'Uploaded to the stores (Distribution app)', true,
          coalesce(d.uploaded, false)
            or (b.pub is not null and not exists (select 1 from blanks x where x.file_name = b.file_name and x.grp = 'main')),
