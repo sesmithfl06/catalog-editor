@@ -4020,7 +4020,7 @@ function wfSteps(kind, lang, ed, v){
   const has = x => x != null && String(x).trim() !== "";
   const offered = x => !v || v.offered.has(x);
   const bestLine = (v && v.best) || "New York Times / USA Today Bestselling Author";
-  const reuse = `Reuse Additional Books, Acknowledgments and About the Author from booklinks copy.vellum (${WF_BOOKLINKS}).`;
+  const reuse = `Reuse Additional Books, Acknowledgments, and About the Author from booklinks copy.vellum (${WF_BOOKLINKS}).`;
   const promoVals = v ? [["End of story promo", v.promo], v.newPromo && v.newPromo !== v.promo ? ["New end of story promo (by its rule)", v.newPromo] : null].filter(Boolean) : [];
   const heading = ed ? WF_RTL_HEADING[ed.language] || "" : "";
   const payVals = v ? [["Long Synopsis", v.synopsis], ["Heading", heading], ["Reasons to Love", v.rtl]] : [];
@@ -4050,9 +4050,9 @@ function wfSteps(kind, lang, ed, v){
   const bibleWriteChk = v=>{ if (!v || !sb) return null; const miss = [!has(sb.word_count) && "word count", !has(sb.description) && "Story Bible Synopsis"].filter(Boolean);
     return miss.length ? {done:false, detail:"Still blank: " + miss.join(", ")} : {done:true, detail:"Story bible in the catalog"}; };
   const bibleWritePrompt = `Use the story-bible-editorial-stager skill to make the story bible for ${t}. I've attached the story's final manuscript. Check names and continuity against it, save the draft as a DOCX whose name ends in pre-images and its md copy, then fill in its details in Supabase.`;
-  const meta = xx ? {app:"Claude", text:"puts this edition's metadata in Supabase and gives you its copyright page, synopsis, cover text lines and Vellum checklist.", rk:"details", tick:"non_english", chk:()=>ed ? {done:true, detail:"In the catalog"} : null,
+  const meta = xx ? {app:"Claude", text:"puts this edition's metadata in Supabase and gives you its copyright page, synopsis, cover text lines, and Vellum checklist.", rk:"details", tick:"non_english", chk:()=>ed ? {done:true, detail:"In the catalog"} : null,
       prompts:[{who:"claude", label:"Metadata", text:`Use the new-book-metadata skill. I've attached the translator's docx for the ${ed ? ed.language : "<language>"} edition of ${(()=>{ const en = wfEnglish(ed); return en ? wfName(en) : ed ? `“${ed.title || f}”` : "my book"; })()}${ed ? `; its file name is ${f}` : ""}. Fill in or add this edition in the Supabase catalog with the Supabase Write connector.`},
-        {who:"claude", label:"Copyright page, synopsis, cover text lines and Vellum checklist", text:`Use the non-english-edition skill for ${ed ? f : "the <language> edition of my book"}: give me the copyright page, synopsis, cover text lines and the Vellum checklist.`}]}
+        {who:"claude", label:"Copyright page, synopsis, cover text lines, and Vellum checklist", text:`Use the non-english-edition skill for ${ed ? f : "the <language> edition of my book"}: give me the copyright page, synopsis, cover text lines, and the Vellum checklist.`}]}
     : {app:"Claude", text: db ? "puts the metadata in Supabase and creates the story bible with image prompts for ChatGPT to finish." : "puts the metadata in Supabase. If this book gets a story bible, it also creates it with image prompts for ChatGPT to finish.", rk:"details",
       chk: db ? metaChk : v=>{ const b = bibleWriteChk(v); return b && !b.done ? b : metaChk(v); },
       prompts:[{who:"claude", label: db ? "" : "Metadata", text:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. ` +
@@ -4060,7 +4060,7 @@ function wfSteps(kind, lang, ed, v){
           plan.late ? "It is a Dragon Box book. Ask me for its Subsc Pub date before writing it. " :
           `It is a Dragon Box book for the ${plan.month} box: its Subsc Pub date is ${plan.date}. `) +
         `Fill in or add this book in the Supabase catalog with the Supabase Write connector.` +
-        (db ? " Then make its story bible from the same manuscript (pre-images DOCX, md copy and its details in Supabase)." : "")}]
+        (db ? " Then make its story bible from the same manuscript (pre-images DOCX, md copy, and its details in Supabase)." : "")}]
         .concat(db ? [] : [{who:"claude", label:"Story bible (only if this book gets one)", text:bibleWritePrompt}])};
   const isbnFields = [["eBook ISBN", "fmt:eBook:isbn"]].concat(aud ? [["Audiobook ISBN", "fmt:Audiobook:isbn"]] : []).concat(db ? [["Story bible ISBN", "sb:isbn"]] : []);
   const bowker = {app:"Bowker", text:`Assign the ISBNs (${isbnFields.map(x=>x[0].replace(" ISBN", "")).join(", ")}).`, links:bowkerLink, rk:"isbns"};
@@ -4071,19 +4071,19 @@ function wfSteps(kind, lang, ed, v){
   // Steps that used to be ticked one by one count as done when all of their old ticks are in.
   const legacy = keys => v=>{ if (!v) return null; const ks = typeof keys === "function" ? keys(v) : keys;
     return ks.every(k=>v.ticks.get("wf:" + k)) ? {done:true, detail:"Ticked earlier"} : null; };
-  const covers = {app:"ChatGPT", text:`creates the first-stage covers${hasBible ? ", the story bible pictures and the story bible cover" : ""}.`, tick:"chatgpt_art",
+  const covers = {app:"ChatGPT", text:`creates the first-stage covers${hasBible ? ", the story bible pictures, and the story bible cover" : ""}.`, tick:"chatgpt_art",
     chk: legacy(["cover_art"].concat(hasBible ? ["bible_cover_art", "bible_pictures"] : [])),
     attach: hasBible ? "Attach the story bible Claude gave you." : undefined,
     prompts:[{who:"bob", text:
       `Make the covers for ${t}${series}. ` +
-      (prev ? `Place the title, series name and author name the same way as on the attached cover of the previous book in the series, ${wfName(prev)}.` : `Place the title, series name and author name so the same placement can be used for every book in the series${ed && ed.series ? "; if I attached another book's cover from the series, match its placement" : ""}.`) +
+      (prev ? `Place the title, series name, and author name the same way as on the attached cover of the previous book in the series, ${wfName(prev)}.` : `Place the title, series name, and author name so the same placement can be used for every book in the series${ed && ed.series ? "; if I attached another book's cover from the series, match its placement" : ""}.`) +
       ` On the covers with text, leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. I need: the eBook cover with text` + (aud ? ", the square audiobook cover with text" : "") +
       `, the eBook-size art with no text at all, the square art with no text at all (for Payhip${aud ? " and the audiobook" : ""})` +
       (pb ? `, and draft print covers: the paperback with text and with no text${hc ? ", and the hardcover with text" : ""}. ${draft.prompt}` : ".") +
       ` The no-text versions should still look good on their own as product images.` +
       (desc ? ` About the book: ${desc}` : "") +
       (hasBible ? ` Then use my story bible creation skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum. Finally make the story bible cover from the story's cover you just made. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
-        (v && v.prevBible ? `Place the title, the words Story Bible and the author name the same way as on the attached story bible cover of ${wfName(v.prevBible)}.` : `Place the title, the words Story Bible and the author name the same way as on the attached cover of the previous story bible.`) : "")}]};
+        (v && v.prevBible ? `Place the title, the words Story Bible, and the author name the same way as on the attached story bible cover of ${wfName(v.prevBible)}.` : `Place the title, the words Story Bible, and the author name the same way as on the attached cover of the previous story bible.`) : "")}]};
   // One Photoshop step for every format that gets the line.
   const ifOff = v ? "" : " (if offered)";
   const nytList = xx ? ["eBook cover"].concat(pb || hc ? ["Print cover" + ifOff] : [])
@@ -4117,7 +4117,7 @@ function wfSteps(kind, lang, ed, v){
     {opt:ao, app:"Laurelle", text:"Send the audio list to the narrator. Update the book to the audiomatch version.", tick:"audio_list"},
     {opt:ao, app:"Narrator", text:"Send the final files.", tick:"audio_final"},
     {opt:ao, app:"Payhip and BookFunnel", text:"Add the audiobook (and add it to the bundle).", tick:"audiobook"},
-    {opt:ao, app:"Catalog Editor", text:"Paste the audiobook links, narrator and runtime.", fields:[["Payhip audiobook link", "sl:Payhip|Audiobook|URL"], ["BookFunnel audiobook link", "sl:BookFunnel|Audiobook|URL"], ["Narrator", "fmt:Audiobook:narrator"], ["Runtime", "fmt:Audiobook:runtime_minutes"]]}];
+    {opt:ao, app:"Catalog Editor", text:"Paste the audiobook links, narrator, and runtime.", fields:[["Payhip audiobook link", "sl:Payhip|Audiobook|URL"], ["BookFunnel audiobook link", "sl:BookFunnel|Audiobook|URL"], ["Narrator", "fmt:Audiobook:narrator"], ["Runtime", "fmt:Audiobook:runtime_minutes"]]}];
 
   // ---- Vellum and print ----
   const vellum = xx ? {app:"Vellum", text:`Duplicate the ${ed ? ed.language : "<language>"} template${ed ? ` as ${f}` : ""} into ${vpFolder}. Style: Subhead Center or Obsidian. Follow the skill's checklist from step 4. Export.`, rk:"vellum"}
@@ -4161,12 +4161,12 @@ function wfSteps(kind, lang, ed, v){
   ];
   // ---- Dragon Box ----
   return [
-    ...S("1. Story, catalog and ISBNs", [final, meta, bowker, isbnPaste]),
+    ...S("1. Story, catalog, and ISBNs", [final, meta, bowker, isbnPaste]),
     ...S("2. Covers and story bible pictures", [covers]),
     ...S("3. Narrator", [narrator]),
-    ...S("4. Vellum, print covers and cover lines", [vellum, bibleVellum, pages, printSpecs, printArt, nyt, coverLink, bundleCover]),
+    ...S("4. Vellum, print covers, and cover lines", [vellum, bibleVellum, pages, printSpecs, printArt, nyt, coverLink, bundleCover]),
     ...S("5. Payhip and BookFunnel", [
-      {app:"Payhip", text:"Make the eBook, story bible and bundle products. Upload both EPUBs of each. Descriptions: values below.", links:payhipLink, tick:"payhip_products", vals: payVals.concat(sbVal)},
+      {app:"Payhip", text:"Make the eBook, story bible, and bundle products. Upload both EPUBs of each. Descriptions: values below.", links:payhipLink, tick:"payhip_products", vals: payVals.concat(sbVal)},
       {app:"BookFunnel", text:"Upload both EPUBs of each title. Add the Payhip link. Build the bundle page.", links:[["Open BookFunnel", "https://bookfunnel.com/dashboard"]], tick:"bookfunnel"},
       {app:"Catalog Editor", text:"Paste the BookFunnel links.", fields:[["BookFunnel eBook link", "sl:BookFunnel|eBook|URL"], ["BookFunnel story bible link", "sl:BookFunnel|Story Bible|URL"], ["BookFunnel bundle link", "sl:BookFunnel|Bundle|URL"]]},
       {app:"BookFunnel", text:"Set up the Sales Action.", tick:"sales_action"}]),
@@ -4181,7 +4181,7 @@ function wfSteps(kind, lang, ed, v){
       {app:"Notion", text:"Save the monthly email letter and links.", tick:"email_notion"}, notion,
       {app:"Canva", text:"Make the monthly flyer.", tick:"flyer"},
       {app:"Canva", text:"Make the inside-box QR sticker (after the link is ready).", tick:"sticker"}]),
-    ...S("8. Release check", [{app:"Every app", text:"Test every link, download and the QR code.", tick:"tested"}]),
+    ...S("8. Release check", [{app:"Every app", text:"Test every link, download, and the QR code.", tick:"tested"}]),
     ...S("Payhip (Pub date)", [live, bibleLinks, bibleApprove]),
     ...S("Wide release", [dist, printIsbns, vlink, links])
   ];
