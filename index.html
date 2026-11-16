@@ -3922,10 +3922,13 @@ function wfPrev(ed, among){
     .sort((a,b)=> +b.number_in_series - +a.number_in_series)[0] || null;
 }
 const wfName = e => `“${e.title || e.file_name}” (${e.file_name})`;
+// A Dragon Box book's Subsc Pub date: the first 15th after today.
+function wfNext15(){ const d = new Date(); if (d.getDate() >= 15) d.setMonth(d.getMonth() + 1, 15); else d.setDate(15);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-15`; }
 // Everything the steps check or show for one book: the Release checklist rows, workflow ticks, ISBNs, promo, synopsis, story bible, Payhip links, Notion.
 async function wfLoadVals(ed){
   const F = encodeURIComponent(ed.file_name);
-  const [rel, ticks, fm, info, sbs, bl, links, notion, notes] = await Promise.all([
+  const [rel, ticks, fm, info, sbs, bl, links, notion, notes, sets] = await Promise.all([
     api("POST", "rpc/release_checklist_for", {p_files:[ed.file_name]}).catch(()=>null),
     api("GET", `release_steps?select=step,done_on,done_by&file_name=eq.${F}&step=like.wf:*`).catch(()=>[]),
     api("GET", `formats?select=format,isbn,not_offered&file_name=eq.${F}`).catch(()=>[]),
@@ -3934,8 +3937,10 @@ async function wfLoadVals(ed){
     api("GET", `bestseller_lines?select=bestseller_line&language=eq.${encodeURIComponent(ed.language || "English")}`).catch(()=>[]),
     api("GET", `store_links?select=store,format,link_or_id&file_name=eq.${F}&store=in.(Payhip,BookFunnel)`).catch(()=>[]),
     api("GET", `notion_pages?select=last_synced_at&file_name=eq.${F}`).catch(()=>[]),
-    api("GET", `edition_release_notes?select=subscription_publication&file_name=eq.${F}`).catch(()=>[])
+    api("GET", `edition_release_notes?select=subscription_publication&file_name=eq.${F}`).catch(()=>[]),
+    api("GET", "settings?select=key,value&key=in.(paperback_min_words,hardcover_min_pages)").catch(()=>[])
   ]);
+  const rules = {}; for (const r of sets || []) rules[r.key] = r.value;
   const bibles = new Set((sbs || []).map(r=>r.file_name));
   const isbn = {}; for (const r of fm || []) if (!r.not_offered) isbn[r.format] = r.isbn || "";
   const sb = (sbs || []).find(r=>r.file_name === ed.file_name) || null;
@@ -3945,7 +3950,7 @@ async function wfLoadVals(ed){
   const synced = (notion || []).map(r=>r.last_synced_at).filter(Boolean).sort().pop() || "";
   return {rel: rel ? new Map(rel.map(r=>[r.step_key, r])) : null, ticks: new Map((ticks || []).map(r=>[r.step, r])),
     isbn, offered, print: offered.has("Paperback") || offered.has("Hardcover"), sb, bibleIsbn:(sb && sb.isbn) || isbn["Story Bible"] || "",
-    sub:String(((notes || [])[0] || {}).subscription_publication || "").slice(0,10), bf, short:i.short_synopsis || "",
+    sub:String(((notes || [])[0] || {}).subscription_publication || "").slice(0,10), bf, short:i.short_synopsis || "", rules,
     genres:i.copyright_page_genres || "", promo:i.end_of_story_promo || "", newPromo:i.new_end_of_story_promo || "", cover:i.cover_image_link || "",
     synopsis:i.long_synopsis || "", rtl:i.reasons_to_love || "", best:((bl || [])[0] || {}).bestseller_line || "", payhip, synced,
     prev:wfPrev(ed), prevBible:wfPrev(ed, bibles)};
@@ -3997,9 +4002,14 @@ function wfSteps(kind, lang, ed, v){
   // ---- steps shared by the workflows ----
   const final = {app:"Word", text:"Write and finalize the story; approve the final text. Every later step uses this final manuscript.", tick:"story_final",
     chk: v=>v && has(ed.word_count) ? {done:true, detail:"Word count in the catalog: " + ed.word_count} : null};
-  const meta = Object.assign({app:"Claude", text:"Attach the final manuscript in Claude to use the new-book-metadata skill (it also saves the md copy and the word count).", sub:[written],
+  const subDate = (v && v.sub) || wfNext15();
+  const meta = Object.assign({app:"Claude", text:"Attach the final manuscript in Claude to use the new-book-metadata skill. For a new book, leave the book above on “New book”: Claude adds the book to Supabase" +
+      (db ? `, with its Subsc Pub date on the upcoming 15th (${rlDay(subDate)})` : " (no Subsc Pub date: it isn't a Dragon Box book)") +
+      ", its formats (no paperback under 20,000 words), the md copy and the word count. Then pick the book above.", sub:[written],
     attach:"The final manuscript (.docx).",
-    claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. Fill in or add this book in the Supabase catalog with the Supabase Write connector.`}, newBook);
+    claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. ` +
+      (db ? `It is a Dragon Box book: its Subsc Pub date is ${subDate}. ` : "It is not a Dragon Box book, so it has no Subsc Pub date. ") +
+      `Fill in or add this book in the Supabase catalog with the Supabase Write connector.`}, newBook);
   const isbnCells = [["eBook ISBN cell", "fmt:eBook:isbn"]].concat(offered("Audiobook") ? [["Audiobook ISBN cell", "fmt:Audiobook:isbn"]] : [])
     .concat(db ? [["SB ISBN cell", "sb:isbn"]] : []);
   const bowker = {app:"Bowker", text:`Get the ISBNs from Bowker: eBook${offered("Audiobook") ? ", audiobook" : ""}${db ? " and the story bible" : ""}. Paste each one in its cell (the buttons open each cell). Paperback and hardcover numbers are not bought from Bowker: KDP and B&N give their own when the print book is published (step under Wide release).`,
@@ -4021,7 +4031,10 @@ function wfSteps(kind, lang, ed, v){
       "Add the end-of-book promo below.",
       "Export the generic EPUB, the Kindle EPUB and the print PDF, then export Word (.docx) as " + F + "-vellum.docx."],
     vals: v ? [["eBook ISBN", v.isbn.eBook], ["Copyright page genres", v.genres]].concat(promoVals) : []};
-  const pages = {app:"Vellum", text:"From the print PDF, enter the page count and page size in the grid, then decide the print formats: a paperback only if the story is long enough (KDP's paperback minimum is 24 pages), a hardcover only for a long book (KDP's hardcover minimum is 75 pages). Mark a format you won't make as not offered (right-click one of its cells).",
+  const hcMin = v && v.rules.hardcover_min_pages;
+  const pages = {app:"Vellum", text:"Once the book is formatted, Vellum shows the print page count: enter it and the page size in the grid. " +
+      (hcMin ? `Hardcover only when the print book has at least ${hcMin} pages (the rule in Supabase); otherwise mark Hardcover not offered (right-click one of its cells).` : "Then decide whether there is a hardcover (some paperbacks are too small for one); mark it not offered if not (right-click one of its cells).") +
+      ` (No paperback under ${Number((v && v.rules.paperback_min_words) || 20000).toLocaleString("en-US")} words: that is set when Claude adds the book.)`,
     rk:"pages", act:"open", chk: v=>v && !v.print ? {done:true, detail:"No paperback or hardcover offered"} : null};
   const printSpecs = {opt:"print", app:"KDP and B&N Press", text:"Get the print cover specs for this page count and trim size: KDP's cover calculator and B&N Press's cover template (paperback, and hardcover when offered).",
     links:[["KDP cover calculator", "https://kdp.amazon.com/cover-calculator"], ["Open B&N Press", "https://press.barnesandnoble.com/"]], tick:"print_specs",
@@ -4075,8 +4088,13 @@ function wfSteps(kind, lang, ed, v){
       return {done:!miss.length, detail: miss.length ? "Still blank: " + miss.join(", ") : "Links, Approved and SB Pub are in"}; }};
   const narrator = {opt: db ? undefined : "audio", app:"Email", text:"Send the approved story and the story bible to the narrator. Narration runs alongside the next steps.", tick:"narrator",
     attach: db ? "The final manuscript and the story bible (pre-vellum .docx)." : "The final manuscript."};
-  const audioIn = {opt: db ? undefined : "audio", app:"Payhip and BookFunnel", text:"When the narrator delivers the audiobook: fill the narrator and runtime in the grid, add the audiobook to Payhip and BookFunnel (and to the bundle), and paste its links.",
-    tick:"audiobook", act:"open", cells: ed ? [["Narrator cell", "fmt:Audiobook:narrator"], ["Runtime cell", "fmt:Audiobook:runtime_minutes"]] : []};
+  const ao = db ? undefined : "audio";
+  const audioSteps = [
+    {opt:ao, app:"Laurelle", text:"The narrator delivers the audio: proof it.", tick:"audio_proofed"},
+    {opt:ao, app:"Laurelle", text:"Send the audio list to the narrator and update the book to the audiomatch version.", tick:"audio_list"},
+    {opt:ao, app:"Narrator", text:"The narrator sends the final files.", tick:"audio_final"},
+    {opt:ao, app:"Payhip and BookFunnel", text:"Add the audiobook to Payhip and BookFunnel (and to the bundle), paste its links, and fill the narrator and runtime in the grid.",
+      tick:"audiobook", act:"open", cells: ed ? [["Narrator cell", "fmt:Audiobook:narrator"], ["Runtime cell", "fmt:Audiobook:runtime_minutes"]] : []}];
 
   // ---- translation (non-Dragon Box) ----
   if (!db && lang === "xx"){
@@ -4111,7 +4129,7 @@ function wfSteps(kind, lang, ed, v){
       S("Before release", coverArt), S("Before release", coverPs),
       S("Before release", vellum), S("Before release", pages), S("Before release", mdFiles),
       S("Before release", printSpecs), S("Before release", printCover),
-      S(A, narrator), S(A, audioIn),
+      S(A, narrator), ...audioSteps.map(x=>S(A, x)),
       S(B, bibleWrite), S(B, bibleIsbn), S(B, biblePics), S(B, bibleCoverArt), S(B, bibleCoverPs), S(B, bundleCover),
       S(B, bibleVellum), S(B, bibleMd), S(B, biblePayhip), S(B, bibleDone),
       S("Release and after", live), S("Release and after", dist), S("Release and after", vlink), S("Release and after", notion), S("Release and after", links)
@@ -4135,7 +4153,7 @@ function wfSteps(kind, lang, ed, v){
       links:[["Open BookFunnel", "https://bookfunnel.com/dashboard"]], cells:bfCells, tick:"bookfunnel",
       chk: v=>v ? (has(v.bf.eBook) && has(v.bf.Bundle) ? {done:true, detail:"BookFunnel eBook and Bundle links in the catalog"} : {done:false, detail:"Still blank: " + [!has(v.bf.eBook) && "BookFunnel eBook", !has(v.bf["Story Bible"]) && "BookFunnel Story Bible", !has(v.bf.Bundle) && "BookFunnel Bundle"].filter(Boolean).join(", ")}) : null}),
     S(s5, {app:"BookFunnel", text:"Set up the Sales Action; confirm the product and the delivery.", tick:"sales_action"}),
-    S(s5, audioIn),
+    ...audioSteps.map(x=>S("Audiobook (when the narrator delivers)", x)),
     S(s6, {app:"Claude", text:`Write the Dragon Box intro letter${month ? " for " + month : ""} with the BookFunnel bundle link in it.`, tick:"intro_letter",
       attach:"Last month's intro letter, so the new one keeps the same layout and voice.",
       claude:`Write the Dragon Box intro letter${month ? ` for ${month}` : " for this month"} for ${t}, in the same layout and voice as last month's letter, which I've attached. Insert the BookFunnel bundle link${v && v.bf.Bundle ? `: ${v.bf.Bundle}` : " (I'll paste it)"}.` +
@@ -4240,7 +4258,7 @@ function wfOpen(kind, file){
     .sort((a,b)=> String(a.title || a.file_name).localeCompare(String(b.title || b.file_name)) || a.file_name.localeCompare(b.file_name));
   const vis = visibleRows();
   const pick = eds.some(e=>e.file_name === keep) ? keep : vis.length === 1 ? vis[0].file_name : "";
-  sel.innerHTML = `<option value="">Any book (the prompts say “my new book”)</option>` +
+  sel.innerHTML = `<option value="">New book (not in the catalog yet: the prompts say “my new book”)</option>` +
     eds.map(e=>`<option value="${esc(e.file_name)}">${esc((e.title || e.file_name) + " — " + e.file_name)}</option>`).join("");
   sel.value = eds.some(e=>e.file_name === pick) ? pick : "";
   $("#wfmsg").textContent = "";
