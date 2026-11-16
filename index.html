@@ -215,6 +215,8 @@ code{font-size:12px;word-break:break-all}
 .ctx button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:6px 10px;border-radius:5px;font-size:13px}
 .ctx button:hover{background:var(--soft)}
 .ctx .sub{padding-left:12px}
+.wfsub{list-style:none;padding-left:4px}
+.wfsub input:checked + span{text-decoration:line-through;opacity:.6}
 .colref{text-decoration:underline dotted;cursor:context-menu}
 /* Find store links */
 dialog#sldlg{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);max-width:1100px;width:calc(100% - 32px);max-height:calc(100vh - 40px);padding:20px}
@@ -4014,7 +4016,7 @@ function wfSteps(kind, lang, ed, v){
   const has = x => x != null && String(x).trim() !== "";
   const offered = x => !v || v.offered.has(x);
   const bestLine = (v && v.best) || "New York Times / USA Today Bestselling Author";
-  const reuse = `Copy Additional Books, Acknowledgments and About the Author from booklinks copy.vellum (${WF_BOOKLINKS}).`;
+  const reuse = `Reuse Additional Books, Acknowledgments and About the Author from booklinks copy.vellum (${WF_BOOKLINKS}).`;
   const promoVals = v ? [["End of story promo", v.promo], v.newPromo && v.newPromo !== v.promo ? ["New end of story promo (by its rule)", v.newPromo] : null].filter(Boolean) : [];
   const heading = ed ? WF_RTL_HEADING[ed.language] || "" : "";
   const payVals = v ? [["Long Synopsis", v.synopsis], ["Heading", heading], ["Reasons to Love", v.rtl]] : [];
@@ -4207,6 +4209,11 @@ function wfStatus(s, v){
   const done = s.tick && !s.rk ? parts.includes(true) : parts.every(Boolean);
   return {done, late: late && !done, note: notes.filter(Boolean).join(" · "), tickKey, ticked, locked: done && !ticked};
 }
+// Ticks on the bulleted sub-steps (Vellum steps): yours alone, kept in this browser per book.
+function wfSubKey(s, k){ const ed = wfBook(); return (ed ? ed.file_name : "new") + "|" + ([].concat(s.rk || [])[0] || s.tick || s.app) + "|" + k; }
+function wfSubAll(){ try{ return JSON.parse(localStorage.getItem("wfsubs") || "{}") || {}; }catch(e){ return {}; } }
+function wfSubGet(key){ return !!wfSubAll()[key]; }
+function wfSubSet(key, on){ try{ const a = wfSubAll(); if (on) a[key] = 1; else delete a[key]; localStorage.setItem("wfsubs", JSON.stringify(a)); }catch(e){} }
 function wfRender(){
   const ed = wfBook(), db = wfKind === "db";
   const lang = wfKind === "xx" ? "xx" : "en";
@@ -4241,7 +4248,7 @@ function wfRender(){
     return head + `<div class="${cls}" data-i="${i}"><span class="n">${st && st.done ? "✓" : st && st.late ? "!" : i+1}</span><div class="body">
       <div>${s.text ? `<span class="app">${esc(s.app)}:</span> ${esc(s.text)}` : ""}${i === next ? ` <span class="nexttag">Next</span>` : ""}</div>
       ${st && st.note ? `<div class="stnote">${esc(st.note)}</div>` : ""}
-      ${s.sub ? `<ul>${s.sub.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      ${s.sub ? `<ul class="wfsub">${s.sub.map((x, k)=>{ const key = wfSubKey(s, k); return `<li><label class="chk"><input type="checkbox" data-sub="${esc(key)}" ${wfSubGet(key) ? "checked" : ""}> <span>${esc(x)}</span></label></li>`; }).join("")}</ul>` : ""}
       ${vals ? `<div class="wfvals">${vals}</div>` : ""}
       ${s.fields ? `<div class="wffields">${s.fields.map(([k, id])=>{ const c = COLMAP[id], cur = ed && c ? show(valueOf(ed, c)) : "";
         return `<label for="wff${i}_${esc(id)}">${esc(k)}</label><input id="wff${i}_${esc(id)}" type="text" data-col="${esc(id)}" value="${esc(cur)}" ${ed ? "" : "disabled placeholder=\"pick the book first\""}>`; }).join("")}</div>` : ""}
@@ -4362,6 +4369,9 @@ $("#wflist").addEventListener("click", async ev=>{
     }catch(err){ msg(friendly(err)); }
     finally{ b.disabled = false; }
   }
+});
+$("#wflist").addEventListener("change", ev=>{
+  const sb = ev.target.closest("input[data-sub]"); if (sb) wfSubSet(sb.dataset.sub, sb.checked);
 });
 $("#wflist").addEventListener("change", async ev=>{
   const box = ev.target.closest("input[data-tick]"); if (!box) return;
