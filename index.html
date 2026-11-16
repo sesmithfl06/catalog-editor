@@ -261,8 +261,7 @@ dialog#wfdlg::backdrop{background:#0006}
 .wffields input{width:100%;min-width:0}
 .wfstep .due{color:var(--muted);font-size:12px}
 .wfstep.late .due{color:var(--bad)}
-.wfstep .loc{color:var(--muted);font-style:italic}
-.wfstep a.loc:hover{text-decoration:underline}
+.wfstep i.loc{color:var(--muted)}
 .wfstep .att{color:var(--muted);font-size:12px;margin-top:3px}
 .wfstep .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .wfstep .acts a{font-size:12px}
@@ -3923,10 +3922,10 @@ $("#rllist").addEventListener("change", async ev=>{
    (tick: a 'wf:<key>' row in release_steps, the same table the Release panel ticks). Release opens a book's workflow from its card. */
 const WF_SQL = "https://supabase.com/dashboard/project/qurcnkeqxfqqfnygkpmd/sql/new";
 const WF_BOOKLINKS = "⟦Dropbox-Sesmithfl/Sesmithfl Team Folder/0 Book Series/0Vellum/For Bob/booklinks copy.vellum|0 Book Series/0Vellum/For Bob/booklinks copy.vellum⟧";
-// File locations in step text are written ⟦shown path|path inside the Sesmithfl Team Folder⟧: shown in grey italic, and a link to that place on dropbox.com when there is a path (it opens on any device signed in to a Dropbox that shares the folder).
+// File locations in step text are written ⟦shown path|path inside the Sesmithfl Team Folder⟧: shown as a normal link (like the other links in the popup), or grey italic when there is no path to link to; a link to that place on dropbox.com when there is a path (it opens on any device signed in to a Dropbox that shares the folder).
 const wfDbxUrl = p => "https://www.dropbox.com/home/" + ["Sesmithfl Team Folder", ...String(p).split("/")].map(encodeURIComponent).join("/");
 const wfRich = t => String(t).split(/⟦([^⟧]*)⟧/).map((x, i)=>{ if (i % 2 === 0) return esc(x); const j = x.lastIndexOf("|"), d = x.slice(0, j), p = x.slice(j + 1);
-  return p ? `<a class="loc" href="${esc(wfDbxUrl(p))}" target="_blank" rel="noopener"><i>${esc(d)}</i></a>` : `<i class="loc">${esc(d)}</i>`; }).join("");
+  return p ? `<a href="${esc(wfDbxUrl(p))}" target="_blank" rel="noopener">${esc(d)} ↗</a>` : `<i class="loc">${esc(d)}</i>`; }).join("");
 const WF_RTL_HEADING = {English:"Discover your new love!"};   // the heading pasted above Reasons to Love on Payhip, by language
 let wfKind = "db", wfCur = [], wfVals = null, wfValsFor = "", wfScroll = false;
 function wfBook(){ const f = $("#wfbook").value; return f && f[0] !== "@" ? data.editions.find(e=>e.file_name===f) || null : null; }
