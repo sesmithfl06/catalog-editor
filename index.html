@@ -4017,8 +4017,8 @@ function wfSteps(kind, lang, ed, v){
       (!db ? " (no Subsc Pub date: it isn't a Dragon Box book)" : plan.set ? ` (Subsc Pub ${rlDay(plan.date)})` :
         plan.late ? ", asking you for its Subsc Pub date" :
         `, with its Subsc Pub date on ${rlDay(plan.date)} (the ${plan.month} box: the month after the last Dragon Box book)`) +
-      ", its formats (no paperback under 20,000 words; a hardcover only from 40,000 words), the md copy and the word count" +
-      (db ? ". In the same chat it makes the story bible from the same manuscript: the pre-images .docx, the bible's md copy and its details in Supabase (story-bible-editorial-stager skill)" : "") + ". Then pick the book above.", sub:[written],
+      ", its formats (no paperback under 20,000 words; a hardcover only from 40,000 words), the eBook price by length, the md copy and the word count" +
+      (db ? ". In the same chat it makes the story bible from the same manuscript: the pre-images .docx, the bible's md copy and its details in Supabase, including its price and SB Pub (= the Subsc Pub date)" : "") + ". Then pick the book above.", sub:[written],
     attach:"The final manuscript (.docx). The skill also saves the story's md copy from it, so no md refresh is needed after Vellum.",
     claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. ` +
       (!db ? "It is not a Dragon Box book, so it has no Subsc Pub date. " : plan.set ? `It is a Dragon Box book: its Subsc Pub date is ${plan.date}. ` :
@@ -4095,7 +4095,7 @@ function wfSteps(kind, lang, ed, v){
     vals: v ? [["SB ISBN", v.bibleIsbn]].concat(promoVals) : []};
   const biblePayhip = {opt:o, app:"Payhip", text:"Put the story bible on Payhip with its Bundle (eBook + Story Bible) and set them Live. Description: paste the Story Bible Synopsis below.", links:[["Open Payhip", "https://payhip.com/"]],
     chk: v=>v ? (has(v.payhip["Story Bible"]) ? {done:true, detail:"Story bible link in the catalog"} : null) : null, tick:"bible_payhip", vals:sbVal};
-  const bibleDone = {opt:o, app:"Catalog Editor", text:"Paste the story bible's Payhip link in the Payhip Story Bible URL column and the Bundle link in the Payhip Bundle URL column, set the story bible's status to Approved and fill SB Pub. Find store links for shown books also lists the blank links.", act:"open", rk:"story_bible",
+  const bibleDone = {opt:o, app:"Catalog Editor", text:"Paste the story bible's Payhip link in the Payhip Story Bible URL column and the Bundle link in the Payhip Bundle URL column, set the story bible's status to Approved and fill SB Pub if it is still blank. Find store links for shown books also lists the blank links.", act:"open", rk:"story_bible",
     chk: v=>{ if (!v || !sb) return null; const miss = [!has(v.payhip["Story Bible"]) && "Payhip Story Bible URL", !has(v.payhip.Bundle) && "Payhip Bundle URL",
       !(sb.status === "Approved") && "status Approved", !sb.publication_date && "SB Pub"].filter(Boolean);
       return {done:!miss.length, detail: miss.length ? "Still blank: " + miss.join(", ") : "Links, Approved and SB Pub are in"}; }};
