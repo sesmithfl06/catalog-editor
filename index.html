@@ -4066,9 +4066,9 @@ function wfSteps(kind, lang, ed, v){
 
   // ---- story bible steps (in the Dragon Box always; otherwise only when the book gets a story bible) ----
   const o = db ? undefined : "bible";
-  const bibleWrite = {opt:o, app:"Claude", text:"Write the story bible without pictures from the final manuscript with the story-bible-editorial-stager skill (it checks every name and detail against the manuscript). It saves a .docx whose name ends in pre-images and fills in the story bible's details in Supabase (which sections it has, word count, md file name, Story Bible Synopsis).",
+  const bibleWrite = {opt:o, app:"Claude", text:"Write the story bible without pictures from the final manuscript with the story-bible-editorial-stager skill (it checks every name and detail against the manuscript). It saves a .docx whose name ends in pre-images and the story bible's md copy, and fills in the story bible's details in Supabase (which sections it has, word count, md file name, Story Bible Synopsis).",
     attach:"The final manuscript.",
-    claude:`Use the story-bible-editorial-stager skill to make the story bible for ${t}. I've attached the story's final manuscript. Check names and continuity against it, save the draft as a DOCX whose name ends in pre-images, then fill in its details in Supabase.`,
+    claude:`Use the story-bible-editorial-stager skill to make the story bible for ${t}. I've attached the story's final manuscript. Check names and continuity against it, save the draft as a DOCX whose name ends in pre-images and its md copy, then fill in its details in Supabase.`,
     chk: v=>{ if (!v) return null; if (!sb) return db ? {done:false, detail:"No story bible in the catalog yet"} : null;
       const miss = [!has(sb.word_count) && "word count", !has(sb.bible_md) && "md file name", !has(sb.description) && "Story Bible Synopsis"].filter(Boolean);
       return miss.length ? {done:false, detail:"Still blank: " + miss.join(", ")} : {done:true, detail:`In the catalog: ${sb.word_count} words, ${sb.bible_md}, Story Bible Synopsis`}; }};
@@ -4091,7 +4091,6 @@ function wfSteps(kind, lang, ed, v){
       "Add the end-of-book promo below.",
       `Export the generic EPUB, the Kindle EPUB and the PDF, then export Word (.docx) as ${F}-Bible-vellum.docx.`],
     vals: v ? [["SB ISBN", v.bibleIsbn]].concat(promoVals) : []};
-  const bibleMd = {opt:o, app:"Update md files", text:`Open Update md files (Dropbox: 05_Scripts_and_Tools/Scripts/Update md files) so Story-Bibles-md/${F}-bible.md matches the Vellum export.`, tick:"bible_md"};
   const biblePayhip = {opt:o, app:"Payhip", text:"Put the story bible on Payhip with its Bundle (eBook + Story Bible) and set them Live. Description: paste the Story Bible Synopsis below.", links:[["Open Payhip", "https://payhip.com/"]],
     chk: v=>v ? (has(v.payhip["Story Bible"]) ? {done:true, detail:"Story bible link in the catalog"} : null) : null, tick:"bible_payhip", vals:sbVal};
   const bibleDone = {opt:o, app:"Catalog Editor", text:"Paste the story bible's Payhip link in the Payhip Story Bible URL column and the Bundle link in the Payhip Bundle URL column, set the story bible's status to Approved and fill SB Pub. Find store links for shown books also lists the blank links.", act:"open", rk:"story_bible",
@@ -4143,7 +4142,7 @@ function wfSteps(kind, lang, ed, v){
       S("Before release", printSpecs), S("Before release", printCover),
       S(A, narrator), ...audioSteps.map(x=>S(A, x)),
       S(B, bibleWrite), S(B, bibleIsbn), S(B, biblePics), S(B, bibleCoverArt), S(B, bibleCoverPs), S(B, bundleCover),
-      S(B, bibleVellum), S(B, bibleMd), S(B, biblePayhip), S(B, bibleDone),
+      S(B, bibleVellum), S(B, biblePayhip), S(B, bibleDone),
       S("Release and after", live), S("Release and after", dist), S("Release and after", vlink), S("Release and after", notion), S("Release and after", links)
     ];
   }
@@ -4158,7 +4157,7 @@ function wfSteps(kind, lang, ed, v){
     S(s1, final), S(s1, meta), S(s1, bowker),
     S(s2, coverArt), S(s2, coverPs), S(s2, bibleCoverArt), S(s2, bibleCoverPs), S(s2, bundleCover),
     S(s3, bibleWrite), S(s3, biblePics), S(s3, narrator),
-    S(s4, vellum), S(s4, bibleVellum), S(s4, pages), S(s4, bibleMd), S(s4, printSpecs), S(s4, printCover),
+    S(s4, vellum), S(s4, bibleVellum), S(s4, pages), S(s4, printSpecs), S(s4, printCover),
     S(s5, {app:"Payhip", text:"Make the products for the eBook, the story bible and the bundle: descriptions below (Long Synopsis, heading, Reasons to Love; Story Bible Synopsis), product images (covers, the text-free cover, the bundle graphic), and upload the generic EPUB and Kindle EPUB of both titles. They go Live at the Payhip step below.",
       links:[["Open Payhip", "https://payhip.com/"]], tick:"payhip_products", vals: payVals.concat(sbVal)}),
     S(s5, {app:"BookFunnel", text:"Upload both EPUB versions of both titles with the same descriptions, add the correct Payhip product link following your setup, then build this month's bundle page with the right titles. Paste the BookFunnel links in their cells.",
