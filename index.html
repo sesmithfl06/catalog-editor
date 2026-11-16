@@ -4073,7 +4073,7 @@ function wfSteps(kind, lang, ed, v){
     return ks.every(k=>v.ticks.get("wf:" + k)) ? {done:true, detail:"Ticked earlier"} : null; };
   const covers = {app:"ChatGPT", text:`creates the first-stage covers${hasBible ? ", the story bible pictures and the story bible cover" : ""}.`, tick:"chatgpt_art",
     chk: legacy(["cover_art"].concat(hasBible ? ["bible_cover_art", "bible_pictures"] : [])),
-    attach: hasBible ? "the story bible's pre-images file" : undefined,
+    attach: hasBible ? "Attach the story bible Claude gave you." : undefined,
     prompts:[{who:"bob", text:
       `Make the covers for ${t}${series}. ` +
       (prev ? `Place the title, series name and author name the same way as on the attached cover of the previous book in the series, ${wfName(prev)}.` : `Place the title, series name and author name so the same placement can be used for every book in the series${ed && ed.series ? "; if I attached another book's cover from the series, match its placement" : ""}.`) +
@@ -4260,7 +4260,7 @@ function wfRender(){
       ${vals ? `<div class="wfvals">${vals}</div>` : ""}
       ${s.fields ? `<div class="wffields">${s.fields.map(([k, id])=>{ const c = COLMAP[id], cur = ed && c ? show(valueOf(ed, c)) : "";
         return `<label for="wff${i}_${esc(id)}">${esc(k)}</label><input id="wff${i}_${esc(id)}" type="text" data-col="${esc(id)}" value="${esc(cur)}" ${ed ? "" : "disabled placeholder=\"pick the book first\""}>`; }).join("")}</div>` : ""}
-      ${s.attach ? `<div class="att">Attach: ${esc(s.attach)}</div>` : ""}
+      ${s.attach ? `<div class="att">${/^Attach /.test(s.attach) ? "" : "Attach: "}${esc(s.attach)}</div>` : ""}
       ${pblocks}
       ${acts.length ? `<div class="acts">${acts.join("")}</div>` : ""}</div></div>`;
   }).join("");
@@ -4338,7 +4338,7 @@ $("#wflist").addEventListener("click", async ev=>{
     const cp = copyText(p).catch(()=>{});   // copy first: once the new tab opens, this page loses focus and the browser refuses to copy
     window.open((a === "claude" ? "https://claude.ai/new?q=" : "https://chatgpt.com/?q=") + encodeURIComponent(p), "_blank", "noopener");
     await cp;
-    msg(`${a === "claude" ? "Claude" : "ChatGPT"} opened with the prompt in the message box (also copied).${s.attach ? " Attach: " + s.attach : ""}`);
+    msg(`${a === "claude" ? "Claude" : "ChatGPT"} opened with the prompt in the message box (also copied).${s.attach ? (/^Attach /.test(s.attach) ? " " : " Attach: ") + s.attach : ""}`);
   } else if (a === "copy"){
     try{ await copyText(pr.text); msg("Prompt copied."); }catch(e){ msg("Copy was blocked."); }
   } else if (a === "val"){
