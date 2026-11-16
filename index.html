@@ -4250,13 +4250,14 @@ function wfRender(){
     for (const [label, url] of s.links || []) acts.push(`<a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)} ↗</a>`);
     if (s.btn) acts.push(`<button type="button" class="primary" data-a="${s.btn[0]}" data-i="${i}" ${ed ? "" : "disabled title=\"Pick the book first\""}>${esc(s.btn[1])}</button>`);
     if (s.fields) acts.push(`<button type="button" class="primary" data-a="save" data-i="${i}" ${ed ? "" : "disabled title=\"Pick the book first\""}>Save</button>`);
-    const pblocks = (s.prompts || []).map((p, k)=>`<div class="wfprompt">${p.label ? `<div class="hint"><b>${esc(p.label)}</b></div>` : ""}<div class="acts"><button type="button" class="primary" data-a="${p.who}" data-i="${i}" data-p="${k}">Open ${p.who === "claude" ? "Claude" : "ChatGPT"} with the prompt</button><button type="button" data-a="copy" data-i="${i}" data-p="${k}">Copy prompt</button></div><details><summary class="hint" style="cursor:pointer">Prompt</summary><pre>${esc(p.text)}</pre></details></div>`).join("");
+    const aiStep = !!(s.text && (s.prompts || []).length && /^[a-z]/.test(s.text));
+    const pblocks = (s.prompts || []).map((p, k)=>`<div class="wfprompt">${p.label ? `<div class="hint"><b>${esc(p.label)}</b></div>` : ""}<div class="acts"><button type="button" class="primary" data-a="${p.who}" data-i="${i}" data-p="${k}">Open ${p.who === "claude" ? "Claude" : "ChatGPT"} with the prompt</button><button type="button" data-a="copy" data-i="${i}" data-p="${k}">Copy prompt</button>${aiStep && k === 0 ? `<i class="hint">(${esc(s.app)} ${esc(s.text)})</i>` : ""}</div><details><summary class="hint" style="cursor:pointer">Prompt</summary><pre>${esc(p.text)}</pre></details></div>`).join("");
     const vals = (s.vals || []).map(([k, val], j)=>`<div class="wfval"><span class="k">${esc(k)}</span>` +
       (val ? (/^https?:\/\//.test(val) ? `<a class="v" href="${esc(val)}" target="_blank" rel="noopener">${esc(val)}</a>` : `<span class="v">${esc(String(val).length > 160 ? String(val).slice(0,160) + "…" : val)}</span>`) +
         `<button type="button" data-a="val" data-i="${i}" data-j="${j}">Copy</button>` : `<span class="v blank">blank in the catalog</span>`) + `</div>`).join("");
     const cls = "wfstep" + (st ? (st.done ? " done" : st.late ? " late" : "") : "") + (i === next ? " next" : "") + (s.opt && v && !st ? " na" : "");
     return head + `<div class="${cls}" data-i="${i}"><span class="n">${st && st.done ? "✓" : st && st.late ? "!" : i+1}</span><div class="body">
-      <div>${s.text ? `<span class="app">${esc(s.app)}${/^[a-z]/.test(s.text) ? "" : ":"}</span> ${esc(s.text)}` : ""}${i === next ? ` <span class="nexttag">Next</span>` : ""}</div>
+      <div>${s.text && !aiStep ? `<span class="app">${esc(s.app)}:</span> ${esc(s.text)}` : ""}${i === next ? ` <span class="nexttag">Next</span>` : ""}</div>
       ${st && st.note ? `<div class="stnote">${esc(st.note)}</div>` : ""}
       ${s.sub ? `<ul class="wfsub">${s.sub.map((x, k)=>{ const key = wfSubKey(s, k); return `<li><label class="chk"><input type="checkbox" data-sub="${esc(key)}" ${wfSubGet(key) ? "checked" : ""}> <span>${esc(x)}</span></label></li>`; }).join("")}</ul>` : ""}
       ${vals ? `<div class="wfvals">${vals}</div>` : ""}
