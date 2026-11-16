@@ -4050,10 +4050,10 @@ function wfSteps(kind, lang, ed, v){
   const bibleWriteChk = v=>{ if (!v || !sb) return null; const miss = [!has(sb.word_count) && "word count", !has(sb.description) && "Story Bible Synopsis"].filter(Boolean);
     return miss.length ? {done:false, detail:"Still blank: " + miss.join(", ")} : {done:true, detail:"Story bible in the catalog"}; };
   const bibleWritePrompt = `Use the story-bible-editorial-stager skill to make the story bible for ${t}. I've attached the story's final manuscript. Check names and continuity against it, save the draft as a DOCX whose name ends in pre-images and its md copy, then fill in its details in Supabase.`;
-  const meta = xx ? {app:"Claude", text:"Put this edition's metadata in Supabase and get its copyright page, synopsis, cover text lines and Vellum checklist.", rk:"details", tick:"non_english", chk:()=>ed ? {done:true, detail:"In the catalog"} : null,
+  const meta = xx ? {app:"Claude", text:"puts this edition's metadata in Supabase and gives you its copyright page, synopsis, cover text lines and Vellum checklist.", rk:"details", tick:"non_english", chk:()=>ed ? {done:true, detail:"In the catalog"} : null,
       prompts:[{who:"claude", label:"Metadata", text:`Use the new-book-metadata skill. I've attached the translator's docx for the ${ed ? ed.language : "<language>"} edition of ${(()=>{ const en = wfEnglish(ed); return en ? wfName(en) : ed ? `“${ed.title || f}”` : "my book"; })()}${ed ? `; its file name is ${f}` : ""}. Fill in or add this edition in the Supabase catalog with the Supabase Write connector.`},
         {who:"claude", label:"Copyright page, synopsis, cover text lines and Vellum checklist", text:`Use the non-english-edition skill for ${ed ? f : "the <language> edition of my book"}: give me the copyright page, synopsis, cover text lines and the Vellum checklist.`}]}
-    : {app:"Claude", text: db ? "Put the metadata in Supabase and create the story bible with image prompts for ChatGPT to finish." : "Put the metadata in Supabase. If this book gets a story bible, also create it with image prompts for ChatGPT to finish.", rk:"details",
+    : {app:"Claude", text: db ? "puts the metadata in Supabase and creates the story bible with image prompts for ChatGPT to finish." : "puts the metadata in Supabase. If this book gets a story bible, it also creates it with image prompts for ChatGPT to finish.", rk:"details",
       chk: db ? metaChk : v=>{ const b = bibleWriteChk(v); return b && !b.done ? b : metaChk(v); },
       prompts:[{who:"claude", label: db ? "" : "Metadata", text:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. ` +
         (!db ? "It is not a Dragon Box book, so it has no Subsc Pub date. " : plan.set ? `It is a Dragon Box book: its Subsc Pub date is ${plan.date}. ` :
@@ -4071,7 +4071,7 @@ function wfSteps(kind, lang, ed, v){
   // Steps that used to be ticked one by one count as done when all of their old ticks are in.
   const legacy = keys => v=>{ if (!v) return null; const ks = typeof keys === "function" ? keys(v) : keys;
     return ks.every(k=>v.ticks.get("wf:" + k)) ? {done:true, detail:"Ticked earlier"} : null; };
-  const covers = {app:"ChatGPT", text:`Create the first-stage covers${hasBible ? ", the story bible pictures and the story bible cover" : ""}.`, tick:"chatgpt_art",
+  const covers = {app:"ChatGPT", text:`creates the first-stage covers${hasBible ? ", the story bible pictures and the story bible cover" : ""}.`, tick:"chatgpt_art",
     chk: legacy(["cover_art"].concat(hasBible ? ["bible_cover_art", "bible_pictures"] : [])),
     vals: hasBible && v ? [["The story's cover", v.cover]] : [],
     prompts:[{who:"bob", label:"Story covers", text:
@@ -4137,7 +4137,7 @@ function wfSteps(kind, lang, ed, v){
   const printSpecs = {opt:"print", app:"KDP and B&N Press", text:`Get the real print cover templates (paperback${hc ? ", hardcover" + hcIf : ""}).`,
     links:[["KDP cover calculator", "https://kdp.amazon.com/cover-calculator"], ["Open B&N Press", "https://press.barnesandnoble.com/"]], tick:"print_specs",
     vals: v ? [["Page count", ed.paperback_pages], ["Page size", ed.paperback_page_size]] : []};
-  const printArt = {opt:"print", app:"ChatGPT", text:"Fit the draft print covers to the KDP and B&N templates.", tick:"print_cover_art",
+  const printArt = {opt:"print", app:"ChatGPT", text:"fits the draft print covers to the KDP and B&N templates.", tick:"print_cover_art",
     prompts:[{who:"bob", text:`Adjust the attached draft print covers for ${t} to the attached KDP and B&N templates: resize the canvas and spine and move anything that sits outside the safe areas. Make one file that works for both: KDP's overall size and B&N's margins (keep text and important art 0.25" inside the trim and spine edges). Keep the art and text placement otherwise the same, and keep the space for the NYT line on the covers with text. I need: the paperback with text, the paperback with no text${hc ? ", and the hardcover with text" : ""}.`}]};
 
   // ---- release ----
@@ -4175,7 +4175,7 @@ function wfSteps(kind, lang, ed, v){
       {app:"BookFunnel", text:"Set up the Sales Action.", tick:"sales_action"}]),
     ...S("Audiobook (when the narrator delivers)", audioSteps),
     ...S("6. Dragon Box content", [
-      {app:"Claude", text:"Write the Dragon Box intro letter.", tick:"intro_letter",
+      {app:"Claude", text:"writes the Dragon Box intro letter.", tick:"intro_letter",
         prompts:[{who:"claude", text:`Write the Dragon Box intro letter${month ? ` for ${month}` : " for this month"} for ${t}, in the same layout and voice as last month's letter, which I've attached. Insert the BookFunnel bundle link${v && v.bf.Bundle ? `: ${v.bf.Bundle}` : " (I'll paste it)"}.` + (v && v.short ? ` About the book: ${v.short}` : "")}],
         vals: v ? [["BookFunnel bundle link", v.bf.Bundle]] : []},
       {app:"Google Drive", text:`File the intro in Dragon Box Subscriptions › ${month || "this month"}.`, tick:"drive"},
@@ -4256,7 +4256,7 @@ function wfRender(){
         `<button type="button" data-a="val" data-i="${i}" data-j="${j}">Copy</button>` : `<span class="v blank">blank in the catalog</span>`) + `</div>`).join("");
     const cls = "wfstep" + (st ? (st.done ? " done" : st.late ? " late" : "") : "") + (i === next ? " next" : "") + (s.opt && v && !st ? " na" : "");
     return head + `<div class="${cls}" data-i="${i}"><span class="n">${st && st.done ? "✓" : st && st.late ? "!" : i+1}</span><div class="body">
-      <div>${s.text ? `<span class="app">${esc(s.app)}:</span> ${esc(s.text)}` : ""}${i === next ? ` <span class="nexttag">Next</span>` : ""}</div>
+      <div>${s.text ? `<span class="app">${esc(s.app)}${/^[a-z]/.test(s.text) ? "" : ":"}</span> ${esc(s.text)}` : ""}${i === next ? ` <span class="nexttag">Next</span>` : ""}</div>
       ${st && st.note ? `<div class="stnote">${esc(st.note)}</div>` : ""}
       ${s.sub ? `<ul class="wfsub">${s.sub.map((x, k)=>{ const key = wfSubKey(s, k); return `<li><label class="chk"><input type="checkbox" data-sub="${esc(key)}" ${wfSubGet(key) ? "checked" : ""}> <span>${esc(x)}</span></label></li>`; }).join("")}</ul>` : ""}
       ${vals ? `<div class="wfvals">${vals}</div>` : ""}
