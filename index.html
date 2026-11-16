@@ -3948,7 +3948,7 @@ async function wfLoadVals(ed){
     api("GET", `store_links?select=store,format,link_or_id&file_name=eq.${F}&store=in.(Payhip,BookFunnel)`).catch(()=>[]),
     api("GET", `notion_pages?select=last_synced_at&file_name=eq.${F}`).catch(()=>[]),
     api("GET", `edition_release_notes?select=subscription_publication&file_name=eq.${F}`).catch(()=>[]),
-    api("GET", "settings?select=key,value&key=in.(paperback_min_words,hardcover_min_pages)").catch(()=>[])
+    api("GET", "settings?select=key,value&key=in.(paperback_min_words,hardcover_min_words)").catch(()=>[])
   ]);
   const rules = {}; for (const r of sets || []) rules[r.key] = r.value;
   const bibles = new Set((sbs || []).map(r=>r.file_name));
@@ -4015,13 +4015,13 @@ function wfSteps(kind, lang, ed, v){
   const plan = v && v.sub ? {date:v.sub, month:"", late:false, set:true} : wfSubPlan();
   const meta = Object.assign({app:"Claude", text:"Attach the final manuscript in Claude to use the new-book-metadata skill. For a new book, leave the book above on “New book”: Claude adds the book to Supabase" +
       (!db ? " (no Subsc Pub date: it isn't a Dragon Box book)" : plan.set ? ` (Subsc Pub ${rlDay(plan.date)})` :
-        plan.late ? `, for the ${plan.month} box: no book has its Subsc Pub on ${rlDay(plan.date)} and that date has passed, so the book is late and Claude asks you for its Subsc Pub date` :
+        plan.late ? ", asking you for its Subsc Pub date" :
         `, with its Subsc Pub date on ${rlDay(plan.date)} (the ${plan.month} box: the month after the last Dragon Box book)`) +
-      ", its formats (no paperback under 20,000 words), the md copy and the word count. Then pick the book above.", sub:[written],
+      ", its formats (no paperback under 20,000 words; a hardcover only from 40,000 words), the md copy and the word count. Then pick the book above.", sub:[written],
     attach:"The final manuscript (.docx).",
     claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. ` +
       (!db ? "It is not a Dragon Box book, so it has no Subsc Pub date. " : plan.set ? `It is a Dragon Box book: its Subsc Pub date is ${plan.date}. ` :
-        plan.late ? `It is a Dragon Box book for the ${plan.month} box, but it is late: no book has its Subsc Pub date on ${plan.date} and that date has passed. Ask me for its actual Subsc Pub date before writing it. ` :
+        plan.late ? "It is a Dragon Box book. Ask me for its Subsc Pub date before writing it. " :
         `It is a Dragon Box book for the ${plan.month} box: its Subsc Pub date is ${plan.date}. `) +
       `Fill in or add this book in the Supabase catalog with the Supabase Write connector.`}, newBook);
   const isbnCells = [["eBook ISBN cell", "fmt:eBook:isbn"]].concat(offered("Audiobook") ? [["Audiobook ISBN cell", "fmt:Audiobook:isbn"]] : [])
@@ -4045,10 +4045,9 @@ function wfSteps(kind, lang, ed, v){
       "Add the end-of-book promo below.",
       "Export the generic EPUB, the Kindle EPUB and the print PDF, then export Word (.docx) as " + F + "-vellum.docx."],
     vals: v ? [["eBook ISBN", v.isbn.eBook], ["Copyright page genres", v.genres]].concat(promoVals) : []};
-  const hcMin = v && v.rules.hardcover_min_pages;
-  const pages = {app:"Vellum", text:"Once the book is formatted, Vellum shows the print page count: enter it and the page size in the grid. " +
-      (hcMin ? `Hardcover only when the print book has at least ${hcMin} pages (the rule in Supabase); otherwise mark Hardcover not offered (right-click one of its cells).` : "Then decide whether there is a hardcover (some paperbacks are too small for one); mark it not offered if not (right-click one of its cells).") +
-      ` (No paperback under ${Number((v && v.rules.paperback_min_words) || 20000).toLocaleString("en-US")} words: that is set when Claude adds the book.)`,
+  const num = (k, d) => Number((v && v.rules[k]) || d).toLocaleString("en-US");
+  const pages = {app:"Vellum", text:"Once the book is formatted, Vellum shows the print page count: enter it and the page size in the grid." +
+      ` (Which print formats the book has was set when Claude added it: no paperback under ${num("paperback_min_words", 20000)} words, a hardcover only from ${num("hardcover_min_words", 40000)} words.)`,
     rk:"pages", act:"open", chk: v=>v && !v.print ? {done:true, detail:"No paperback or hardcover offered"} : null};
   const printSpecs = {opt:"print", app:"KDP and B&N Press", text:"Get the print cover specs for this page count and trim size: KDP's cover calculator and B&N Press's cover template (paperback, and hardcover when offered).",
     links:[["KDP cover calculator", "https://kdp.amazon.com/cover-calculator"], ["Open B&N Press", "https://press.barnesandnoble.com/"]], tick:"print_specs",
