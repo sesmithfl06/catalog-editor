@@ -448,7 +448,10 @@ dialog#ncdlg::backdrop{background:#0006}
 
 <!-- ============ Story / story bible workflow ============ -->
 <dialog id="wfdlg">
-  <h2 id="wftitle">Dragon Box workflow</h2>
+  <div class="row" style="position:sticky;top:-20px;z-index:2;background:var(--panel);margin:-20px -20px 6px;padding:14px 20px 6px">
+    <h2 id="wftitle" style="margin:0">Dragon Box workflow</h2><span class="grow"></span>
+    <button id="wfx" type="button" aria-label="Close" title="Close">✕ Close</button>
+  </div>
   <p class="hint" id="wfhint"></p>
   <div class="row">
     <b>Book</b>
@@ -4311,6 +4314,7 @@ function wfPick(ed){ $("#wfbook").value = ed.file_name; $("#wfsearch").hidden = 
 $("#wfsearch").oninput = ()=>{ const v = $("#wfsearch").value;
   const ed = data.editions.find(e=>e.file_name && (e.title || e.file_name) + " — " + e.file_name === v); if (ed) wfPick(ed); };
 $("#wfclose").onclick = ()=>$("#wfdlg").close();
+$("#wfx").onclick = ()=>$("#wfdlg").close();
 $("#wfbook").onchange = async ()=>{
   const v = $("#wfbook").value, msg = t=>{ $("#wfmsg").textContent = t; };
   $("#wfsearch").hidden = v !== "@search";
