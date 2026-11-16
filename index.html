@@ -56,6 +56,7 @@ details.setup{margin-top:18px;font-size:13px;color:var(--muted)}
 header{grid-column:1/3;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
 header h1{font-size:16px;margin:0 8px 0 0}
 header .grow{flex:1}
+header .tools1{display:inline-flex;gap:10px;align-items:center;flex:none;white-space:nowrap}   /* Undo, Redo, Export, Send shown to Notion and its ? stay together on the first line */
 header .brk{flex:0 0 100%;height:0}   /* forces a new line: Sign out stays on the top line, the status text starts the second line */
 header .who{color:var(--muted);font-size:12px}
 #status{font-size:12px;color:var(--muted);flex:0 0 260px;width:260px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}   /* fixed width so the buttons after it never shift; full text shows on hover */
@@ -707,6 +708,13 @@ dialog#ncdlg::backdrop{background:#0006}
 <div id="app" class="hidden">
   <header>
     <h1>Catalog Editor</h1>
+    <span class="tools1">
+      <button id="undo" title="Ctrl/⌘+Z" disabled>Undo</button>
+      <button id="redo" title="⌘+Shift+Z, or Ctrl+Y" disabled>Redo</button>
+      <button id="export" title="Download a CSV file (opens in Excel): what you see now, or everything">Export</button>
+      <button id="notionShown" title="Sync the books shown in the grid (after your filters) to Notion">Send shown to Notion</button>
+      <span class="helptip" tabindex="0" role="note" aria-label="Help: Send shown to Notion" data-tip="Sends all prearranged columns to Notion for each visible row.">?</span>
+    </span>
     <span class="grow"></span>
     <span class="who" id="nqueue"></span>
     <span class="who" id="who"></span>
@@ -717,11 +725,6 @@ dialog#ncdlg::backdrop{background:#0006}
     <span id="status">Loading…</span>
     <button id="linkexit" type="button" class="hidden" title="This view shows only the book and cell the link opened. Click to go back to your usual books and columns.">Show all books &amp; columns</button>
     <span class="grow"></span>
-    <button id="undo" title="Ctrl/⌘+Z" disabled>Undo</button>
-    <button id="redo" title="⌘+Shift+Z, or Ctrl+Y" disabled>Redo</button>
-    <button id="export" title="Download a CSV file (opens in Excel): what you see now, or everything">Export</button>
-    <button id="notionShown" title="Sync the books shown in the grid (after your filters) to Notion">Send shown to Notion</button>
-    <span class="helptip" tabindex="0" role="note" aria-label="Help: Send shown to Notion" data-tip="Sends all prearranged columns to Notion for each visible row.">?</span>
     <button id="wfdb" title="The steps for a Dragon Box book, from the final manuscript through the box content and release check to wide release: which are done for a book, what is missing, the values to paste, and links that open Claude or ChatGPT with the prompt ready">Dragon Box workflow</button>
     <button id="wfnondb" title="The steps for a book released without the Dragon Box (English book or translation), from the manuscript to wide release: which are done, what is missing, the values to paste, and links that open Claude or ChatGPT with the prompt ready">Non-Dragon Box workflow</button>
     <button id="release" title="The books in progress, each with its release steps: what is done, what is due and what is late. Open a book's workflow from its card">Release</button>
