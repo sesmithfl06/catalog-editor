@@ -3922,9 +3922,19 @@ function wfPrev(ed, among){
     .sort((a,b)=> +b.number_in_series - +a.number_in_series)[0] || null;
 }
 const wfName = e => `“${e.title || e.file_name}” (${e.file_name})`;
-// A Dragon Box book's Subsc Pub date: the first 15th after today.
-function wfNext15(){ const d = new Date(); if (d.getDate() >= 15) d.setMonth(d.getMonth() + 1, 15); else d.setDate(15);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-15`; }
+// A new Dragon Box book's box month: the month after the latest Subsc Pub date in Supabase (wfLastSub, read when the list opens).
+// On time when that month's 15th is today or later (Subsc Pub = that 15th). Late when that 15th has already passed with no book:
+// it comes out outside the usual time, so the date is asked for. With no Subsc Pub date in Supabase at all: the first 15th after today.
+let wfLastSub = "";
+function wfSubPlan(){
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-15`;
+  const now = new Date(), today = now.toISOString().slice(0,10);
+  let d;
+  if (wfLastSub){ d = new Date(wfLastSub.slice(0,7) + "-15T12:00:00"); d.setMonth(d.getMonth() + 1, 15); }
+  else { d = new Date(now); if (d.getDate() >= 15) d.setMonth(d.getMonth() + 1, 15); else d.setDate(15); }
+  const date = iso(d), month = d.toLocaleDateString("en-US", {month:"long", year:"numeric"});
+  return {date, month, late: date < today};
+}
 // Everything the steps check or show for one book: the Release checklist rows, workflow ticks, ISBNs, promo, synopsis, story bible, Payhip links, Notion.
 async function wfLoadVals(ed){
   const F = encodeURIComponent(ed.file_name);
@@ -4002,13 +4012,17 @@ function wfSteps(kind, lang, ed, v){
   // ---- steps shared by the workflows ----
   const final = {app:"Word", text:"Write and finalize the story; approve the final text. Every later step uses this final manuscript.", tick:"story_final",
     chk: v=>v && has(ed.word_count) ? {done:true, detail:"Word count in the catalog: " + ed.word_count} : null};
-  const subDate = (v && v.sub) || wfNext15();
+  const plan = v && v.sub ? {date:v.sub, month:"", late:false, set:true} : wfSubPlan();
   const meta = Object.assign({app:"Claude", text:"Attach the final manuscript in Claude to use the new-book-metadata skill. For a new book, leave the book above on “New book”: Claude adds the book to Supabase" +
-      (db ? `, with its Subsc Pub date on the upcoming 15th (${rlDay(subDate)})` : " (no Subsc Pub date: it isn't a Dragon Box book)") +
+      (!db ? " (no Subsc Pub date: it isn't a Dragon Box book)" : plan.set ? ` (Subsc Pub ${rlDay(plan.date)})` :
+        plan.late ? `, for the ${plan.month} box: no book has its Subsc Pub on ${rlDay(plan.date)} and that date has passed, so the book is late and Claude asks you for its Subsc Pub date` :
+        `, with its Subsc Pub date on ${rlDay(plan.date)} (the ${plan.month} box: the month after the last Dragon Box book)`) +
       ", its formats (no paperback under 20,000 words), the md copy and the word count. Then pick the book above.", sub:[written],
     attach:"The final manuscript (.docx).",
     claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. ` +
-      (db ? `It is a Dragon Box book: its Subsc Pub date is ${subDate}. ` : "It is not a Dragon Box book, so it has no Subsc Pub date. ") +
+      (!db ? "It is not a Dragon Box book, so it has no Subsc Pub date. " : plan.set ? `It is a Dragon Box book: its Subsc Pub date is ${plan.date}. ` :
+        plan.late ? `It is a Dragon Box book for the ${plan.month} box, but it is late: no book has its Subsc Pub date on ${plan.date} and that date has passed. Ask me for its actual Subsc Pub date before writing it. ` :
+        `It is a Dragon Box book for the ${plan.month} box: its Subsc Pub date is ${plan.date}. `) +
       `Fill in or add this book in the Supabase catalog with the Supabase Write connector.`}, newBook);
   const isbnCells = [["eBook ISBN cell", "fmt:eBook:isbn"]].concat(offered("Audiobook") ? [["Audiobook ISBN cell", "fmt:Audiobook:isbn"]] : [])
     .concat(db ? [["SB ISBN cell", "sb:isbn"]] : []);
@@ -4263,6 +4277,8 @@ function wfOpen(kind, file){
   sel.value = eds.some(e=>e.file_name === pick) ? pick : "";
   $("#wfmsg").textContent = "";
   wfValsFor = ""; wfVals = null; wfScroll = true;   // reload each time the list opens, so new values and ticks show
+  api("GET", "edition_release_notes?select=subscription_publication&subscription_publication=not.is.null&order=subscription_publication.desc&limit=1")
+    .then(r=>{ wfLastSub = String(((r || [])[0] || {}).subscription_publication || ""); if ($("#wfdlg").open) wfRender(); }).catch(()=>{});
   wfBookChanged(true);
   if (!$("#wfdlg").open) $("#wfdlg").showModal();
 }
