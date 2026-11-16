@@ -4018,7 +4018,7 @@ function wfSteps(kind, lang, ed, v){
         plan.late ? ", asking you for its Subsc Pub date" :
         `, with its Subsc Pub date on ${rlDay(plan.date)} (the ${plan.month} box: the month after the last Dragon Box book)`) +
       ", its formats (no paperback under 20,000 words; a hardcover only from 40,000 words), the md copy and the word count. Then pick the book above.", sub:[written],
-    attach:"The final manuscript (.docx).",
+    attach:"The final manuscript (.docx). The skill also saves the story's md copy from it, so no md refresh is needed after Vellum.",
     claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. ` +
       (!db ? "It is not a Dragon Box book, so it has no Subsc Pub date. " : plan.set ? `It is a Dragon Box book: its Subsc Pub date is ${plan.date}. ` :
         plan.late ? "It is a Dragon Box book. Ask me for its Subsc Pub date before writing it. " :
@@ -4053,7 +4053,6 @@ function wfSteps(kind, lang, ed, v){
     links:[["KDP cover calculator", "https://kdp.amazon.com/cover-calculator"], ["Open B&N Press", "https://press.barnesandnoble.com/"]], tick:"print_specs",
     vals: v ? [["Page count", ed.paperback_pages], ["Page size", ed.paperback_page_size]] : []};
   const printCover = {opt:"print", app:"Photoshop", text:"Build the full print cover (front, spine, back) at those specs from the cover art, for the paperback and, when offered, the hardcover. The text-free version is useful for the back and spine.", tick:"print_cover"};
-  const mdFiles = {app:"Update md files", text:`Open Update md files (Dropbox: 05_Scripts_and_Tools/Scripts/Update md files) so the md copies match the Vellum exports${db ? " (the story and the story bible)" : ""}, and fix the word count in the grid if it moved.`, tick:"md_files"};
   const live = {app:"Payhip", text:"Set the eBook product to Live. Its description: paste the Long Synopsis, then the heading, then Reasons to Love. At the end of the Payhip section in the Distribution app, copy the product's link and press Resume: it is sent to Supabase and ticks this step (or paste it in the Payhip eBook column). Kindle Unlimited books skip this.",
     links:[["Open Payhip", "https://payhip.com/"]], rk:"payhip_live", vals:payVals};
   const dist = {app:"Distribution app", text:"Upload to every distributor. Finishing a distributor ticks this step. Print books: KDP and B&N give the paperback (and hardcover) their own numbers; paste them in the Amz ISBN and BN ISBN cells.", rk:"distribution",
@@ -4140,7 +4139,7 @@ function wfSteps(kind, lang, ed, v){
     return [
       S("Before release", final), S("Before release", meta), S("Before release", bowker),
       S("Before release", coverArt), S("Before release", coverPs),
-      S("Before release", vellum), S("Before release", pages), S("Before release", mdFiles),
+      S("Before release", vellum), S("Before release", pages),
       S("Before release", printSpecs), S("Before release", printCover),
       S(A, narrator), ...audioSteps.map(x=>S(A, x)),
       S(B, bibleWrite), S(B, bibleIsbn), S(B, biblePics), S(B, bibleCoverArt), S(B, bibleCoverPs), S(B, bundleCover),
@@ -4159,7 +4158,7 @@ function wfSteps(kind, lang, ed, v){
     S(s1, final), S(s1, meta), S(s1, bowker),
     S(s2, coverArt), S(s2, coverPs), S(s2, bibleCoverArt), S(s2, bibleCoverPs), S(s2, bundleCover),
     S(s3, bibleWrite), S(s3, biblePics), S(s3, narrator),
-    S(s4, vellum), S(s4, bibleVellum), S(s4, pages), S(s4, mdFiles), S(s4, printSpecs), S(s4, printCover),
+    S(s4, vellum), S(s4, bibleVellum), S(s4, pages), S(s4, bibleMd), S(s4, printSpecs), S(s4, printCover),
     S(s5, {app:"Payhip", text:"Make the products for the eBook, the story bible and the bundle: descriptions below (Long Synopsis, heading, Reasons to Love; Story Bible Synopsis), product images (covers, the text-free cover, the bundle graphic), and upload the generic EPUB and Kindle EPUB of both titles. They go Live at the Payhip step below.",
       links:[["Open Payhip", "https://payhip.com/"]], tick:"payhip_products", vals: payVals.concat(sbVal)}),
     S(s5, {app:"BookFunnel", text:"Upload both EPUB versions of both titles with the same descriptions, add the correct Payhip product link following your setup, then build this month's bundle page with the right titles. Paste the BookFunnel links in their cells.",
