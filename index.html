@@ -2649,10 +2649,11 @@ const cpyBtn = document.createElement("button");
 cpyBtn.type = "button"; cpyBtn.className = "cpy"; cpyBtn.textContent = "⧉"; cpyBtn.title = "Copy this cell";
 cpyBtn.setAttribute("aria-label","Copy this cell");
 let cpyTimer;
+// The fallback textarea goes inside the open popup, because a modal dialog makes everything outside it unselectable.
 function copyText(t){
   if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t);
   return new Promise((res,rej)=>{ const ta = document.createElement("textarea"); ta.value = t; ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
-    (document.querySelector("dialog[open]") || document.body).appendChild(ta); ta.select();   // inside the open popup: a modal dialog makes everything outside it unselectable let ok = false; try{ ok = document.execCommand("copy"); }catch(e){} ta.remove(); ok ? res() : rej(new Error("copy blocked")); });
+    (document.querySelector("dialog[open]") || document.body).appendChild(ta); ta.select(); let ok = false; try{ ok = document.execCommand("copy"); }catch(e){} ta.remove(); ok ? res() : rej(new Error("copy blocked")); });
 }
 function cpyReset(){ clearTimeout(cpyTimer); cpyBtn.classList.remove("done"); cpyBtn.textContent = "⧉"; }
 $("#gridwrap").addEventListener("mouseover", e=>{
