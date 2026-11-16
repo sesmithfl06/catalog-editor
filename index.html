@@ -3976,7 +3976,7 @@ async function wfLoadVals(ed){
     api("GET", `edition_info?select=copyright_page_genres,end_of_story_promo,new_end_of_story_promo,cover_image_link,long_synopsis,short_synopsis,reasons_to_love&file_name=eq.${F}`).catch(()=>[]),
     api("GET", "story_bibles?select=file_name,isbn,bible_md,word_count,status,publication_date,description,has_pictures,has_creatures,has_places,has_family_lines,has_alliances,has_pronunciations,has_culture_words,has_timeline,has_book_connections,has_book_club_questions").catch(()=>[]),
     api("GET", `bestseller_lines?select=bestseller_line&language=eq.${encodeURIComponent(ed.language || "English")}`).catch(()=>[]),
-    api("GET", `store_links?select=store,format,link_or_id&file_name=eq.${F}&store=in.(Payhip,BookFunnel)`).catch(()=>[]),
+    api("GET", `store_links?select=store,format,link_or_id&file_name=eq.${F}&store=in.(Payhip,BookFunnel,Amazon,Apple,Barnes%20%26%20Noble,Kobo,Google%20Play,Books2Read)`).catch(()=>[]),
     api("GET", `notion_pages?select=last_synced_at&file_name=eq.${F}`).catch(()=>[]),
     api("GET", `edition_release_notes?select=subscription_publication&file_name=eq.${F}`).catch(()=>[]),
     api("GET", "settings?select=key,value&key=in.(paperback_min_words,hardcover_min_words)").catch(()=>[])
@@ -3986,14 +3986,19 @@ async function wfLoadVals(ed){
   const isbn = {}; for (const r of fm || []) if (!r.not_offered) isbn[r.format] = r.isbn || "";
   const sb = (sbs || []).find(r=>r.file_name === ed.file_name) || null;
   const i = (info || [])[0] || {};
-  const payhip = {}, bf = {}; for (const r of links || []) (r.store === "BookFunnel" ? bf : payhip)[r.format] = r.link_or_id || "";
+  const payhip = {}, bf = {}, eb = {};
+  for (const r of links || []){
+    if (r.store === "BookFunnel") bf[r.format] = r.link_or_id || "";
+    else if (r.store === "Payhip") payhip[r.format] = r.link_or_id || "";
+    if (r.format === "eBook" && r.link_type) eb[r.store + "|" + r.link_type] = r.link_or_id || "";   // the eBook store IDs and links for the Vellum store link
+  }
   const offered = new Set((fm || []).filter(r=>!r.not_offered).map(r=>r.format));
   const synced = (notion || []).map(r=>r.last_synced_at).filter(Boolean).sort().pop() || "";
   return {rel: rel ? new Map(rel.map(r=>[r.step_key, r])) : null, ticks: new Map((ticks || []).map(r=>[r.step, r])),
     isbn, offered, print: offered.has("Paperback") || offered.has("Hardcover"), sb, bibleIsbn:(sb && sb.isbn) || isbn["Story Bible"] || "",
     sub:String(((notes || [])[0] || {}).subscription_publication || "").slice(0,10), bf, short:i.short_synopsis || "", rules,
     genres:i.copyright_page_genres || "", promo:i.end_of_story_promo || "", newPromo:i.new_end_of_story_promo || "", cover:i.cover_image_link || "",
-    synopsis:i.long_synopsis || "", rtl:i.reasons_to_love || "", best:((bl || [])[0] || {}).bestseller_line || "", payhip, synced,
+    synopsis:i.long_synopsis || "", rtl:i.reasons_to_love || "", best:((bl || [])[0] || {}).bestseller_line || "", payhip, eb, synced,
     prev:wfPrev(ed), prevBible:wfPrev(ed, bibles)};
 }
 // The story bible's Payhip description: the standard text, leaving out what this bible doesn't have (its has_… sections in story_bibles).
@@ -4145,7 +4150,9 @@ function wfSteps(kind, lang, ed, v){
   const dist = {app:"Distribution app", text:"Upload to every distributor.", rk:"distribution"};
   const printIsbns = {opt:"print", app:"Catalog Editor", text:"Paste the print ISBNs KDP and B&N gave.",
     fields:[].concat(pb ? [["Paperback Amazon ISBN", "fmt:Paperback:amazon_isbn"], ["Paperback B&N ISBN", "fmt:Paperback:bn_isbn"]] : [], hc ? [["Hardcover Amazon ISBN", "fmt:Hardcover:amazon_isbn"], ["Hardcover B&N ISBN", "fmt:Hardcover:bn_isbn"]] : [])};
-  const vlink = {app:"Vellum", text:"Add the store link to booklinks copy.vellum.", btn:["vlink", "Done: mark it in the catalog"], rk:"vellum_link"};
+  const vlink = {app:"Vellum", text:"Add the store link to booklinks copy.vellum.", btn:["vlink", "Done: mark it in the catalog"], rk:"vellum_link",
+    vals: v ? [["ASIN", v.eb["Amazon|ASIN"]], ["Apple ID", v.eb["Apple|ID"]], ["Nook link (B&N eBook)", v.eb["Barnes & Noble|URL"]], ["Kobo link", v.eb["Kobo|URL"]],
+      ["Google Play link", v.eb["Google Play|URL"]], ["U-link", v.eb["Books2Read|Universal Link"]], ["Payhip eBook link", v.eb["Payhip|URL"]]] : []};
   const notion = {app:"Catalog Editor", text:"Send the book to Notion.", btn:["notion", "Send this book to Notion"],
     chk: v=>v ? (v.synced ? {done:true, detail:"Sent " + rlDay(v.synced.slice(0,10))} : {done:false, detail:"Not sent to Notion yet"}) : null};
   const links = {app:"Catalog Editor", text:"2 days after Pub: find the store links.", btn:["links", "Find store links for this book"], rk:["links_main","links_hardcover","links_audiobook"]};
