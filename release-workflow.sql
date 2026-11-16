@@ -6,7 +6,8 @@
 --  2. release_checklist: every book in progress (not released or released in the last 60 days) with each step
 --     of its workflow, done or not, how it was done, its due date and what is still missing. Most steps tick
 --     themselves from the catalog (new_book_passes, store_link_blanks, ISBNs, the Payhip eBook link, story_bibles).
---       English: Before Subsc Pub -> Payhip -> Wide release. Other languages: Before release -> Release and after
+--       English: Before Subsc Pub (Dragon Box books, which have a Subsc Pub date; others: Before release) -> Payhip
+--       -> Wide release; only Dragon Box books have 'Added to the subscription post'. Other languages: Before release -> Release and after
 --       (Payhip is part of the release). Get ISBNs is due by Subsc Pub (English) or release (other languages);
 --       store links are due 2 days after the date of that format.
 --  3. release_fill_blanks(file_name, items): what the Distribution app calls. It only fills blank values and
@@ -126,7 +127,7 @@ steps as (
          (select p.still_blank from passes p where p.file_name = b.file_name and p.pass = 3)),
       (1, 50, 'cover', 'Cover done', true,
          not public.needs_value(b.cover_image_link), case when b.english then coalesce(b.sub, b.pub) else b.pub end, null),
-      (1, 60, 'subscription_post', 'Added to the subscription post', b.english,
+      (1, 60, 'subscription_post', 'Added to the subscription post', b.sub is not null,
          false, b.sub, case when b.sub is null then 'No Subsc Pub date yet' end),
       (case when b.english then 2 else 3 end, 25, 'payhip_live', 'Payhip product Live', not b.ku and coalesce(ph.live, true),
          ph.file_name is not null, b.pub,
@@ -165,7 +166,7 @@ judged as (
 )
 select b.file_name, b.title, b.language, b.sheet_order, b.pub as publication_date, b.sub as subscription_publication,
        s.stage,
-       case s.stage when 1 then case when b.english then 'Before Subsc Pub' else 'Before release' end
+       case s.stage when 1 then case when b.sub is not null then 'Before Subsc Pub' else 'Before release' end
                     when 2 then 'Payhip' else case when b.english then 'Wide release' else 'Release and after' end end as stage_name,
        s.step_order, s.step_key, s.step,
        s.auto_how is not null or r.file_name is not null as done,

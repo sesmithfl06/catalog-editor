@@ -253,6 +253,7 @@ dialog#wfdlg::backdrop{background:#0006}
 .wfstep .n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600}
 .wfstep .body{flex:1;min-width:0}
 .wfstep .app{font-weight:600}
+.wfstep.na{opacity:.55}
 .wfstep .att{color:var(--muted);font-size:12px;margin-top:3px}
 .wfstep .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .wfstep .acts a{font-size:12px}
@@ -440,7 +441,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
 <!-- ============ Story / story bible workflow ============ -->
 <dialog id="wfdlg">
-  <h2 id="wftitle">Story workflow</h2>
+  <h2 id="wftitle">Dragon Box workflow</h2>
   <p class="hint" id="wfhint"></p>
   <div class="row">
     <b>Book</b>
@@ -644,12 +645,13 @@ dialog#ncdlg::backdrop{background:#0006}
     </ul>
   </details>
 
-  <details><summary>…follow the standard steps for a new book or a story bible?</summary>
+  <details><summary>…follow the standard steps for a new book (Dragon Box or not), a translation or a story bible?</summary>
     <ul>
-      <li>Press <b>Story workflow</b> or <b>Story bible workflow</b> at the top. Each step says which app it happens in. Pick a book at the top of the list to put its name and file name in the prompts; for a story, <b>English book</b> or <b>Translation</b> switches the steps (picking a book sets it for you).</li>
+      <li>Press <b>Dragon Box workflow</b> or <b>Non-Dragon Box workflow</b> at the top. Each step says which app it happens in. Pick a book at the top of the list to put its name and file name in the prompts; picking a book also picks its workflow (Dragon Box when it is an English book with a Subsc Pub date). In the Non-Dragon Box workflow, <b>English book</b> or <b>Translation</b> switches the steps. The button at the bottom switches between the two workflows for the same book.</li>
+      <li>The Dragon Box workflow follows the monthly box: story and catalog, covers (Bob leaves space for the NYT line, matches the previous cover's text placement and also makes a text-free version), story bible and narrator, Vellum, page count and print covers (only when a paperback or hardcover is offered: the print cover can only be sized once Vellum gives the page count and KDP and B&N give the specs), Payhip and BookFunnel, the box content (intro letter, Google Drive, subscription post), Notion, Canva flyer and QR sticker, the release check, then Payhip and wide release. Story bible steps are part of it; in the Non-Dragon Box workflow they and the audiobook steps count only when the book has a story bible or an audiobook (otherwise they are greyed out).</li>
       <li>With a book picked, each step shows whether it is done: ✓ green when done, red ! when late, and the next step to do is outlined. Most steps check themselves from the catalog and the Release checklist (book details, ISBNs, cover, Vellum, page count, Payhip, uploads, Vellum link, Notion, store links, the story bible's details and links); what is still missing is written under the step. Steps nothing in the catalog can show (Bob's pictures and covers, the NYT line on a story bible cover, Vellum for a story bible…) have a <b>Done</b> box; ticks are kept in Supabase (release_steps, logged in the change log) and untick to undo.</li>
-      <li>In <b>Release</b>, each book's card has <b>Story workflow</b> (and <b>Story bible workflow</b> for English books): it opens that book's list at the next step to do.</li>
-      <li>The Distribution app's <b>Workflow › Workflow Hub…</b> has the same steps with buttons that open Claude, Photoshop and the Vellum template. Its Catalog Editor buttons open this page at the book, at <b>Find store links for shown books</b>, or at the book's workflow. Ticks made in either place show in both.</li>
+      <li>In <b>Release</b>, each book's card has a <b>Workflow</b> button (<b>Dragon Box workflow</b> for Dragon Box books): it opens that book's list at the next step to do.</li>
+      <li>The Distribution app's <b>Workflow › Workflow Hub…</b> has its own copy of the steps with buttons that open Claude, Photoshop and the Vellum template. Its Catalog Editor buttons open this page at the book, at <b>Find store links for shown books</b>, or at the book's workflow. Ticks made in either place show in both.</li>
       <li>The Vellum, cover, Bob and Payhip steps show the values they need from the catalog (ISBNs, copyright page genres, end-of-book promo, bestseller line, the story's cover, Long Synopsis, the heading “Discover your new love!” and Reasons to Love for a story; the Story Bible Synopsis for a story bible), each with a <b>Copy</b> button. A value in red is still blank in the catalog.</li>
       <li><b>Open Claude with the prompt</b> opens claude.ai in a new tab with the prompt already in the message box; it is also copied, so ⌘V works if the box is empty. Attach the file the step names, then send. <b>Open Bob with the prompt</b> does the same in ChatGPT. Open <b>Prompt</b> to read it first.</li>
     </ul>
@@ -721,9 +723,9 @@ dialog#ncdlg::backdrop{background:#0006}
     <button id="notionShown" title="Sync the books shown in the grid (after your filters) to Notion">Send shown to Notion</button>
     <span class="helptip" tabindex="0" role="note" aria-label="Help: Send shown to Notion" data-tip="Sends all prearranged columns to Notion for each visible row.">?</span>
     <button id="storelinks" title="List the blank store links of the books shown in the grid (after your filters). Apple and Google Play are looked up for you; the other stores get a Search link">Find store links for shown books</button>
-    <button id="wfstory" title="The standard steps for a new book, from manuscript to wide release: which are done for a book, what is missing, the values to paste, and links that open Claude with the prompt ready">Story workflow</button>
-    <button id="wfbible" title="The standard steps for a story bible, from manuscript to Payhip: which are done for a book, what is missing, the values to paste, and links that open Claude with the prompt ready">Story bible workflow</button>
-    <button id="release" title="The books in progress, each with its release steps: what is done, what is due and what is late. Open a book's Story workflow from its card">Release</button>
+    <button id="wfdb" title="The steps for a Dragon Box book, from the final manuscript through the box content and release check to wide release: which are done for a book, what is missing, the values to paste, and links that open Claude or Bob with the prompt ready">Dragon Box workflow</button>
+    <button id="wfnondb" title="The steps for a book released without the Dragon Box (English book or translation), from the manuscript to wide release: which are done, what is missing, the values to paste, and links that open Claude or Bob with the prompt ready">Non-Dragon Box workflow</button>
+    <button id="release" title="The books in progress, each with its release steps: what is done, what is due and what is late. Open a book's workflow from its card">Release</button>
   </header>
 
   <aside>
@@ -3857,7 +3859,7 @@ function rlRender(){
     return `<div class="rlbook" data-f="${esc(r.file_name)}">
       <h3><a data-a="open" title="Open this book in the grid">${esc(r.title || r.file_name)}</a>
         <span class="meta">${esc(r.language)}${dates ? " · " + esc(dates) : ""} · ${b.steps.length - b.open.length} of ${b.steps.length} done${b.late ? ` · <span class="late">${b.late} late</span>` : ""}</span>
-        <span class="grow"></span><button type="button" data-wf="story" title="This book's Story workflow, at the next step to do">Story workflow</button>${r.language === "English" ? `<button type="button" data-wf="bible" title="This book's Story bible workflow, at the next step to do">Story bible workflow</button>` : ""}</h3>
+        <span class="grow"></span><button type="button" data-wf="auto" title="This book's workflow (Dragon Box when it has a Subsc Pub date), at the next step to do">${r.language === "English" && r.subscription_publication ? "Dragon Box workflow" : "Workflow"}</button></h3>
       <div class="rlstages">${[...stages.values()].map(st=>`<div class="rlstage"><h4>${esc(st.name)}</h4>${st.steps.map(rlStep).join("")}</div>`).join("")}</div>
     </div>`;
   }).join("");
@@ -3910,7 +3912,7 @@ $("#rllist").addEventListener("change", async ev=>{
 const WF_SQL = "https://supabase.com/dashboard/project/qurcnkeqxfqqfnygkpmd/sql/new";
 const WF_BOOKLINKS = "Dropbox-Sesmithfl/Sesmithfl Team Folder/0 Book Series/0Vellum/For Bob/booklinks copy.vellum";
 const WF_RTL_HEADING = {English:"Discover your new love!"};   // the heading pasted above Reasons to Love on Payhip, by language
-let wfKind = "story", wfCur = [], wfVals = null, wfValsFor = "", wfScroll = false;
+let wfKind = "db", wfCur = [], wfVals = null, wfValsFor = "", wfScroll = false;
 function wfBook(){ const f = $("#wfbook").value; return f ? data.editions.find(e=>e.file_name===f) || null : null; }
 function wfEnglish(ed){ return !ed ? null : ed.language === "English" ? ed : data.editions.find(e=>e.story_id && e.story_id === ed.story_id && e.language === "English") || null; }
 // The book before this one in the same series and language (highest lower book number); with `among`, only books in that set.
@@ -3923,24 +3925,27 @@ const wfName = e => `“${e.title || e.file_name}” (${e.file_name})`;
 // Everything the steps check or show for one book: the Release checklist rows, workflow ticks, ISBNs, promo, synopsis, story bible, Payhip links, Notion.
 async function wfLoadVals(ed){
   const F = encodeURIComponent(ed.file_name);
-  const [rel, ticks, fm, info, sbs, bl, links, notion] = await Promise.all([
+  const [rel, ticks, fm, info, sbs, bl, links, notion, notes] = await Promise.all([
     api("POST", "rpc/release_checklist_for", {p_files:[ed.file_name]}).catch(()=>null),
     api("GET", `release_steps?select=step,done_on,done_by&file_name=eq.${F}&step=like.wf:*`).catch(()=>[]),
     api("GET", `formats?select=format,isbn,not_offered&file_name=eq.${F}`).catch(()=>[]),
-    api("GET", `edition_info?select=copyright_page_genres,end_of_story_promo,new_end_of_story_promo,cover_image_link,long_synopsis,reasons_to_love&file_name=eq.${F}`).catch(()=>[]),
+    api("GET", `edition_info?select=copyright_page_genres,end_of_story_promo,new_end_of_story_promo,cover_image_link,long_synopsis,short_synopsis,reasons_to_love&file_name=eq.${F}`).catch(()=>[]),
     api("GET", "story_bibles?select=file_name,isbn,bible_md,word_count,status,publication_date,description,has_pictures,has_creatures,has_places,has_family_lines,has_alliances,has_pronunciations,has_culture_words,has_timeline,has_book_connections,has_book_club_questions").catch(()=>[]),
     api("GET", `bestseller_lines?select=bestseller_line&language=eq.${encodeURIComponent(ed.language || "English")}`).catch(()=>[]),
-    api("GET", `store_links?select=format,link_or_id&file_name=eq.${F}&store=eq.Payhip`).catch(()=>[]),
-    api("GET", `notion_pages?select=last_synced_at&file_name=eq.${F}`).catch(()=>[])
+    api("GET", `store_links?select=store,format,link_or_id&file_name=eq.${F}&store=in.(Payhip,BookFunnel)`).catch(()=>[]),
+    api("GET", `notion_pages?select=last_synced_at&file_name=eq.${F}`).catch(()=>[]),
+    api("GET", `edition_release_notes?select=subscription_publication&file_name=eq.${F}`).catch(()=>[])
   ]);
   const bibles = new Set((sbs || []).map(r=>r.file_name));
   const isbn = {}; for (const r of fm || []) if (!r.not_offered) isbn[r.format] = r.isbn || "";
   const sb = (sbs || []).find(r=>r.file_name === ed.file_name) || null;
   const i = (info || [])[0] || {};
-  const payhip = {}; for (const r of links || []) payhip[r.format] = r.link_or_id || "";
+  const payhip = {}, bf = {}; for (const r of links || []) (r.store === "BookFunnel" ? bf : payhip)[r.format] = r.link_or_id || "";
+  const offered = new Set((fm || []).filter(r=>!r.not_offered).map(r=>r.format));
   const synced = (notion || []).map(r=>r.last_synced_at).filter(Boolean).sort().pop() || "";
   return {rel: rel ? new Map(rel.map(r=>[r.step_key, r])) : null, ticks: new Map((ticks || []).map(r=>[r.step, r])),
-    isbn, offered:new Set((fm || []).filter(r=>!r.not_offered).map(r=>r.format)), sb, bibleIsbn:(sb && sb.isbn) || isbn["Story Bible"] || "",
+    isbn, offered, print: offered.has("Paperback") || offered.has("Hardcover"), sb, bibleIsbn:(sb && sb.isbn) || isbn["Story Bible"] || "",
+    sub:String(((notes || [])[0] || {}).subscription_publication || "").slice(0,10), bf, short:i.short_synopsis || "",
     genres:i.copyright_page_genres || "", promo:i.end_of_story_promo || "", newPromo:i.new_end_of_story_promo || "", cover:i.cover_image_link || "",
     synopsis:i.long_synopsis || "", rtl:i.reasons_to_love || "", best:((bl || [])[0] || {}).bestseller_line || "", payhip, synced,
     prev:wfPrev(ed), prevBible:wfPrev(ed, bibles)};
@@ -3962,121 +3967,195 @@ function wfBibleBlurb(sb){
     inside.filter(Boolean).join(" "),
     `Written for the reader who ${pic ? "loves images and " : ""}wants a quick reference to all the details of the story!${sb.has_book_club_questions ? " Great for book club discussions." : ""}`].join("\n\n");
 }
+// The steps of one workflow. kind: "db" = Dragon Box (English book in the monthly Dragon Box, has a Subsc Pub date);
+// "nondb" = released without the Dragon Box, lang "en" = English book, "xx" = translation.
+// Step fields: stage, app, text, sub (list), claude / bob (prompt), attach, links, cells ([label, column id]), vals ([label, value]),
+// rk (Release checklist step key(s)), chk (check from the catalog), tick (a 'wf:<key>' tick), act ("open" = show the book in the grid),
+// opt ("bible": only when the book has a story bible; "print": only when a paperback or hardcover is offered; "audio": only when an audiobook is offered).
 function wfSteps(kind, lang, ed, v){
   const f = ed ? ed.file_name : "";
   const t = ed ? wfName(ed) : "my new book";
   const F = ed ? f : "<file name>";
   const has = x => x != null && String(x).trim() !== "";
-  const inCat = {chk:()=>ed ? {done:true, detail:"In the catalog"} : null};
-  // Claude writes the book into Supabase itself (Supabase Write connector); the Release checklist's 'details' check lists anything still blank.
+  const offered = x => !v || v.offered.has(x);
   const written = "Claude fills in the book in Supabase with the Supabase Write connector. Then press Reload from Supabase here; anything still blank is listed under this step.";
   const newBook = {rk:"details", chk:()=>ed ? {done:true, detail:"In the catalog"} : null};
-  // One button per ISBN cell of the offered formats (opens the grid at that cell).
-  const isbnCells = ed ? ["eBook","Paperback","Hardcover","Audiobook"].filter(x=>!v || v.offered.has(x)).map(x=>[x + " ISBN cell", `fmt:${x}:isbn`]) : [];
-  const pages = {app:"Vellum", text:"Enter the print file's page count and page size in the grid.", rk:"pages", act:"open"};
+  const bestLine = (v && v.best) || "New York Times / USA Today Bestselling Author";
+  const reuse = `Reuse Additional Books, Acknowledgments and About the Author from the Vellum titled Series, file booklinks copy.vellum (${WF_BOOKLINKS}).`;
+  const promoVals = v ? [["End of story promo", v.promo], v.newPromo && v.newPromo !== v.promo ? ["New end of story promo (by its rule)", v.newPromo] : null].filter(Boolean) : [];
   const heading = ed ? WF_RTL_HEADING[ed.language] || "" : "";
   const payVals = v ? [["Long Synopsis", v.synopsis], ["Heading", heading], ["Reasons to Love", v.rtl]] : [];
+  const sb = v && v.sb;
+  const sbVal = v ? [["Story Bible Synopsis", (sb && sb.description) || wfBibleBlurb(sb)]] : [];
+  const prev = v && v.prev;
+  const desc = ed && ed.essential_description ? String(ed.essential_description).slice(0, 1500) : "";
+  const series = ed && ed.series ? `, book ${ed.number_in_series ?? "?"} of the ${ed.series} series` : "";
+  const vpFolder = `Dropbox: Sesmithfl Team Folder/02_Manuscripts/Large Catalog/Vellum-Process/${ed && ed.series ? ed.series : "<full series name>"}`;
+  const month = v && v.sub ? new Date(v.sub + "T12:00:00").toLocaleDateString("en-US", {month:"long", year:"numeric"}) : "";
+  const db = kind === "db";
+
+  // ---- steps shared by the workflows ----
+  const final = {app:"Word", text:"Write and finalize the story; approve the final text. Every later step uses this final manuscript.", tick:"story_final",
+    chk: v=>v && has(ed.word_count) ? {done:true, detail:"Word count in the catalog: " + ed.word_count} : null};
+  const meta = Object.assign({app:"Claude", text:"Attach the final manuscript in Claude to use the new-book-metadata skill (it also saves the md copy and the word count).", sub:[written],
+    attach:"The final manuscript (.docx).",
+    claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. Fill in or add this book in the Supabase catalog with the Supabase Write connector.`}, newBook);
+  const isbnCells = [["eBook ISBN cell", "fmt:eBook:isbn"]].concat(offered("Audiobook") ? [["Audiobook ISBN cell", "fmt:Audiobook:isbn"]] : [])
+    .concat(db ? [["SB ISBN cell", "sb:isbn"]] : []);
+  const bowker = {app:"Bowker", text:`Get the ISBNs from Bowker: eBook${offered("Audiobook") ? ", audiobook" : ""}${db ? " and the story bible" : ""}. Paste each one in its cell (the buttons open each cell). Paperback and hardcover numbers are not bought from Bowker: KDP and B&N give their own when the print book is published (step under Wide release).`,
+    links:[["Open Bowker", "https://www.myidentifiers.com/"]], cells: ed ? isbnCells : [], rk:"isbns",
+    chk: db ? v=>v ? (has(v.bibleIsbn) ? {done:true, detail:"SB ISBN " + v.bibleIsbn} : {done:false, detail:"SB ISBN is blank"}) : null : undefined};
+  const coverArt = {app:"Bob (ChatGPT)", text:"Make the cover art: space left for the NYT line, the text placed like the previous cover in the series (book 1: a placement the whole series can reuse), and a second version of the same art with no text at all, for Payhip and anywhere else a clean image looks better.", tick:"cover_art",
+    attach: prev ? `The cover of ${wfName(prev)}.` : "The cover of another book in the series, if there is one.",
+    bob:`Make the cover image for ${t}${series}. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
+      (prev ? `Place the title, series name and author name the same way as on the attached cover of the previous book in the series, ${wfName(prev)}.` : `Place the title, series name and author name so the same placement can be used for every book in the series${ed && ed.series ? "; if I attached another book's cover from the series, match its placement" : ""}.`) +
+      ` Then give me the same image again with no text at all (no title, series or author name), composed so it still looks good on its own as a product image.` +
+      (desc ? ` About the book: ${desc}` : "")};
+  const coverPs = {app:"Photoshop", text:`Add the NYT line to the cover. Save the eBook cover${db || offered("Audiobook") ? ", the square audiobook cover" : ""} and the text-free version, then fill the Cover image link in the grid.`, rk:"cover", act:"open",
+    vals: v ? [["Bestseller line", v.best]] : []};
+  const vellum = {app:"Vellum", text:"Format the book:", rk:"vellum", sub:[
+      `Duplicate the Vellum template and save the copy in ${vpFolder}.`,
+      "Style: Subhead Center or Obsidian (same layout; they differ only in the graphic each chapter starts with and the subhead: all caps in Subhead Center, sentence case in Obsidian). Import the final manuscript.",
+      "Copyright page: paste the ISBNs and genres below.",
+      reuse,
+      "Add the end-of-book promo below.",
+      "Export the generic EPUB, the Kindle EPUB and the print PDF, then export Word (.docx) as " + F + "-vellum.docx."],
+    vals: v ? [["eBook ISBN", v.isbn.eBook], ["Copyright page genres", v.genres]].concat(promoVals) : []};
+  const pages = {app:"Vellum", text:"From the print PDF, enter the page count and page size in the grid, then decide the print formats: a paperback only if the story is long enough (KDP's paperback minimum is 24 pages), a hardcover only for a long book (KDP's hardcover minimum is 75 pages). Mark a format you won't make as not offered (right-click one of its cells).",
+    rk:"pages", act:"open", chk: v=>v && !v.print ? {done:true, detail:"No paperback or hardcover offered"} : null};
+  const printSpecs = {opt:"print", app:"KDP and B&N Press", text:"Get the print cover specs for this page count and trim size: KDP's cover calculator and B&N Press's cover template (paperback, and hardcover when offered).",
+    links:[["KDP cover calculator", "https://kdp.amazon.com/cover-calculator"], ["Open B&N Press", "https://press.barnesandnoble.com/"]], tick:"print_specs",
+    vals: v ? [["Page count", ed.paperback_pages], ["Page size", ed.paperback_page_size]] : []};
+  const printCover = {opt:"print", app:"Photoshop", text:"Build the full print cover (front, spine, back) at those specs from the cover art, for the paperback and, when offered, the hardcover. The text-free version is useful for the back and spine.", tick:"print_cover"};
+  const mdFiles = {app:"Update md files", text:`Open Update md files (Dropbox: 05_Scripts_and_Tools/Scripts/Update md files) so the md copies match the Vellum exports${db ? " (the story and the story bible)" : ""}, and fix the word count in the grid if it moved.`, tick:"md_files"};
   const live = {app:"Payhip", text:"Set the eBook product to Live. Its description: paste the Long Synopsis, then the heading, then Reasons to Love. At the end of the Payhip section in the Distribution app, copy the product's link and press Resume: it is sent to Supabase and ticks this step (or paste it in the Payhip eBook column). Kindle Unlimited books skip this.",
     links:[["Open Payhip", "https://payhip.com/"]], rk:"payhip_live", vals:payVals};
-  const dist = {app:"Distribution app", text:"Upload to every distributor. Finishing a distributor ticks this step.", rk:"distribution"};
+  const dist = {app:"Distribution app", text:"Upload to every distributor. Finishing a distributor ticks this step. Print books: KDP and B&N give the paperback (and hardcover) their own numbers; paste them in the Amz ISBN and BN ISBN cells.", rk:"distribution",
+    cells: ed ? [].concat(offered("Paperback") ? [["Pb Amz ISBN cell", "fmt:Paperback:amazon_isbn"], ["Pb BN ISBN cell", "fmt:Paperback:bn_isbn"]] : [],
+      offered("Hardcover") ? [["Hc Amz ISBN cell", "fmt:Hardcover:amazon_isbn"], ["Hc BN ISBN cell", "fmt:Hardcover:bn_isbn"]] : []) : []};
   const vlink = {app:"Vellum", text:"Save the complete store link in booklinks copy.vellum, then tick the Vellum link column in the grid.", rk:"vellum_link", act:"open"};
   const notion = {app:"Catalog Editor", text:"With only this book shown in the grid, press Send shown to Notion.", act:"open",
     chk: v=>v ? (v.synced ? {done:true, detail:"Sent " + rlDay(v.synced.slice(0,10))} : {done:false, detail:"Not sent to Notion yet"}) : null};
   const links = {app:"Catalog Editor", text:"2 days after the Pub date: with this book shown, press Find store links for shown books and save each link.", act:"open",
     rk:["links_main","links_hardcover","links_audiobook"]};
-  const promoVals = v ? [["End of story promo", v.promo], v.newPromo && v.newPromo !== v.promo ? ["New end of story promo (by its rule)", v.newPromo] : null].filter(Boolean) : [];
-  const reuse = `Reuse Additional Books, Acknowledgments and About the Author from the Vellum titled Series, file booklinks copy.vellum (${WF_BOOKLINKS}).`;
-  const bestLine = (v && v.best) || "New York Times / USA Today Bestselling Author";
-  if (kind === "bible"){
-    const sb = v && v.sb;
-    return [
-      {stage:"Write", app:"Claude", text:"Write the story bible without pictures with the story-bible-editorial-stager skill. It saves a .docx whose name ends in pre-images and fills in the story bible's details in Supabase (which sections it has, word count, md file name, Story Bible Synopsis).",
-        attach:"The story's manuscript.",
-        claude:`Use the story-bible-editorial-stager skill to make the story bible for ${t}. I've attached the story's manuscript. Save the draft as a DOCX whose name ends in pre-images, then fill in its details in Supabase.`,
-        chk: v=>{ if (!v) return null; if (!sb) return {done:false, detail:"No story bible in the catalog yet"};
-          const miss = [!has(sb.word_count) && "word count", !has(sb.bible_md) && "md file name", !has(sb.description) && "Story Bible Synopsis"].filter(Boolean);
-          return miss.length ? {done:false, detail:"Still blank: " + miss.join(", ")} : {done:true, detail:`In the catalog: ${sb.word_count} words, ${sb.bible_md}, Story Bible Synopsis`}; }},
-      {stage:"Write", app:"Bowker", text:"Get the story bible's ISBN and paste it in the SB ISBN cell.", links:[["Open Bowker", "https://www.myidentifiers.com/"]], cells: ed ? [["SB ISBN cell", "sb:isbn"]] : [],
-        chk: v=>v ? (has(v.bibleIsbn) ? {done:true, detail:"SB ISBN " + v.bibleIsbn} : {done:false, detail:"SB ISBN is blank"}) : null},
-      {stage:"Pictures and cover", app:"Bob (ChatGPT)", text:"Put in the pictures and maps with the story bible creation skill. It saves a .docx whose name ends in pre-vellum.",
-        attach:"The pre-images .docx and the story's manuscript.", tick:"bible_pictures",
-        bob:`Use my story bible creation skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum.`},
-      {stage:"Pictures and cover", app:"Bob (ChatGPT)", text:"Make the story bible cover from the story's cover, with space for the NYT line and the text placed like the previous story bible's cover.",
-        attach:`The story's cover${v && v.prevBible ? ` and the story bible cover of ${wfName(v.prevBible)}` : " and the previous story bible's cover"}.`, tick:"bible_cover_art",
-        bob:`Make the story bible cover for ${t} from the attached cover of the story. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
-          (v && v.prevBible ? `Place the title, the words Story Bible and the author name the same way as on the attached story bible cover of ${wfName(v.prevBible)}.` : `Place the title, the words Story Bible and the author name the same way as on the attached cover of the previous story bible.`),
-        vals: v ? [["The story's cover", v.cover]] : []},
-      {stage:"Pictures and cover", app:"Photoshop", text:"Add the NYT line to the story bible cover.", tick:"bible_cover", vals: v ? [["Bestseller line", v.best]] : []},
-      {stage:"Vellum", app:"Vellum", text:"Format the story bible:", tick:"bible_vellum", sub:[
-          "Use the Vellum style Bible 2 (not the story style) and import the pre-vellum file.",
-          "Copyright page: paste the values below. Make sure the genre is reference-related.",
-          reuse,
-          "Add the end-of-book promo below.",
-          `Export the eBooks and the PDF, then export Word (.docx) as ${F}-Bible-vellum.docx.`],
-        vals: v ? [["SB ISBN", v.bibleIsbn]].concat(promoVals) : []},
-      {stage:"Vellum", app:"Update md files", text:`Open Update md files (Dropbox: 05_Scripts_and_Tools/Scripts/Update md files) so Story-Bibles-md/${F}-bible.md matches the Vellum export.`, tick:"bible_md"},
-      {stage:"Payhip", app:"Payhip", text:"Put the story bible on Payhip with its Bundle (eBook + Story Bible) and set them Live. Description: paste the Story Bible Synopsis below.", links:[["Open Payhip", "https://payhip.com/"]],
-        chk: v=>v ? (has(v.payhip["Story Bible"]) ? {done:true, detail:"Story bible link in the catalog"} : null) : null, tick:"bible_payhip", vals: v ? [["Story Bible Synopsis", (sb && sb.description) || wfBibleBlurb(sb)]] : []},
-      {stage:"Payhip", app:"Catalog Editor", text:"Paste the story bible's Payhip link in the Payhip Story Bible URL column and the Bundle link in the Payhip Bundle URL column, set the story bible's status to Approved and fill SB Pub. Find store links for shown books also lists the blank links.", act:"open",
-        chk: v=>{ if (!v) return null; const miss = [!has(v.payhip["Story Bible"]) && "Payhip Story Bible URL", !has(v.payhip.Bundle) && "Payhip Bundle URL",
-          !(sb && sb.status === "Approved") && "status Approved", !(sb && sb.publication_date) && "SB Pub"].filter(Boolean);
-          return {done:!miss.length, detail: miss.length ? "Still blank: " + miss.join(", ") : "Links, Approved and SB Pub are in"}; }}
-    ];
-  }
-  if (lang === "xx"){
+
+  // ---- story bible steps (in the Dragon Box always; otherwise only when the book gets a story bible) ----
+  const o = db ? undefined : "bible";
+  const bibleWrite = {opt:o, app:"Claude", text:"Write the story bible without pictures from the final manuscript with the story-bible-editorial-stager skill (it checks every name and detail against the manuscript). It saves a .docx whose name ends in pre-images and fills in the story bible's details in Supabase (which sections it has, word count, md file name, Story Bible Synopsis).",
+    attach:"The final manuscript.",
+    claude:`Use the story-bible-editorial-stager skill to make the story bible for ${t}. I've attached the story's final manuscript. Check names and continuity against it, save the draft as a DOCX whose name ends in pre-images, then fill in its details in Supabase.`,
+    chk: v=>{ if (!v) return null; if (!sb) return db ? {done:false, detail:"No story bible in the catalog yet"} : null;
+      const miss = [!has(sb.word_count) && "word count", !has(sb.bible_md) && "md file name", !has(sb.description) && "Story Bible Synopsis"].filter(Boolean);
+      return miss.length ? {done:false, detail:"Still blank: " + miss.join(", ")} : {done:true, detail:`In the catalog: ${sb.word_count} words, ${sb.bible_md}, Story Bible Synopsis`}; }};
+  const bibleIsbn = {opt:o, app:"Bowker", text:"Get the story bible's ISBN and paste it in the SB ISBN cell.", links:[["Open Bowker", "https://www.myidentifiers.com/"]], cells: ed ? [["SB ISBN cell", "sb:isbn"]] : [],
+    chk: v=>v ? (has(v.bibleIsbn) ? {done:true, detail:"SB ISBN " + v.bibleIsbn} : {done:false, detail:"SB ISBN is blank"}) : null};
+  const biblePics = {opt:o, app:"Bob (ChatGPT)", text:"Put in the pictures and maps with the story bible creation skill. It saves a .docx whose name ends in pre-vellum.",
+    attach:"The pre-images .docx and the story's final manuscript.", tick:"bible_pictures",
+    bob:`Use my story bible creation skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum.`};
+  const bibleCoverArt = {opt:o, app:"Bob (ChatGPT)", text:"Make the story bible cover from the story's cover, with space for the NYT line and the text placed like the previous story bible's cover.",
+    attach:`The story's cover${v && v.prevBible ? ` and the story bible cover of ${wfName(v.prevBible)}` : " and the previous story bible's cover"}.`, tick:"bible_cover_art",
+    bob:`Make the story bible cover for ${t} from the attached cover of the story. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
+      (v && v.prevBible ? `Place the title, the words Story Bible and the author name the same way as on the attached story bible cover of ${wfName(v.prevBible)}.` : `Place the title, the words Story Bible and the author name the same way as on the attached cover of the previous story bible.`),
+    vals: v ? [["The story's cover", v.cover]] : []};
+  const bibleCoverPs = {opt:o, app:"Photoshop", text:"Add the NYT line to the story bible cover.", tick:"bible_cover", vals: v ? [["Bestseller line", v.best]] : []};
+  const bundleCover = {opt:o, app:"Photoshop", text:"Make the bundle cover from the eBook and story bible covers (plus the audiobook cover when it is in the bundle).", tick:"bundle_cover"};
+  const bibleVellum = {opt:o, app:"Vellum", text:"Format the story bible:", tick:"bible_vellum", sub:[
+      "Use the Vellum style Bible 2 (not the story style) and import the pre-vellum file.",
+      "Copyright page: paste the values below. Make sure the genre is reference-related.",
+      reuse,
+      "Add the end-of-book promo below.",
+      `Export the generic EPUB, the Kindle EPUB and the PDF, then export Word (.docx) as ${F}-Bible-vellum.docx.`],
+    vals: v ? [["SB ISBN", v.bibleIsbn]].concat(promoVals) : []};
+  const bibleMd = {opt:o, app:"Update md files", text:`Open Update md files (Dropbox: 05_Scripts_and_Tools/Scripts/Update md files) so Story-Bibles-md/${F}-bible.md matches the Vellum export.`, tick:"bible_md"};
+  const biblePayhip = {opt:o, app:"Payhip", text:"Put the story bible on Payhip with its Bundle (eBook + Story Bible) and set them Live. Description: paste the Story Bible Synopsis below.", links:[["Open Payhip", "https://payhip.com/"]],
+    chk: v=>v ? (has(v.payhip["Story Bible"]) ? {done:true, detail:"Story bible link in the catalog"} : null) : null, tick:"bible_payhip", vals:sbVal};
+  const bibleDone = {opt:o, app:"Catalog Editor", text:"Paste the story bible's Payhip link in the Payhip Story Bible URL column and the Bundle link in the Payhip Bundle URL column, set the story bible's status to Approved and fill SB Pub. Find store links for shown books also lists the blank links.", act:"open", rk:"story_bible",
+    chk: v=>{ if (!v || !sb) return null; const miss = [!has(v.payhip["Story Bible"]) && "Payhip Story Bible URL", !has(v.payhip.Bundle) && "Payhip Bundle URL",
+      !(sb.status === "Approved") && "status Approved", !sb.publication_date && "SB Pub"].filter(Boolean);
+      return {done:!miss.length, detail: miss.length ? "Still blank: " + miss.join(", ") : "Links, Approved and SB Pub are in"}; }};
+  const narrator = {opt: db ? undefined : "audio", app:"Email", text:"Send the approved story and the story bible to the narrator. Narration runs alongside the next steps.", tick:"narrator",
+    attach: db ? "The final manuscript and the story bible (pre-vellum .docx)." : "The final manuscript."};
+  const audioIn = {opt: db ? undefined : "audio", app:"Payhip and BookFunnel", text:"When the narrator delivers the audiobook: fill the narrator and runtime in the grid, add the audiobook to Payhip and BookFunnel (and to the bundle), and paste its links.",
+    tick:"audiobook", act:"open", cells: ed ? [["Narrator cell", "fmt:Audiobook:narrator"], ["Runtime cell", "fmt:Audiobook:runtime_minutes"]] : []};
+
+  // ---- translation (non-Dragon Box) ----
+  if (!db && lang === "xx"){
     const en = wfEnglish(ed), L = ed ? ed.language : "<language>";
     const of = en ? wfName(en) : ed ? `“${ed.title || f}”` : "my book";
+    const S = (stage, s) => Object.assign({stage}, s);
     return [
-      Object.assign({stage:"Before release", app:"Claude", text:"Attach the translator's .docx in Claude to use the new-book-metadata skill.", sub:[written],
-        claude:`Use the new-book-metadata skill. I've attached the translator's docx for the ${L} edition of ${of}${ed ? `; its file name is ${f}` : ""}. Fill in or add this edition in the Supabase catalog with the Supabase Write connector.`}, newBook),
-      {stage:"Before release", app:"Bowker", text:"Get the ISBNs and paste each one in its cell (the buttons below open each cell).", links:[["Open Bowker", "https://www.myidentifiers.com/"]], cells:isbnCells, rk:"isbns"},
-      {stage:"Before release", app:"Claude", text:"Get the copyright page, synopsis, cover text lines and Vellum checklist with the non-english-edition skill.", tick:"non_english",
-        claude:`Use the non-english-edition skill for ${ed ? f : `the ${L} edition of ${of}`}: give me the copyright page, synopsis, cover text lines and the Vellum checklist.`},
-      {stage:"Before release", app:"Vellum", text:`Duplicate the ${L} template${ed ? `, name it ${f},` : ""} and use the style Subhead Center or Obsidian. Save it in Dropbox: Sesmithfl Team Folder/02_Manuscripts/Large Catalog/Vellum-Process/${ed && ed.series ? ed.series : "<full series name>"}. Follow the Vellum checklist from step 4. Export the eBooks and the PDF.`, rk:"vellum"},
-      Object.assign({stage:"Before release"}, pages),
-      {stage:"Before release", app:"Photoshop", text:"Make the cover with the cover text lines from step 4. Fill the Cover image link in the grid.", rk:"cover", act:"open"},
-      Object.assign({stage:"Release and after"}, live),
-      Object.assign({stage:"Release and after"}, dist),
-      Object.assign({stage:"Release and after"}, vlink),
-      Object.assign({stage:"Release and after"}, notion),
-      Object.assign({stage:"Release and after"}, links)
+      S("Before release", Object.assign({app:"Claude", text:"Attach the translator's .docx in Claude to use the new-book-metadata skill.", sub:[written],
+        claude:`Use the new-book-metadata skill. I've attached the translator's docx for the ${L} edition of ${of}${ed ? `; its file name is ${f}` : ""}. Fill in or add this edition in the Supabase catalog with the Supabase Write connector.`}, newBook)),
+      S("Before release", {app:"Bowker", text:"Get the eBook ISBN and paste it in its cell. Paperback numbers come from KDP and B&N when the print book is published.", links:[["Open Bowker", "https://www.myidentifiers.com/"]], cells: ed ? [["eBook ISBN cell", "fmt:eBook:isbn"]] : [], rk:"isbns"}),
+      S("Before release", {app:"Claude", text:"Get the copyright page, synopsis, cover text lines and Vellum checklist with the non-english-edition skill.", tick:"non_english",
+        claude:`Use the non-english-edition skill for ${ed ? f : `the ${L} edition of ${of}`}: give me the copyright page, synopsis, cover text lines and the Vellum checklist.`}),
+      S("Before release", {app:"Vellum", text:`Duplicate the ${L} template${ed ? `, name it ${f},` : ""} and use the style Subhead Center or Obsidian. Save it in ${vpFolder}. Follow the Vellum checklist from step 4. Export the eBooks and the PDF.`, rk:"vellum"}),
+      S("Before release", pages),
+      S("Before release", {app:"Photoshop", text:"Make the cover from the English cover art with the cover text lines from the non-english-edition skill (the text-free version of the English cover is the clean image for Payhip). Fill the Cover image link in the grid.", rk:"cover", act:"open"}),
+      S("Before release", printSpecs),
+      S("Before release", printCover),
+      S("Release and after", live),
+      S("Release and after", dist),
+      S("Release and after", vlink),
+      S("Release and after", notion),
+      S("Release and after", links)
     ];
   }
-  const prev = v && v.prev;
-  const desc = ed && ed.essential_description ? String(ed.essential_description).slice(0, 1500) : "";
-  const series = ed && ed.series ? `, book ${ed.number_in_series ?? "?"} of the ${ed.series} series` : "";
+
+  // ---- English book, not in the Dragon Box ----
+  if (!db){
+    const S = (stage, s) => Object.assign({stage}, s);
+    const B = "Story bible (only if this book gets one)", A = "Audiobook (only if one is offered)";
+    return [
+      S("Before release", final), S("Before release", meta), S("Before release", bowker),
+      S("Before release", coverArt), S("Before release", coverPs),
+      S("Before release", vellum), S("Before release", pages), S("Before release", mdFiles),
+      S("Before release", printSpecs), S("Before release", printCover),
+      S(A, narrator), S(A, audioIn),
+      S(B, bibleWrite), S(B, bibleIsbn), S(B, biblePics), S(B, bibleCoverArt), S(B, bibleCoverPs), S(B, bundleCover),
+      S(B, bibleVellum), S(B, bibleMd), S(B, biblePayhip), S(B, bibleDone),
+      S("Release and after", live), S("Release and after", dist), S("Release and after", vlink), S("Release and after", notion), S("Release and after", links)
+    ];
+  }
+
+  // ---- Dragon Box ----
+  const bfCells = ed ? [["BookFunnel eBook cell", "sl:BookFunnel|eBook|BookFunnel URL"], ["BookFunnel Story Bible cell", "sl:BookFunnel|Story Bible|BookFunnel URL"], ["BookFunnel Bundle cell", "sl:BookFunnel|Bundle|BookFunnel URL"]] : [];
+  const S = (stage, s) => Object.assign({stage}, s);
+  const s1 = "1. Story, catalog and ISBNs", s2 = "2. Covers", s3 = "3. Story bible and narrator", s4 = "4. Vellum and print covers",
+    s5 = "5. Payhip and BookFunnel", s6 = "6. Dragon Box content", s7 = "7. Communications and print", s8 = "8. Release check",
+    s9 = "Payhip (Pub date)", s10 = "Wide release";
   return [
-    Object.assign({stage:"Before Subsc Pub", app:"Claude", text:"Attach the manuscript in Claude to use the new-book-metadata skill.", sub:[written],
-      claude:`Use the new-book-metadata skill. I've attached the manuscript of ${t}. Fill in or add this book in the Supabase catalog with the Supabase Write connector.`}, newBook),
-    {stage:"Before Subsc Pub", app:"Bowker", text:"Get the ISBNs (eBook and paperback, plus hardcover or audiobook when offered) and paste each one in its cell (the buttons below open each cell).", links:[["Open Bowker", "https://www.myidentifiers.com/"]], cells:isbnCells, rk:"isbns"},
-    {stage:"Before Subsc Pub", app:"Bob (ChatGPT)", text:"Make the cover image with space for the NYT line, with the text placed like the previous book in the series (or, for book 1, a placement the whole series can reuse).", tick:"cover_art",
-      attach: prev ? `The cover of ${wfName(prev)}.` : "The cover of another book in the series, if there is one.",
-      bob:`Make the cover image for ${t}${series}. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
-        (prev ? `Place the title, series name and author name the same way as on the attached cover of the previous book in the series, ${wfName(prev)}.` : `Place the title, series name and author name so the same placement can be used for every book in the series${ed && ed.series ? "; if I attached another book's cover from the series, match its placement" : ""}.`) +
-        (desc ? ` About the book: ${desc}` : "")},
-    {stage:"Before Subsc Pub", app:"Photoshop", text:"Add the NYT line to the cover, then fill the Cover image link in the grid.", rk:"cover", act:"open", vals: v ? [["Bestseller line", v.best]] : []},
-    {stage:"Before Subsc Pub", app:"Vellum", text:"Format the book:", rk:"vellum", sub:[
-        `Duplicate the Vellum template and save the copy in Dropbox: Sesmithfl Team Folder/02_Manuscripts/Large Catalog/Vellum-Process/${ed && ed.series ? ed.series : "<full series name>"}.`,
-        "Style: Subhead Center or Obsidian (same layout; they differ only in the graphic each chapter starts with and the subhead: all caps in Subhead Center, sentence case in Obsidian). Import the manuscript.",
-        "Copyright page: paste the values below.",
-        reuse,
-        "Add the end-of-book promo below.",
-        "Export the eBooks and the PDF, then export Word (.docx)."],
-      vals: v ? [["eBook ISBN", v.isbn.eBook], v.offered.has("Paperback") ? ["Paperback ISBN", v.isbn.Paperback] : null, v.offered.has("Hardcover") ? ["Hardcover ISBN", v.isbn.Hardcover] : null,
-        ["Copyright page genres", v.genres]].filter(Boolean).concat(promoVals) : []},
-    Object.assign({stage:"Before Subsc Pub"}, pages),
-    {stage:"Before Subsc Pub", app:"Payhip", text:"Add the book to the subscription post.", rk:"subscription_post"},
-    {stage:"Before Subsc Pub", app:"Catalog Editor", text:"If the book gets a story bible, follow the Story bible workflow.", act:"bible", rk:"story_bible"},
-    Object.assign({stage:"Payhip"}, live),
-    Object.assign({stage:"Wide release"}, dist),
-    Object.assign({stage:"Wide release"}, vlink),
-    Object.assign({stage:"Wide release"}, notion),
-    Object.assign({stage:"Wide release"}, links)
+    S(s1, final), S(s1, meta), S(s1, bowker),
+    S(s2, coverArt), S(s2, coverPs), S(s2, bibleCoverArt), S(s2, bibleCoverPs), S(s2, bundleCover),
+    S(s3, bibleWrite), S(s3, biblePics), S(s3, narrator),
+    S(s4, vellum), S(s4, bibleVellum), S(s4, pages), S(s4, mdFiles), S(s4, printSpecs), S(s4, printCover),
+    S(s5, {app:"Payhip", text:"Make the products for the eBook, the story bible and the bundle: descriptions below (Long Synopsis, heading, Reasons to Love; Story Bible Synopsis), product images (covers, the text-free cover, the bundle graphic), and upload the generic EPUB and Kindle EPUB of both titles. They go Live at the Payhip step below.",
+      links:[["Open Payhip", "https://payhip.com/"]], tick:"payhip_products", vals: payVals.concat(sbVal)}),
+    S(s5, {app:"BookFunnel", text:"Upload both EPUB versions of both titles with the same descriptions, add the correct Payhip product link following your setup, then build this month's bundle page with the right titles. Paste the BookFunnel links in their cells.",
+      links:[["Open BookFunnel", "https://bookfunnel.com/dashboard"]], cells:bfCells, tick:"bookfunnel",
+      chk: v=>v ? (has(v.bf.eBook) && has(v.bf.Bundle) ? {done:true, detail:"BookFunnel eBook and Bundle links in the catalog"} : {done:false, detail:"Still blank: " + [!has(v.bf.eBook) && "BookFunnel eBook", !has(v.bf["Story Bible"]) && "BookFunnel Story Bible", !has(v.bf.Bundle) && "BookFunnel Bundle"].filter(Boolean).join(", ")}) : null}),
+    S(s5, {app:"BookFunnel", text:"Set up the Sales Action; confirm the product and the delivery.", tick:"sales_action"}),
+    S(s5, audioIn),
+    S(s6, {app:"Claude", text:`Write the Dragon Box intro letter${month ? " for " + month : ""} with the BookFunnel bundle link in it.`, tick:"intro_letter",
+      attach:"Last month's intro letter, so the new one keeps the same layout and voice.",
+      claude:`Write the Dragon Box intro letter${month ? ` for ${month}` : " for this month"} for ${t}, in the same layout and voice as last month's letter, which I've attached. Insert the BookFunnel bundle link${v && v.bf.Bundle ? `: ${v.bf.Bundle}` : " (I'll paste it)"}.` +
+        (v && v.short ? ` About the book: ${v.short}` : ""),
+      vals: v ? [["BookFunnel bundle link", v.bf.Bundle]] : []}),
+    S(s6, {app:"Google Drive", text:`Add the intro to Dragon Box Subscriptions in the ${month || "correct monthly"} folder.`, tick:"drive"}),
+    S(s6, {app:"Payhip", text:"Add the book to the subscription post.", rk:"subscription_post"}),
+    S(s7, {app:"Notion", text:"Save the monthly email letter: final copy and the release links.", tick:"email_notion"}),
+    S(s7, Object.assign({}, notion, {text:"With only this book shown in the grid, press Send shown to Notion so the book's Notion page has the release details."})),
+    S(s7, {app:"Canva", text:"Make the monthly flyer with the approved covers, copy and destinations.", tick:"flyer"}),
+    S(s7, {app:"Canva", text:"Make the inside-box sticker with a QR code for this month's Dragon Box destination (only after that link is ready).", tick:"sticker"}),
+    S(s8, {app:"Every app", text:"Test every pathway: ISBNs, purchase, delivery, downloads, bundle contents, the letter's links and the QR code. Release gate: all files approved, the correct month confirmed, every link and the QR code tested.", tick:"tested"}),
+    S(s9, live), S(s9, bibleDone),
+    S(s10, dist), S(s10, vlink), S(s10, links)
   ];
 }
 // Done or not, from the Release checklist (rk), the catalog (chk) and ticks made here (tick). null = nothing to tell (no book, or the book isn't in progress).
 function wfStatus(s, v){
   if (!v) return null;
+  if ((s.opt === "bible" && !v.sb) || (s.opt === "print" && !v.print) || (s.opt === "audio" && !v.offered.has("Audiobook"))) return null;   // doesn't apply to this book
   const parts = [], notes = [];
   let late = false, tickKey = null, ticked = false, tickRow = null;
   if (s.rk && v.rel){
@@ -4099,19 +4178,22 @@ function wfStatus(s, v){
   return {done, late: late && !done, note: notes.filter(Boolean).join(" · "), tickKey, ticked, locked: done && !ticked};
 }
 function wfRender(){
-  const ed = wfBook(), bible = wfKind === "bible";
+  const ed = wfBook(), db = wfKind === "db";
   const lang = (document.querySelector("input[name=wflang]:checked") || {}).value || "en";
   const v = ed && wfValsFor === ed.file_name ? wfVals : null;
-  $("#wftitle").textContent = bible ? "Story bible workflow" : "Story workflow";
-  $("#wfhint").textContent = (bible ? "The standard steps for a story bible, from the manuscript to Payhip." : "The standard steps for a new book, from the manuscript to wide release.") +
+  $("#wftitle").textContent = db ? "Dragon Box workflow" : "Non-Dragon Box workflow";
+  $("#wfhint").textContent = (db ? "The steps for a Dragon Box book (an English book with a Subsc Pub date): story, catalog, covers, story bible, narrator, Vellum, Payhip and BookFunnel, the box content, the release check, then Payhip and wide release." :
+      lang === "xx" ? "The steps for a translation, from the translator's .docx to wide release." : "The steps for an English book released without the Dragon Box, from the manuscript to wide release; the story bible and audiobook steps count only when the book has them.") +
     " Pick a book to see which steps are done (from the catalog and the Release checklist; tick the others), what is still missing, and the values to paste. “Open Claude” opens claude.ai with the prompt already in the message box (it is also copied, so ⌘V works if the box is empty); attach the file the step names, then send.";
-  $("#wflangrow").style.display = bible ? "none" : "contents";
-  $("#wfswitch").textContent = bible ? "← Story workflow" : "Story bible workflow →";
+  $("#wflangrow").style.display = db ? "none" : "contents";
+  $("#wfswitch").textContent = db ? "Non-Dragon Box workflow →" : "← Dragon Box workflow";
   wfCur = wfSteps(wfKind, lang, ed, v);
   const sts = wfCur.map(s=>wfStatus(s, v));
   const next = sts.findIndex(st=>st && !st.done);
   const doneN = sts.filter(st=>st && st.done).length;
-  if (ed) $("#wfmsg").textContent = !v ? "Loading this book…" : `${doneN} of ${wfCur.length} steps done` + (v.rel && !v.rel.size && !bible ? " (not in progress, so Release has no checklist for it)" : "");
+  const counted = sts.filter(Boolean).length;
+  const other = v && ed.language === "English" && (db ? !v.sub : !!v.sub) ? (db ? " · This book has no Subsc Pub date, so it isn't a Dragon Box book" : " · This book has a Subsc Pub date: it is a Dragon Box book") : "";
+  if (ed) $("#wfmsg").textContent = !v ? "Loading this book…" : `${doneN} of ${counted} steps done` + (v.rel && !v.rel.size ? " (not in progress, so Release has no checklist for it)" : "") + other;
   let stage = null;
   $("#wflist").innerHTML = wfCur.map((s,i)=>{
     const st = sts[i];
@@ -4123,12 +4205,11 @@ function wfRender(){
     for (const [label, url] of s.links || []) acts.push(`<a href="${esc(url)}" target="_blank" rel="noopener">${esc(label)} ↗</a>`);
     for (const [label, col] of s.cells || []) acts.push(`<button type="button" data-a="cell" data-col="${esc(col)}" title="Show this book's cell in the grid, ready to paste">${esc(label)}</button>`);
     if (s.act === "open" && ed) acts.push(`<button type="button" data-a="open">Show this book in the grid</button>`);
-    if (s.act === "bible") acts.push(`<button type="button" data-a="bible">Story bible workflow</button>`);
     const text = s.claude || s.bob;
     const vals = (s.vals || []).map(([k, val], j)=>`<div class="wfval"><span class="k">${esc(k)}</span>` +
       (val ? (/^https?:\/\//.test(val) ? `<a class="v" href="${esc(val)}" target="_blank" rel="noopener">${esc(val)}</a>` : `<span class="v">${esc(String(val).length > 160 ? String(val).slice(0,160) + "…" : val)}</span>`) +
         `<button type="button" data-a="val" data-i="${i}" data-j="${j}">Copy</button>` : `<span class="v blank">blank in the catalog</span>`) + `</div>`).join("");
-    const cls = "wfstep" + (st ? (st.done ? " done" : st.late ? " late" : "") : "") + (i === next ? " next" : "");
+    const cls = "wfstep" + (st ? (st.done ? " done" : st.late ? " late" : "") : "") + (i === next ? " next" : "") + (s.opt && v && !st ? " na" : "");
     return head + `<div class="${cls}" data-i="${i}"><span class="n">${st && st.done ? "✓" : st && st.late ? "!" : i+1}</span><div class="body">
       <div><span class="app">${esc(s.app)}:</span> ${esc(s.text)}${i === next ? ` <span class="nexttag">Next</span>` : ""}</div>
       ${st && st.note ? `<div class="stnote">${esc(st.note)}</div>` : ""}
@@ -4144,13 +4225,18 @@ async function wfBookChanged(force){
   wfLangFromBook(); wfRender();
   const ed = wfBook(); if (!ed || (!force && wfValsFor === ed.file_name)) return;
   const f = ed.file_name;
-  try{ const v = await wfLoadVals(ed); if ($("#wfbook").value !== f) return; wfVals = v; wfValsFor = f; wfRender(); }
+  try{ const v = await wfLoadVals(ed); if ($("#wfbook").value !== f) return; wfVals = v; wfValsFor = f;
+    if (wfAuto){ wfAuto = false; wfKind = ed.language === "English" && v.sub ? "db" : "nondb"; }
+    wfRender(); }
   catch(err){ $("#wfmsg").textContent = "Couldn't load this book: " + friendly(err); }
 }
+// kind "db" / "nondb"; "auto" (from a Release card or the Distribution app) picks it from the book once its Subsc Pub date is loaded.
+let wfAuto = false;
 function wfOpen(kind, file){
-  wfKind = kind;
+  wfAuto = kind === "auto" || kind === "story" || kind === "bible";   // story / bible: older links from the Distribution app
+  if (!wfAuto) wfKind = kind;
   const sel = $("#wfbook"), keep = file || sel.value;
-  const eds = data.editions.filter(e=>e.file_name && (kind !== "bible" || e.language === "English")).slice()
+  const eds = data.editions.filter(e=>e.file_name).slice()
     .sort((a,b)=> String(a.title || a.file_name).localeCompare(String(b.title || b.file_name)) || a.file_name.localeCompare(b.file_name));
   const vis = visibleRows();
   const pick = eds.some(e=>e.file_name === keep) ? keep : vis.length === 1 ? vis[0].file_name : "";
@@ -4166,11 +4252,11 @@ function wfLangFromBook(){
   const ed = wfBook(); if (!ed) return;
   const r = document.querySelector(`input[name=wflang][value=${ed.language === "English" ? "en" : "xx"}]`); if (r) r.checked = true;
 }
-$("#wfstory").onclick = ()=>wfOpen("story");
-$("#wfbible").onclick = ()=>wfOpen("bible");
-$("#wfswitch").onclick = ()=>wfOpen(wfKind === "bible" ? "story" : "bible");
+$("#wfdb").onclick = ()=>wfOpen("db");
+$("#wfnondb").onclick = ()=>wfOpen("nondb");
+$("#wfswitch").onclick = ()=>wfOpen(wfKind === "db" ? "nondb" : "db");
 $("#wfclose").onclick = ()=>$("#wfdlg").close();
-$("#wfbook").onchange = ()=>{ wfScroll = true; wfBookChanged(); };
+$("#wfbook").onchange = ()=>{ wfScroll = true; wfAuto = true; wfBookChanged(); };
 document.querySelectorAll("input[name=wflang]").forEach(r=>r.onchange = ()=>wfRender());
 $("#wflist").addEventListener("click", async ev=>{
   const b = ev.target.closest("button[data-a]"); if (!b) return;
@@ -4188,7 +4274,6 @@ $("#wflist").addEventListener("click", async ev=>{
     try{ await copyText(val); msg(k + " copied."); }catch(e){ msg("Copy was blocked: select the value and copy it."); }
   } else if (a === "open"){ const ed = wfBook(); if (ed){ $("#wfdlg").close(); location.hash = "book=" + encodeURIComponent(ed.file_name); } }
   else if (a === "cell"){ const ed = wfBook(); if (ed){ $("#wfdlg").close(); location.hash = "book=" + encodeURIComponent(ed.file_name) + "&col=" + encodeURIComponent(b.dataset.col); } }
-  else if (a === "bible") wfOpen("bible");
 });
 $("#wflist").addEventListener("change", async ev=>{
   const box = ev.target.closest("input[data-tick]"); if (!box) return;
@@ -4253,7 +4338,7 @@ $("#export").onclick = e=>{
 /* ---------- links straight to one cell: #book=<file_name>&col=<column id> ----------
    The Distribution Clipboard Queue app sends these. col is optional (no col = the book's row).
    do= (from the app's Workflow Hub) also opens something for that book: links = Find store links for
-   shown books with only that book shown; story / bible = its Story / Story bible workflow; release = Release.
+   shown books with only that book shown; story / bible = its workflow (Dragon Box or not, picked from the book); release = Release.
    A new tab signs in first as usual; the link waits in pendingJump and runs once loadAll finishes.
    After jumping, book and col are taken off the address so a reload doesn't jump again. */
 let pendingJump = null, appReady = false;
