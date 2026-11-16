@@ -3924,18 +3924,19 @@ function wfPrev(ed, among){
 const wfName = e => `“${e.title || e.file_name}” (${e.file_name})`;
 // Draft print cover sizes from the word count, before Vellum gives the page count. Pages: about 200 words a page at 5x8 (under 40,000 words)
 // and 285 at 6x9 (her English books' averages). Paperback: 0.125" bleed; spine at 0.0027" a page (KDP, the wider) with spine text kept
-// inside B&N's narrower spine (0.00212" a page); text 0.25" inside the trim (B&N's margin). Hardcover (a guess until the real template):
-// 0.75" extra on every side for the wrap and bleed, a 0.5" hinge each side of the spine, spine 0.25" wider than the paperback's.
+// inside B&N's narrower spine (0.00212" a page); text 0.25" inside the trim (B&N's margin). Hardcover from KDP's case laminate template
+// (6x9, 250 pages, white: 14.327 x 10.417", spine 0.752"): spine 0.002252" a page + 0.19"; 0.7875" added to each board's width and
+// 0.7085" to top and bottom; live area 0.715" in from every outer edge, with a 0.457" hinge band each side of the spine.
 function wfDraftSpecs(words, hc){
   const w = parseInt(String(words || "").replace(/\D/g, ""), 10);
   if (!w) return {short:"guessed from the word count once the book is in the catalog.", prompt:"Size them as a 6x9 paperback (5x8 if the story is under 40,000 words) with a spine guessed from the length; keep all text 0.25\" inside the trim and spine edges. We'll adjust them to the real templates later."};
   const six = w >= 40000, tw = six ? 6 : 5, th = six ? 9 : 8, pages = Math.ceil(w / (six ? 285 : 200) / 2) * 2;
   const r = x => Math.round(x * 100) / 100, sp = r(pages * 0.0027), bn = r(pages * 0.00212);
-  const pbW = r(2 * tw + sp + 0.25), pbH = r(th + 0.25), hs = r(sp + 0.25), hcW = r(2 * tw + hs + 1 + 1.5), hcH = r(th + 1.5);
+  const pbW = r(2 * tw + sp + 0.25), pbH = r(th + 0.25), hs = r(pages * 0.002252 + 0.19), hcW = r(2 * (tw + 0.7875) + hs), hcH = r(th + 1.417);
   const size = `${tw}x${th}`;
   return {short:`paperback ${pbW} x ${pbH}" (${size}, about ${pages} pages, spine ${sp}")` + (hc ? `; hardcover ${hcW} x ${hcH}"` : "") + ". Adjusted to the real templates after Vellum.",
     prompt:`These are drafts we'll adjust to the real KDP and B&N templates later. Paperback, full wrap (back, spine, front): ${pbW} x ${pbH} inches including 0.125" bleed on every edge; ${size} trim, about ${pages} pages, spine about ${sp}". Keep all text and important art at least 0.25" inside the trim edges, spine text within the middle ${r(Math.max(bn - 0.125, 0.1))}" of the spine, and leave a 1.5 x 1.11" space for the barcode at the bottom right of the back cover.` +
-      (hc ? ` Hardcover (case wrap): ${hcW} x ${hcH} inches, with 0.75" extra on every side that wraps around the boards and a 0.5" hinge on each side of a ${hs}" spine; keep text at least 0.25" inside the board edges and out of the hinges.` : "")};
+      (hc ? ` Hardcover (case laminate): ${hcW} x ${hcH} inches, spine ${hs}". Keep text and important art at least 0.72" in from every outer edge (that part wraps around the boards), out of a 0.46" hinge band on each side of the spine, spine text 0.06" inside the spine edges, and leave a 2 x 1.2" space for the barcode at the bottom right of the back cover.` : "")};
 }
 // A new Dragon Box book's box month: the month after the latest Subsc Pub date in Supabase (wfLastSub, read when the list opens).
 // On time when that month's 15th is today or later (Subsc Pub = that 15th). Late when that 15th has already passed with no book:
