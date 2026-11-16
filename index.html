@@ -4244,14 +4244,14 @@ function wfRender(){
         `<button type="button" data-a="val" data-i="${i}" data-j="${j}">Copy</button>` : `<span class="v blank">blank in the catalog</span>`) + `</div>`).join("");
     const cls = "wfstep" + (st ? (st.done ? " done" : st.late ? " late" : "") : "") + (i === next ? " next" : "") + (s.opt && v && !st ? " na" : "");
     return head + `<div class="${cls}" data-i="${i}"><span class="n">${st && st.done ? "✓" : st && st.late ? "!" : i+1}</span><div class="body">
-      <div><span class="app">${esc(s.app)}:</span> ${esc(s.text)}${i === next ? ` <span class="nexttag">Next</span>` : ""}</div>
+      <div>${s.text ? `<span class="app">${esc(s.app)}:</span> ${esc(s.text)}` : ""}${i === next ? ` <span class="nexttag">Next</span>` : ""}</div>
       ${st && st.note ? `<div class="stnote">${esc(st.note)}</div>` : ""}
       ${s.sub ? `<ul>${s.sub.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>` : ""}
       ${vals ? `<div class="wfvals">${vals}</div>` : ""}
       ${s.fields ? `<div class="wffields">${s.fields.map(([k, id])=>{ const c = COLMAP[id], cur = ed && c ? show(valueOf(ed, c)) : "";
         return `<label for="wff${i}_${esc(id)}">${esc(k)}</label><input id="wff${i}_${esc(id)}" type="text" data-col="${esc(id)}" value="${esc(cur)}" ${ed ? "" : "disabled placeholder=\"pick the book first\""}>`; }).join("")}</div>` : ""}
       ${s.attach ? `<div class="att">Attach: ${esc(s.attach)}</div>` : ""}
-      ${text ? `<details><summary class="hint" style="cursor:pointer">Prompt</summary><pre>${esc(text)}</pre></details>` : ""}
+      ${text && s.text ? `<details><summary class="hint" style="cursor:pointer">Prompt</summary><pre>${esc(text)}</pre></details>` : ""}
       ${acts.length ? `<div class="acts">${acts.join("")}</div>` : ""}</div></div>`;
   }).join("");
   if (wfScroll && v){ wfScroll = false; const n = $("#wflist .wfstep.next"); if (n) n.scrollIntoView({block:"center"}); }
