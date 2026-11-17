@@ -3977,7 +3977,7 @@ async function wfLoadVals(ed){
     api("GET", `edition_info?select=copyright_page_genres,end_of_story_promo,new_end_of_story_promo,cover_image_link,long_synopsis,short_synopsis,reasons_to_love&file_name=eq.${F}`).catch(()=>[]),
     api("GET", "story_bibles?select=file_name,isbn,bible_md,word_count,status,publication_date,description,has_pictures,has_creatures,has_places,has_family_lines,has_alliances,has_pronunciations,has_culture_words,has_timeline,has_book_connections,has_book_club_questions").catch(()=>[]),
     api("GET", `bestseller_lines?select=bestseller_line&language=eq.${encodeURIComponent(ed.language || "English")}`).catch(()=>[]),
-    api("GET", `store_links?select=store,format,link_or_id&file_name=eq.${F}&store=in.(Payhip,BookFunnel,Amazon,Apple,Barnes%20%26%20Noble,Kobo,Google%20Play,Books2Read)`).catch(()=>[]),
+    api("GET", `store_links?select=store,format,link_type,link_or_id&file_name=eq.${F}&store=in.(Payhip,BookFunnel,Amazon,Apple,Barnes%20%26%20Noble,Kobo,Google%20Play,Books2Read)`).catch(()=>[]),
     api("GET", `notion_pages?select=last_synced_at&file_name=eq.${F}`).catch(()=>[]),
     api("GET", `edition_release_notes?select=subscription_publication&file_name=eq.${F}`).catch(()=>[]),
     api("GET", "settings?select=key,value&key=in.(paperback_min_words,hardcover_min_words)").catch(()=>[]),
