@@ -66,7 +66,7 @@ with b as (
     from public.edition_info e
    where e.not_released_reason is null
      and not coalesce(e.anthology_only, false)
-     and e.file_name !~ '(BX|\+|TWOSES)'
+     and e.file_name !~ '(BX|\+|TWOSES|LOK-05-Madas)'
      and (p_files is null or e.file_name = any(p_files))
      and (e.publication_date is null or e.publication_date >= current_date - 60
           or e.subscription_publication >= current_date - 60

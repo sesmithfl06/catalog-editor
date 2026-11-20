@@ -2152,7 +2152,7 @@ const hiddenRows = new Set();   // file_names of books hidden with right-click â
 const pinned = [];   // file_names kept in the list by searching one after the other (this view only)
 // Add the previous book in the series / the corresponding English book to whatever is shown (this view only).
 // They are added even when the language, series, search or column filters would hide them; a row hidden with right-click stays hidden.
-const isCollection = ed => /(BX|\+|TWOSES)/.test(ed.file_name||"");
+const isCollection = ed => /(BX|\+|TWOSES|LOK-05-Madas)/.test(ed.file_name||"");
 function previousBook(ed){
   const n = Number(ed.number_in_series);
   if (!ed.series || isCollection(ed) || ed.number_in_series==null || ed.number_in_series==="" || !isFinite(n)) return null;
@@ -3787,7 +3787,7 @@ const RL_HOW = {"data":"from the catalog", "date passed":"its date has passed", 
 // Which books the popup loads: the in-progress book whose release date is nearest today, the one with the most recent edits, or both.
 function rlInProgress(){
   const cut = new Date(); cut.setDate(cut.getDate() - 60); const c = cut.toISOString().slice(0,10);
-  return data.editions.filter(ed=>!ed.not_released_reason && !ed.anthology_only && !/(BX|\+|TWOSES)/.test(ed.file_name || "") &&
+  return data.editions.filter(ed=>!ed.not_released_reason && !ed.anthology_only && !/(BX|\+|TWOSES|LOK-05-Madas)/.test(ed.file_name || "") &&
     (!ed.publication_date || String(ed.publication_date).slice(0,10) >= c || String(ed.subscription_publication||"").slice(0,10) >= c));
 }
 function rlClosest(){
