@@ -4130,7 +4130,7 @@ function wfSteps(kind, lang, ed, v){
       "Add the end-of-book promo below.",
       `Export: generic EPUB, Kindle EPUB, PDF, Word (${F}-Bible-vellum.docx).`],
     vals: v ? [["SB ISBN", v.bibleIsbn]].concat(promoVals) : []};
-  const biblePayhip = {opt:o, app:"Payhip", text:"Add the story bible and bundle. Set them Live. Description: paste the value below.", links:payhipLink, tick:"bible_payhip", vals:sbVal};
+  const biblePayhip = {opt:o, app:"Payhip", text:"Add the story bible and bundle. Set them Live. Description: paste the value below. Don't use Bob's Payhip Product Page Description Builder skill.", links:payhipLink, tick:"bible_payhip", vals:sbVal};
   const bibleLinks = {opt:o, app:"Catalog Editor", text:"Paste the story bible and bundle Payhip links.", fields:[["Payhip story bible link", "sl:Payhip|Story Bible|URL"], ["Payhip bundle link", "sl:Payhip|Bundle|URL"]]};
 
   // ---- narrator and audiobook ----
@@ -4166,7 +4166,7 @@ function wfSteps(kind, lang, ed, v){
 
   // ---- release ----
   const ku = !!(ed && ed.kindle_unlimited);
-  const live = {app:"Payhip", text: ku ? "Set the eBook Live. Description: paste the values below. (Skip for Kindle Unlimited.)" : "Set the eBook Live. Description: paste the values below. Then paste its Payhip link.", links:payhipLink, rk:"payhip_live", vals:payVals,
+  const live = {app:"Payhip", text: ku ? "Set the eBook Live. Description: paste the values below. Don't use Bob's Payhip Product Page Description Builder skill. (Skip for Kindle Unlimited.)" : "Set the eBook Live. Description: paste the values below. Don't use Bob's Payhip Product Page Description Builder skill. Then paste its Payhip link.", links:payhipLink, rk:"payhip_live", vals:payVals,
     fields: ku ? undefined : [["Payhip eBook link", "sl:Payhip|eBook|URL"]]};
   const dist = {app:"Distribution app", text:"Upload to every distributor.", rk:"distribution"};
   const printIsbns = {opt:"print", app:"Catalog Editor", text:"Paste the print ISBNs KDP and B&N gave.",
