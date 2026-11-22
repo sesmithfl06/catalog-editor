@@ -877,7 +877,7 @@ async function getAll(table, order){   // table may carry a filter: "marketing_c
 // kinds: ed (editions), st (stories, shared by all languages), one (one row per edition),
 // est (English text kept on a translation), ml (marketing link), fmt (format), sb (story bible, the companion book), sl (store link), ser (series), info (worked out, read-only)
 const ONE_TABLES = {edition_subtitles:["subtitle"], edition_awards:["award","badge"], edition_release_notes:["subscription_publication","collection_publication"],
-  projects:["plot"]};
+  projects:["plot","aplus","blank_on_payhip","seo_payhip","blurb_payhip"]};
 // Which fields each format uses. eBook and paperback share the book's Publication date (editions); hardcover and audiobook keep their own.
 // The story bible is a companion book with its own row in story_bibles (SB_FIELDS below), not a format.
 // Each format has its own Price ($) here, typed in the editor. The story bible price is story_bibles.price_usd.
@@ -1108,7 +1108,7 @@ function applyDefaultOrder(){
 
 /* ---------- sidebar groups (what a person looks for) ---------- */
 // Only the sidebar grouping and the order inside each group are set here; the grid's column order (c.order) is untouched.
-const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Store IDs","Links","Translations"];
+const GROUP_ORDER = ["Book Basics","Story","Series","Marketing","Distribution","Story Bible (companion book)","Store IDs","Links","Projects","Translations"];
 const GROUP_ITEMS = {
   "Book Basics": ["ed:file_name","ed:title","one:edition_subtitles:subtitle","ed:language","ed:series","ed:number_in_series","info:series_and_book_number","one:projects:plot",
     "ed:loglines","ed:short_synopsis","ed:medium_synopsis","info:long_synopsis","ed:essential_description","ed:archived_short_synopsis","ed:archived_long_synopsis","ed:alt_short_synopsis","ed:alt_medium_synopsis","ed:alt_long_synopsis",
@@ -1118,11 +1118,13 @@ const GROUP_ITEMS = {
     "list:authors_note","info:author","info:author_bio","ed:translator","ed:proofreader","ed:sheet_order","ed:story_id","st:story_id"],
   "Story": ["st:main_plot","st:subplots","st:connected_universe","list:main_characters","list:all_characters","list:char_facts","list:char_settings","list:char_rels","list:species","list:technology","list:language","list:rare","list:pron","list:scenes"],
   "Series": ["ser:series_synopsis","ser:series_url","ser:series_note"],
-  "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","tsr:Teaser","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule","list:reviews","list:copy"],
+  "Marketing": ["ed:tagline","st:tags","st:display_tags","ed:reasons_to_love","tsr:Teaser","one:edition_awards:award","one:edition_awards:badge","ed:end_of_story_promo","list:reviews","list:copy"],
   "Distribution": ["ed:kindle_unlimited","ed:keywords","ed:seo","ed:bisac","ed:copyright_page_genres","ed:thema","ed:bowker_genres","ed:amazon_genres","ed:bn_genres","ed:kobo_genres","ed:apple_genres","ed:ai_texts","ed:ai_images","ed:vellum_link_created","info:whole_book_number"],
   "Story Bible (companion book)": ["sl:Payhip|Story Bible|URL","sb:price_usd","sl:BookFunnel|Story Bible|URL","sb:isbn","sb:publication_date","sb:word_count","sb:description","list:bookclub"],
   "Store IDs": ["sl:Amazon|eBook|ASIN","sl:Amazon|Paperback|ASIN","sl:Amazon|Hardcover|ASIN","sl:Apple|eBook|ID"],   // IDs, not links
   "Links": [],
+  "Projects": ["one:projects:aplus","one:projects:blank_on_payhip","one:projects:seo_payhip","one:projects:blurb_payhip",
+    "ed:new_end_of_story_promo_file_name","ed:new_end_of_story_promo_rule"],   // the new end promo is a project not started yet: new books don't fill it
   "Translations": ["ed:ai_translations","info:translation_cache","calc:bestseller_line"]
 };
 const KIND_GROUP = {dbx:"Links", tsr:"Marketing", calc:"Book Basics", promo:"Book Basics", ed:"Book Basics", one:"Book Basics", info:"Book Basics", st:"Story", list:"Story", ser:"Series", diff:"Book Basics", fmt:"Distribution", sb:SB_GROUP, sl:"Links", ml:"Links", aff:"Links", est:"Translations"};
@@ -1143,7 +1145,7 @@ const DEFAULT_NICKS = {
   "ml:Amazon affiliate link:url":"Amz eB US Affil", "ml:Apple Books affiliate link:url":"Apple Affil", "ml:B&N affiliate link:url":"BN Affil", "ml:Google Play affiliate link:url":"Google Play Affil",
   "sb:isbn":"SB ISBN", "sb:description":"SB synopsis", "sb:publication_date":"SB Pub", "sb:word_count":"SB words", "sb:price_usd":"SB $",
   "info:translation_cache":"Translation Cache", "calc:bestseller_line":"Bestseller line",
-  "ed:end_of_story_promo":"End promo (current)", "ed:new_end_of_story_promo_file_name":"New end promo file", "ed:new_end_of_story_promo_rule":"New end promo rule",
+  "ed:end_of_story_promo":"End promo (current)", "ed:new_end_of_story_promo_file_name":"New end promo project file", "ed:new_end_of_story_promo_rule":"New end promo project rule",
   "ed:character_sheet_included":"Char sheet", "st:main_genre_differentiated":"Main genre", "ed:vellum_link_created":"Vellum link",
   "one:edition_release_notes:subscription_publication":"Subsc Pub", "one:edition_release_notes:collection_publication":"Collection Pub"
 };
@@ -4035,7 +4037,8 @@ function wfSteps(kind, lang, ed, v){
   const offered = x => !v || v.offered.has(x);
   const bestLine = (v && v.best) || "New York Times / USA Today Bestselling Author";
   const reuse = `Reuse Additional Books, Acknowledgments, and About the Author from booklinks copy.vellum (${WF_BOOKLINKS}).`;
-  const promoVals = v ? [["End of story promo", v.promo], v.newPromo && v.newPromo !== v.promo ? ["New end of story promo (by its rule)", v.newPromo] : null].filter(Boolean) : [];
+  const promoVals = v ? [["End of story promo", v.promo]] : [];
+  const promoField = [["End promo (current)", "ed:end_of_story_promo"]];
   const heading = ed ? WF_RTL_HEADING[ed.language] || "" : "";
   const payVals = v ? [["Long Synopsis", v.synopsis], ["Heading", heading], ["Reasons to Love", v.rtl]] : [];
   const sb = v && v.sb;
@@ -4138,10 +4141,10 @@ function wfSteps(kind, lang, ed, v){
     {opt:ao, app:"Laurelle", text:"Send the audio list to the narrator. Update the book to the audiomatch version.", tick:"audio_list"},
     {opt:ao, app:"Narrator", text:"Send the final files.", tick:"audio_final"},
     {opt:ao, app:"Payhip and BookFunnel", text:"Add the audiobook (and add it to the bundle).", tick:"audiobook"},
-    {opt:ao, app:"Catalog Editor", text:"Paste the audiobook links, narrator, narrator bio, runtime, and the audiobook's release date.", fields:[["Payhip audiobook link", "sl:Payhip|Audiobook|URL"], ["BookFunnel audiobook link", "sl:BookFunnel|Audiobook|URL"], ["Narrator", "fmt:Audiobook:narrator"], ["Narrator bio", "fmt:Audiobook:narrator_bio"], ["Runtime", "fmt:Audiobook:runtime_minutes"], ["Audiobook Pub date", "fmt:Audiobook:publication_date"]]}];
+    {opt:ao, app:"Catalog Editor", text:"Paste the audiobook links, narrator, narrator bio, runtime, prices, and the audiobook's release date.", fields:[["Payhip audiobook link", "sl:Payhip|Audiobook|URL"], ["BookFunnel audiobook link", "sl:BookFunnel|Audiobook|URL"], ["Narrator", "fmt:Audiobook:narrator"], ["Narrator bio", "fmt:Audiobook:narrator_bio"], ["Runtime", "fmt:Audiobook:runtime_minutes"], ["Ab $", "fmt:Audiobook:price_usd"], ["Ab Lib $", "fmt:Audiobook:library_price_usd"], ["Audiobook Pub date", "fmt:Audiobook:publication_date"]]}];
 
   // ---- Vellum and print ----
-  const vellum = xx ? {app:"Vellum", text:`Duplicate the ${ed ? ed.language : "<language>"} template${ed ? ` as ${f}` : ""} into ${vpFolder}. Style: Subhead Center or Obsidian. Follow the skill's checklist from step 4. Export.`, rk:"vellum"}
+  const vellum = xx ? {app:"Vellum", text:`Duplicate the ${ed ? ed.language : "<language>"} template${ed ? ` as ${f}` : ""} into ${vpFolder}. Style: Subhead Center or Obsidian. Follow the skill's checklist from step 4. Export.`, rk:"vellum", fields:promoField}
     : {app:"Vellum", text:"Format the book.", rk:"vellum", sub:[
       `Duplicate the template into ${vpFolder}.`,
       "Style: Subhead Center or Obsidian. Import the manuscript.",
@@ -4149,8 +4152,9 @@ function wfSteps(kind, lang, ed, v){
       reuse,
       "Add the end-of-book promo below.",
       "Export: generic EPUB, Kindle EPUB, print PDF, Word (" + F + "-vellum.docx)."],
-    vals: v ? [["eBook ISBN", v.isbn.eBook], ["Copyright page genres", v.genres]].concat(promoVals) : []};
-  const pages = {app:"Catalog Editor", text:"Enter the page count and page size Vellum shows.", fields:[["Page count", "ed:paperback_pages"], ["Page size", "ed:paperback_page_size"]],
+    vals: v ? [["eBook ISBN", v.isbn.eBook], ["Copyright page genres", v.genres]] : [], fields:promoField};
+  const pages = {app:"Catalog Editor", text:"Enter the page count and page size Vellum shows" + (pb || hc ? ", and the print prices." : "."), fields:[["Page count", "ed:paperback_pages"], ["Page size", "ed:paperback_page_size"]]
+      .concat(pb ? [["Pb $", "fmt:Paperback:price_usd"]] : [], hc ? [["Hc $", "fmt:Hardcover:price_usd"]] : []),
     rk:"pages", chk: v=>v && !v.print ? {done:true, detail:"No paperback or hardcover offered"} : null};
   const printSpecs = {opt:"print", app:"KDP and B&N Press", text:`Get the real print cover templates (paperback${hc ? ", hardcover" + hcIf : ""}).`,
     links:[["KDP cover calculator", "https://kdp.amazon.com/cover-calculator"], ["Open B&N Press", "https://press.barnesandnoble.com/"]], tick:"print_specs",
