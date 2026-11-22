@@ -4109,7 +4109,7 @@ function wfSteps(kind, lang, ed, v){
       (pb ? `, and draft print covers: the paperback with text and with no text${hc ? ", and the hardcover with text" : ""}. ${draft.prompt}` : ".") +
       ` The no-text versions should still look good on their own as product images.` +
       (desc ? ` About the book: ${desc}` : "") +
-      (hasBible ? ` Then use my story bible creation skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum. Finally make the story bible cover from the story's cover you just made. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
+      (hasBible ? ` Then use my S.E. Smith Comprehensive Story Bible Formatter skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum. Finally make the story bible cover from the story's cover you just made. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
         (v && v.prevBible ? `Place the title, the words Story Bible, and the author name the same way as on the attached story bible cover of ${wfName(v.prevBible)}.` : `Place the title, the words Story Bible, and the author name the same way as on the attached cover of the previous story bible.`) : "")}]};
   // One Photoshop step for every format that gets the line.
   const nytList = xx ? [C("eBook cover", "eBook", "line")].concat(pb || hc ? [C("Print cover" + ifOff, "Print", "line")] : [])
