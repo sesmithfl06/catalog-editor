@@ -4077,8 +4077,14 @@ function wfSteps(kind, lang, ed, v){
         (db ? " Then make its story bible from the same manuscript (pre-images DOCX, md copy, and its details in Supabase)." : "")}]
         .concat(db ? [] : [{who:"claude", label:"Story bible (only if this book gets one)", text:bibleWritePrompt}])};
   const isbnFields = [["eBook ISBN", "fmt:eBook:isbn"]].concat(aud ? [["Audiobook ISBN", "fmt:Audiobook:isbn"]] : []).concat(db ? [["Story bible ISBN", "sb:isbn"]] : []);
-  const bowker = {app:"Bowker", text:`Assign the ISBNs (${isbnFields.map(x=>x[0].replace(" ISBN", "")).join(", ")}).`, links:bowkerLink, rk:"isbns"};
-  const isbnPaste = {app:"Catalog Editor", text:"Paste the ISBNs.", fields:isbnFields, rk:"isbns"};
+  // Done when these ISBNs are in the catalog. Not from the Release checklist's ISBN step: that one also waits for the print ISBNs, which KDP and B&N give after release (their own step below).
+  const isbnChk = list => v=>{ if (!v || !ed) return null;
+    const miss = list.filter(([,id])=>{ const c = COLMAP[id], x = c ? valueOf(ed, c) : null; return x == null || String(x).trim() === ""; }).map(([k])=>k);
+    return {done:!miss.length, detail:miss.length ? "Blank: " + miss.join(", ") : ""}; };
+  const bowker = {app:"Bowker", text:`Assign the ISBNs (${isbnFields.map(x=>x[0].replace(" ISBN", "")).join(", ")}).`, links:bowkerLink, chk:isbnChk(isbnFields)};
+  const isbnPaste = {app:"Catalog Editor", text:"Paste the ISBNs.", fields:isbnFields};
+  // The wide release date: the Release checklist's due dates and the store link steps go by it, and the new-book script leaves it blank unless it is given.
+  const pubDate = {app:"Catalog Editor", text:"Enter the wide release date (Pub date) once it is set.", fields:[["Pub date", "ed:publication_date"]]};
 
   // ---- covers ----
   const hasBible = !xx && (db || !v || !!sb);
@@ -4132,7 +4138,7 @@ function wfSteps(kind, lang, ed, v){
     {opt:ao, app:"Laurelle", text:"Send the audio list to the narrator. Update the book to the audiomatch version.", tick:"audio_list"},
     {opt:ao, app:"Narrator", text:"Send the final files.", tick:"audio_final"},
     {opt:ao, app:"Payhip and BookFunnel", text:"Add the audiobook (and add it to the bundle).", tick:"audiobook"},
-    {opt:ao, app:"Catalog Editor", text:"Paste the audiobook links, narrator, and runtime.", fields:[["Payhip audiobook link", "sl:Payhip|Audiobook|URL"], ["BookFunnel audiobook link", "sl:BookFunnel|Audiobook|URL"], ["Narrator", "fmt:Audiobook:narrator"], ["Runtime", "fmt:Audiobook:runtime_minutes"]]}];
+    {opt:ao, app:"Catalog Editor", text:"Paste the audiobook links, narrator, narrator bio, runtime, and the audiobook's release date.", fields:[["Payhip audiobook link", "sl:Payhip|Audiobook|URL"], ["BookFunnel audiobook link", "sl:BookFunnel|Audiobook|URL"], ["Narrator", "fmt:Audiobook:narrator"], ["Narrator bio", "fmt:Audiobook:narrator_bio"], ["Runtime", "fmt:Audiobook:runtime_minutes"], ["Audiobook Pub date", "fmt:Audiobook:publication_date"]]}];
 
   // ---- Vellum and print ----
   const vellum = xx ? {app:"Vellum", text:`Duplicate the ${ed ? ed.language : "<language>"} template${ed ? ` as ${f}` : ""} into ${vpFolder}. Style: Subhead Center or Obsidian. Follow the skill's checklist from step 4. Export.`, rk:"vellum"}
@@ -4155,7 +4161,9 @@ function wfSteps(kind, lang, ed, v){
     prompts:[{who:"bob", text:`Adjust the attached draft print covers for ${t} to the attached KDP and B&N templates: resize the canvas and spine and move anything that sits outside the safe areas. Make one file that works for both: KDP's overall size and B&N's margins (keep text and important art 0.25" inside the trim and spine edges). Keep the art and text placement otherwise the same, and keep the space for the NYT line on the covers with text. I need: the paperback with text, the paperback with no text${hc ? ", and the hardcover with text" : ""}.`}]};
 
   // ---- release ----
-  const live = {app:"Payhip", text:"Set the eBook Live. Description: paste the values below. (Skip for Kindle Unlimited.)", links:payhipLink, rk:"payhip_live", vals:payVals};
+  const ku = !!(ed && ed.kindle_unlimited);
+  const live = {app:"Payhip", text: ku ? "Set the eBook Live. Description: paste the values below. (Skip for Kindle Unlimited.)" : "Set the eBook Live. Description: paste the values below. Then paste its Payhip link.", links:payhipLink, rk:"payhip_live", vals:payVals,
+    fields: ku ? undefined : [["Payhip eBook link", "sl:Payhip|eBook|URL"]]};
   const dist = {app:"Distribution app", text:"Upload to every distributor.", rk:"distribution"};
   const printIsbns = {opt:"print", app:"Catalog Editor", text:"Paste the print ISBNs KDP and B&N gave.",
     fields:[].concat(pb ? [["Paperback Amazon ISBN", "fmt:Paperback:amazon_isbn"], ["Paperback B&N ISBN", "fmt:Paperback:bn_isbn"]] : [], hc ? [["Hardcover Amazon ISBN", "fmt:Hardcover:amazon_isbn"], ["Hardcover B&N ISBN", "fmt:Hardcover:bn_isbn"]] : [])};
@@ -4168,12 +4176,12 @@ function wfSteps(kind, lang, ed, v){
 
   const S = (stage, list) => list.map(s=>Object.assign({stage}, s));
   if (xx) return [
-    ...S("Before release", [meta, {app:"Bowker", text:"Assign the eBook ISBN.", links:bowkerLink, rk:"isbns"}, {app:"Catalog Editor", text:"Paste the eBook ISBN.", fields:[["eBook ISBN", "fmt:eBook:isbn"]], rk:"isbns"},
-      vellum, pages, printSpecs, nyt, coverLink]),
+    ...S("Before release", [meta, {app:"Bowker", text:"Assign the eBook ISBN.", links:bowkerLink, chk:isbnChk([["eBook ISBN", "fmt:eBook:isbn"]])}, {app:"Catalog Editor", text:"Paste the eBook ISBN.", fields:[["eBook ISBN", "fmt:eBook:isbn"]]},
+      vellum, pages, printSpecs, nyt, coverLink, pubDate]),
     ...S("Release and after", [live, dist, printIsbns, vlink, notion, links])
   ];
   if (!db) return [
-    ...S("Before release", [final, meta, bowker, isbnPaste, covers, vellum, pages, printSpecs, printArt, nyt, coverLink]),
+    ...S("Before release", [final, meta, bowker, isbnPaste, covers, vellum, pages, printSpecs, printArt, nyt, coverLink, pubDate]),
     ...S("Audiobook (only if one is offered)", [narrator, ...audioSteps]),
     ...S("Story bible (only if this book gets one)", [bibleIsbn, bibleIsbnPaste, bundleCover, bibleVellum, biblePayhip, bibleLinks]),
     ...S("Release and after", [live, dist, printIsbns, vlink, notion, links])
@@ -4201,7 +4209,7 @@ function wfSteps(kind, lang, ed, v){
       {app:"Canva", text:"Make the monthly flyer.", tick:"flyer"},
       {app:"Canva", text:"Make the inside-box QR sticker (after the link is ready).", tick:"sticker"}]),
     ...S("8. Release check", [{app:"Every app", text:"Test every link, download, and the QR code.", tick:"tested"}]),
-    ...S("Payhip (Pub date)", [live, bibleLinks]),
+    ...S("Payhip (Pub date)", [pubDate, live, bibleLinks]),
     ...S("Wide release", [dist, printIsbns, vlink, links])
   ];
 }
