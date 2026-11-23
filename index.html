@@ -151,6 +151,9 @@ td.title .v{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellip
 #gridwrap.full td .v{display:block;-webkit-line-clamp:unset;overflow:visible}
 #gridwrap.full td.long{--w:460px}
 td.edit{cursor:default}
+td .v:has(+ select.yn){display:none}
+td select.yn{width:100%;min-width:0;padding:2px 4px;font-size:inherit;background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer}
+td select.yn:hover,td select.yn:focus{border-color:var(--line);background:var(--panel)}
 /* header = dark blue (all columns, title too); title column cells = very subtle dark purple with slight row banding */
 :root{--hdr:#1f3a66; --hdr-ink:#ffffff; --ttl:#332c3e; --ttl-band:#413854; --ttl-ink:#ffffff}
 th{background:var(--hdr);color:var(--hdr-ink)}
@@ -2461,6 +2464,16 @@ function sortSummary(){
 }
 
 let viewCols = [], viewRows = [];
+/* Yes/No cells: a dropdown in the cell (Yes first, then No, then blank). Picking one saves straight away. */
+const ynSelect = v => `<select class="yn" aria-label="Yes or No"><option value="true"${v===true?" selected":""}>Yes</option><option value="false"${v===false?" selected":""}>No</option><option value=""${v==null?" selected":""}>(blank)</option></select>`;
+$("#gridwrap").addEventListener("change", e=>{
+  const sel = e.target.closest("select.yn"); if (!sel) return;
+  const td = sel.closest("td"), ed = viewRows[+td.dataset.r], c = viewCols[+td.dataset.c], old = valueOf(ed,c);
+  const v = sel.value==="" ? null : sel.value==="true";
+  if (show(v)===show(old)) return;
+  undoGrp = null;
+  saveCell(ed, c, v, old, td, true).then(ok=>{ if (!ok) sel.value = old==null ? "" : String(old); });
+});
 function renderGrid(){
   clearSel();
   const blanksOnly = !linkView && $("#fcolblank").checked;
@@ -2501,6 +2514,7 @@ function renderGrid(){
         h += `<th class="sortable ${i===0?"first":""} ${i<nFrz?"frz":""} ${i===nFrz-1?"frzlast":""} ${colWidths[c.id]?"sized":""} ${on?"sorted":""} ${fk||fc?"filtered":""}" data-sort="${esc(c.id)}" data-c="${i}" draggable="true" aria-sort="${on?(sk.dir>0?"ascending":"descending"):"none"}"><span>${hp?qm(hp,c.label):esc(c.label)}</span>${on ? `<span class="sic" title="${esc(tip)}">${icon}</span>` : ""}${fk||fc ? `<span class="fic" title="${esc(ftip)}">▾</span>` : ""}<span class="rsz" draggable="false" title="Double-click to reset width"></span></th>`;
   });
   h += "</tr></thead><tbody>";
+  const ynCol = viewCols.map(c=>typeOf(c)==="bool");   // Yes/No columns get a dropdown right in the cell
   viewRows.forEach((ed,ri)=>{
     h += "<tr>";
     viewCols.forEach((c,ci)=>{
@@ -2508,7 +2522,7 @@ function renderGrid(){
       const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", emptyCls(ed,c,v), (isLong(c)?"long":""), (c.id==="ed:title"?"title":""), (isGenreCol(c)?"genres":"")].join(" ");
       const noFmt = c.kind==="fmt" && !data.fmt[rowKey(ed,c)] ? `This book has no ${c.f}. Right-click → Add ${c.f} to add it.`
         : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it." : "";
-      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt || (ok ? "" : "Can't be edited: " + whyNoEdit(ed,c)), valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div></td>`;
+      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt || (ok ? "" : "Can't be edited: " + whyNoEdit(ed,c)), valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div>${ok && ynCol[ci] ? ynSelect(v) : ""}</td>`;
     });
     h += "</tr>";
   });
@@ -2831,6 +2845,7 @@ function parseFor(c, text){
 let editing = null; // {td, ed, c, old}
 /* left click only selects a cell; editing is right-click → Edit (or Enter / F2 on the selected cell) */
 $("#gridwrap").addEventListener("keydown", e=>{
+  if (e.target.tagName==="SELECT") return;   // a Yes/No dropdown in a cell keeps its own keys
   const ro = e.target.closest("td.ro[data-r]");
   if (ro && !editing && (e.key==="Enter" || e.key==="F2")){ e.preventDefault(); showWhyNoEdit(viewRows[+ro.dataset.r], viewCols[+ro.dataset.c]); return; }
   const td = e.target.closest("td.edit"); if (!td || editing) return;
@@ -3144,6 +3159,7 @@ function updateCell(ed, c){
       if (!same) return;
       const td = cellAt(ri,ci); if (!td) return;
       const v = valueOf(r,cc); td.querySelector(".v").textContent = disp(v,cc); td.title = disp(v,cc).slice(0,600);
+      const yn = td.querySelector("select.yn"); if (yn) yn.value = v==null ? "" : String(v);
       setEmptyCls(td, r, cc, v);
     });
   });
