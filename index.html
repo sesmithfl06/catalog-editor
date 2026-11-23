@@ -750,7 +750,8 @@ dialog#ncdlg::backdrop{background:#0006}
       <summary>Books <span class="n" id="bookcount"></span></summary>
       <div class="body">
         <select id="flang" aria-label="Language"><option value="">All languages</option></select>
-        <select id="fseries" aria-label="Series"><option value="">All series</option></select>
+        <select id="fseries" aria-label="Series" title="Pick a series to add it; pick more to show several series together. Click a series below to remove it."><option value="">All series</option></select>
+        <div id="fserieschips" style="display:flex;flex-wrap:wrap;gap:4px"></div>
         <input id="frow" type="search" placeholder="Find a book by title or file name…" title="Looks in the title and the file name. Tick Expand scope to also look in every ticked column. With several words, a book must have each word in what is searched.">
         <label id="fexpandlbl" style="display:flex;gap:6px;align-items:center;font-size:12px" title="Off: the search looks in the title and the file name. On: it also looks in every ticked column."><input id="fexpand" type="checkbox"> Expand scope (search all columns)</label>
         <label id="fprevlbl" style="display:flex;gap:6px;align-items:center;font-size:12px" title="Also shows the book before each shown book: same series and language, next lower book number."><input id="fprev" type="checkbox"> Add the previous book in the series</label>
@@ -1872,7 +1873,7 @@ async function moveLocalPresets(){
 }
 function presetRow(name, p){
   return {preset_name:name, purpose:"Catalog Editor view", columns:p.cols,
-    editor_view:{lang:p.lang||"", series:p.series||"", find:p.find||"", blanks:!!p.blanks, blankAdd:p.blankAdd||[], blankOff:p.blankOff||[], sort:(p.sorts||[])[0]||{id:null,dir:1}, sorts:p.sorts||[], filters:p.filters||{}, conds:p.conds||{}, layout:p.layout||{order:[],widths:{},frozen:1}}};
+    editor_view:{lang:p.lang||"", seriesList:p.seriesList||(p.series?[p.series]:[]), find:p.find||"", blanks:!!p.blanks, blankAdd:p.blankAdd||[], blankOff:p.blankOff||[], sort:(p.sorts||[])[0]||{id:null,dir:1}, sorts:p.sorts||[], filters:p.filters||{}, conds:p.conds||{}, layout:p.layout||{order:[],widths:{},frozen:1}}};
 }
 function presetById(id){ return PRESETS.find(p=>String(p.id)===String(id)); }
 function presetToView(row){
@@ -1900,7 +1901,7 @@ function renderPresetMenu(sel){
 async function applyPreset(p){
   checked = new Set(p.cols);
   sortKeys = (p.sorts||[]).map(k=>({id:k.id, dir:k.dir}));
-  $("#flang").value = p.lang || ""; $("#fseries").value = p.series || ""; $("#frow").value = p.find || "";
+  $("#flang").value = p.lang || ""; setSeries(p.seriesList || (p.series ? [p.series] : [])); $("#frow").value = p.find || "";
   $("#fcolblank").checked = !!p.blanks;
   blankAdd = new Set(p.blankAdd||[]); blankOff = new Set(p.blankOff||[]);
   colFilters = {}; for (const [id, vals] of Object.entries(p.filters||{})) if (COLMAP[id] && Array.isArray(vals) && vals.length) colFilters[id] = new Set(vals);
@@ -1920,7 +1921,7 @@ $("#presetsave").onclick = async()=>{
   const name = (prompt("Name this view:", def)||"").trim(); if (!name) return;
   const same = PRESETS.find(p=>p.editor_view && p.preset_name===name);
   if (same && name!==def && !confirm(`A view named "${name}" already exists. Replace it?`)) return;
-  const body = presetRow(name, {cols:[...checked], lang:$("#flang").value, series:$("#fseries").value, find:$("#frow").value, blanks:$("#fcolblank").checked, blankAdd:[...blankAdd], blankOff:[...blankOff], sorts:sortKeys.map(k=>({id:k.id, dir:k.dir})), filters:filtersForSave(), conds:condsForSave(), layout:layoutForSave()});
+  const body = presetRow(name, {cols:[...checked], lang:$("#flang").value, seriesList:[...seriesSel], find:$("#frow").value, blanks:$("#fcolblank").checked, blankAdd:[...blankAdd], blankOff:[...blankOff], sorts:sortKeys.map(k=>({id:k.id, dir:k.dir})), filters:filtersForSave(), conds:condsForSave(), layout:layoutForSave()});
   try{
     const row = same ? await patchOne("column_presets", "id=eq."+q(same.id), body) : await insertOne("column_presets", body);
     PRESETS = PRESETS.filter(p=>p.id!==row.id).concat(row);
@@ -1928,7 +1929,7 @@ $("#presetsave").onclick = async()=>{
   }catch(err){ setStatus("View not saved: " + friendly(err), "bad"); }
 };
 function currentViewBody(name){
-  return presetRow(name, {cols:[...checked], lang:$("#flang").value, series:$("#fseries").value, find:$("#frow").value, blanks:$("#fcolblank").checked, blankAdd:[...blankAdd], blankOff:[...blankOff], sorts:sortKeys.map(k=>({id:k.id, dir:k.dir})), filters:filtersForSave(), conds:condsForSave(), layout:layoutForSave()});
+  return presetRow(name, {cols:[...checked], lang:$("#flang").value, seriesList:[...seriesSel], find:$("#frow").value, blanks:$("#fcolblank").checked, blankAdd:[...blankAdd], blankOff:[...blankOff], sorts:sortKeys.map(k=>({id:k.id, dir:k.dir})), filters:filtersForSave(), conds:condsForSave(), layout:layoutForSave()});
 }
 $("#presetupd").onclick = async()=>{
   const row = presetById($("#presetsel").value.slice(3)); if (!row || !row.editor_view) return;
@@ -2184,7 +2185,14 @@ function fillFilters(){
   $("#flang").innerHTML = `<option value="">All languages</option>` + langs.map(l=>`<option>${esc(l)}</option>`).join("");
   const sers = [...new Set(data.editions.map(e=>e.series))].filter(Boolean).sort();
   $("#fseries").innerHTML = `<option value="">All series</option>` + sers.map(s=>`<option>${esc(s)}</option>`).join("");
+  drawSeriesChips();
 }
+const seriesSel = new Set();   // series ticked in the Series box; empty = all series (this view and saved views)
+function drawSeriesChips(){
+  $("#fseries").options[0].textContent = seriesSel.size ? "Add another series…" : "All series";
+  $("#fserieschips").innerHTML = [...seriesSel].map(s=>`<button type="button" class="serchip" data-s="${esc(s)}" title="Click to remove this series">${esc(s)} ✕</button>`).join("");
+}
+function setSeries(list){ seriesSel.clear(); (list||[]).forEach(s=>seriesSel.add(s)); $("#fseries").value = ""; drawSeriesChips(); }
 const hiddenRows = new Set();   // file_names of books hidden with right-click → Hide row (this view only; nothing is changed in Supabase)
 const pinned = [];   // file_names kept in the list by searching one after the other (this view only)
 // Add the previous book in the series / the corresponding English book to whatever is shown (this view only).
@@ -2220,7 +2228,7 @@ function visibleRows(skipId){
   return out;
 }
 function baseVisibleRows(skipId){
-  const L = $("#flang").value, S = $("#fseries").value, q = $("#frow").value.trim().toLowerCase();
+  const L = $("#flang").value, S = seriesSel, q = $("#frow").value.trim().toLowerCase();
   const matches = searchRows(L, S, q).filter(ed=>passesFilters(ed, skipId));
   if (!pinned.length) return matches;
   const kept = pinned.map(fn=>data.editions.find(ed=>ed.file_name===fn)).filter(ed=>ed && !hiddenRows.has(ed.file_name) && passesFilters(ed, skipId));
@@ -2228,7 +2236,7 @@ function baseVisibleRows(skipId){
 }
 function addPins(){
   const q = $("#frow").value.trim().toLowerCase(); if (!q) return;
-  const found = searchRows($("#flang").value, $("#fseries").value, q);
+  const found = searchRows($("#flang").value, seriesSel, q);
   if (!found.length){ setStatus("No book matches that search","warn"); return; }
   found.forEach(ed=>{ if (!pinned.includes(ed.file_name)) pinned.push(ed.file_name); });
   $("#frow").value = ""; renderGrid(); $("#frow").focus();
@@ -2244,7 +2252,7 @@ function searchRows(L, S, q){
   return data.editions.filter(ed=>{
     if (hiddenRows.has(ed.file_name)) return false;
     if (L && ed.language!==L) return false;
-    if (S && ed.series!==S) return false;
+    if (S && S.size && !S.has(ed.series)) return false;
     if (words.length){
       let hay = (ed.title||"") + "\n" + (ed.file_name||"");
       for (const c of cols){ if (formatMissing(ed,c)) continue; const v = valueOf(ed,c); if (v!=null && v!=="") hay += "\n" + show(v) + "\n" + disp(v,c); }
@@ -2635,7 +2643,9 @@ $("#gridwrap").addEventListener("drop", e=>{
 });
 $("#gridwrap").addEventListener("dragend", ()=>{ dragCol = null; dragCols = []; clearDrop(); document.querySelectorAll("#gridwrap th.dragging").forEach(t=>t.classList.remove("dragging")); });
 function freezeTo(id){ const i = viewCols.findIndex(c=>c.id===id); if (i<0) return; frozenN = i+1; renderGrid(); setStatus(frozenN>1 ? `Froze ${frozenN} columns on the left` : "Only the first column is frozen","ok"); }
-["#flang","#fseries"].forEach(s=>$(s).addEventListener("change", renderGrid));
+$("#flang").addEventListener("change", renderGrid);
+$("#fseries").addEventListener("change", ()=>{ const v = $("#fseries").value; if (v) seriesSel.add(v); $("#fseries").value = ""; drawSeriesChips(); renderGrid(); });
+$("#fserieschips").addEventListener("click", e=>{ const b = e.target.closest(".serchip"); if (!b) return; seriesSel.delete(b.dataset.s); drawSeriesChips(); renderGrid(); });
 $("#fcolblank").addEventListener("change", async()=>{
   try{ if ($("#fcolblank").checked){ setStatus("Checking every column for blanks…","ok"); await ensureLoaded(allCols()); } else await ensureLoaded(ticked()); renderGrid(); renderColumnList(); setStatus("Ready","ok"); }
   catch(err){ setStatus(err.message,"bad"); }
@@ -4663,7 +4673,7 @@ $("#linkexit").onclick = async ()=>{
 // Changing a filter, the book search, a column tick or a preset leaves the link view first (capture
 // runs before those controls' own handlers, which then redraw the grid the usual way).
 ["change","input"].forEach(t=>$("aside").addEventListener(t, e=>{
-  if (e.target.closest("#flang,#fseries,#frow,#fexpand,#fprev,#feng,#fcolblank,#collist,#presetsel")) leaveLinkView();
+  if (e.target.closest("#flang,#fseries,#fserieschips,#frow,#fexpand,#fprev,#feng,#fcolblank,#collist,#presetsel")) leaveLinkView();
 }, true));
 
 async function jumpTo(book, colId){
