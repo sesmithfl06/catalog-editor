@@ -153,6 +153,7 @@ td.title .v{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellip
 td.edit{cursor:default}
 td .v:has(+ select.yn){display:none}
 td select.yn{width:100%;min-width:0;padding:2px 4px;font-size:inherit;background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer}
+td select.yn.blank:not(:focus){color:transparent}
 td select.yn:hover,td select.yn:focus{border-color:var(--line);background:var(--panel)}
 /* header = dark blue (all columns, title too); title column cells = very subtle dark purple with slight row banding */
 :root{--hdr:#1f3a66; --hdr-ink:#ffffff; --ttl:#332c3e; --ttl-band:#413854; --ttl-ink:#ffffff}
@@ -2466,18 +2467,16 @@ function sortSummary(){
 
 let viewCols = [], viewRows = [];
 /* Yes/No cells: a dropdown in the cell (Yes first, then No, then blank). Picking one saves straight away. */
-const ynSelect = v => `<select class="yn" aria-label="Yes or No"><option value="true"${v===true?" selected":""}>Yes</option><option value="false"${v===false?" selected":""}>No</option><option value=""${v==null?" selected":""}></option></select>`;
-/* A blank Yes/No cell looks empty; the word "(blank)" only appears in the list once the dropdown is opened. */
-const ynBlankText = (sel, open) => { const o = sel.querySelector('option[value=""]'); if (o) o.textContent = open ? "(blank)" : ""; };
-$("#gridwrap").addEventListener("focusin", e=>{ if (e.target.matches && e.target.matches("select.yn")) ynBlankText(e.target, true); });
-$("#gridwrap").addEventListener("focusout", e=>{ if (e.target.matches && e.target.matches("select.yn")) ynBlankText(e.target, false); });
+/* A blank Yes/No cell looks empty (its "(blank)" text is only hidden by colour while the dropdown is not focused, so nothing changes when it opens). */
+const ynSelect = v => `<select class="yn${v==null?" blank":""}" aria-label="Yes or No"><option value="true"${v===true?" selected":""}>Yes</option><option value="false"${v===false?" selected":""}>No</option><option value=""${v==null?" selected":""}>(blank)</option></select>`;
 $("#gridwrap").addEventListener("change", e=>{
   const sel = e.target.closest("select.yn"); if (!sel) return;
   const td = sel.closest("td"), ed = viewRows[+td.dataset.r], c = viewCols[+td.dataset.c], old = valueOf(ed,c);
   const v = sel.value==="" ? null : sel.value==="true";
+  sel.classList.toggle("blank", v==null);
   if (show(v)===show(old)) return;
   undoGrp = null;
-  saveCell(ed, c, v, old, td, true).then(ok=>{ if (!ok) sel.value = old==null ? "" : String(old); });
+  saveCell(ed, c, v, old, td, true).then(ok=>{ if (!ok){ sel.value = old==null ? "" : String(old); sel.classList.toggle("blank", old==null); } });
 });
 function renderGrid(){
   clearSel();
@@ -3211,7 +3210,7 @@ function updateCell(ed, c){
       if (!same) return;
       const td = cellAt(ri,ci); if (!td) return;
       const v = valueOf(r,cc); td.querySelector(".v").textContent = disp(v,cc); td.title = disp(v,cc).slice(0,600);
-      const yn = td.querySelector("select.yn"); if (yn) yn.value = v==null ? "" : String(v);
+      const yn = td.querySelector("select.yn"); if (yn){ yn.value = v==null ? "" : String(v); yn.classList.toggle("blank", v==null); }
       setEmptyCls(td, r, cc, v);
     });
   });
