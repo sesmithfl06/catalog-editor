@@ -635,7 +635,7 @@ dialog#ncdlg::backdrop{background:#0006}
   <details><summary>…choose, hide, move and freeze columns?</summary>
     <ul>
       <li>Tick columns in the sidebar. Type in “Find a column…” and press <b>Check all shown</b> to tick every column the search finds. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”. In that dialog, the first list is what goes to Notion (right-click an item → <b>Don't go to Notion</b>) and the second list is <b>what does not go</b> (hover for why; right-click one the sync has a place for → <b>Send to Notion</b>).</li>
-      <li>Right-click a column heading → Does this go to Notion?, Clear filter, <b>Hide</b> (Hide column, Hide from here to end), <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, <b>Reset</b> (this column's width, all column widths, column order). Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
+      <li>Right-click a column heading → Does this go to Notion?, Clear filter, <b>Hide</b> (Hide column, Hide from here to end), <b>Delete column…</b> (only columns in the Projects section, other than Plot Order: removes the column and what is typed in it from Supabase for every book), <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, <b>Reset</b> (this column's width, all column widths, column order). Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
       <li>Drag a heading to move the column (a blue edge shows where it lands). Drag the right edge of a heading to resize; double-click that edge to reset the width.</li>
       <li><b>Show full text</b> (above the grid) shows long cells in full; otherwise only the first line shows.</li>
       <li><b>Blanks</b> (Columns section) shows the title plus every column that has a blank to fill for at least one book shown. Striped cells are empty because the book has no such thing (no award, no subtitle, no such format) and don't count. It loads every column, so it can take a minute.</li>
@@ -1170,7 +1170,8 @@ function buildCatalog(sample){
   const edCols = Object.keys(sample.editions[0]||{}).filter(c=>!SKIP_ED.has(c));
   for (const c of edCols) addCol({id:"ed:"+c, kind:"ed", col:c, table:"editions", label:regLabel("editions",c), group:regGroup("editions",c,"Edition"), order:regOrder("editions",c), ro:c==="sheet_order"});
   for (const c of sample.storyCols) if (c!=="story_id" && !SKIP_ST.has(c)) addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), ro:false});
-  for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
+  const regOk = Object.keys(REG).length > 0;   // a project column deleted in the editor (Delete column) is gone from field_registry, so it is left out
+  for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) if (!(t==="projects" && c!=="plot" && regOk && !REG[t+"."+c])) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
   for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:(f==="title" ? "English source title" : "English "+f.replace(/_/g," ")), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
   for (const l of sample.mlTypes){ const a = AFF_ML[l];
     addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:a ? 6000.1 : 6000, ro:!!a, aff:a, note:a ? AFF_NOTE : undefined});
@@ -1694,6 +1695,27 @@ async function hideColumn(id){
   recordView(vb);
   await refresh();
 }
+/* right-click a column header in the Projects section: Delete column… (removes the column and everything typed in it from Supabase, via delete_catalog_column) */
+function delColTarget(c){ return !c ? null : c.kind==="one" && c.t==="projects" ? {table:"projects", col:c.col} : (c.kind==="ed" || c.kind==="st") ? {table:c.table, col:c.col} : null; }
+function canDeleteCol(id){
+  const c = COLMAP[id], t = delColTarget(c);
+  if (!t || c.group!=="Projects" || t.col==="plot" || t.col==="file_name") return false;
+  const r = REG[t.table+"."+t.col]; return !!(r && r.group_name==="Projects");
+}
+async function deleteColumn(id){
+  const c = COLMAP[id], t = delColTarget(c); if (!t) return;
+  await ensureLoaded([c]);
+  const filled = data.editions.filter(ed=>{ const v = valueOf(ed, c); return v!=null && v!=="" && !(Array.isArray(v) && !v.length); }).length;
+  if (!confirm(`Delete the column "${c.label}"?\n\nIt is removed from Supabase for every book${filled ? `, with what is typed in it for ${filled} book${filled>1?"s":""}` : " (it's blank for every book)"}. Undo can't bring it back.`)) return;
+  setStatus(`Deleting "${c.label}"…`);
+  try{
+    await api("POST","rpc/delete_catalog_column", {p_table:t.table, p_column:t.col});
+    checked.delete(id); sortKeys = sortKeys.filter(k=>k.id!==id); delete colFilters[id];
+    await new Promise(r=>setTimeout(r, 1500));   // Supabase needs a moment to forget the column
+    await loadAll();
+    setStatus(`Deleted the column "${c.label}".`, "ok");
+  }catch(err){ setStatus(`"${c.label}" wasn't deleted: ` + friendly(err), "bad"); }
+}
 /* right-click a column header: Hide from here to end (unticks this column and every column to its right in the grid; the locked ones always stay) */
 async function hideColumnsFrom(id){
   const i = viewCols.findIndex(c=>c.id===id); if(i<0) return;
@@ -1794,6 +1816,7 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   const locked = blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
   const m = document.createElement("div"); m.className = "ctx";
   m.innerHTML = (COLMAP[id] && COLMAP[id].full ? `<button type="button" data-a="full">Show full name</button>` : "") + `<button type="button" data-a="notion">Does this go to Notion?</button><button type="button" data-a="rename">Rename column…</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "") + (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`
+    + (canDeleteCol(id) ? `<button type="button" data-a="delcol">Delete column…</button>` : "")
     + `<button type="button" data-a="freeze">Freeze up to this column</button>` + (frozenN>1 ? `<button type="button" data-a="unfreeze">Unfreeze (first column only)</button>` : "")
     + (colWidths[id] || Object.keys(colWidths).length || colOrder.length ? `<button type="button" data-a="tog" data-s="reset">Reset ▸</button><div class="sub" data-s="reset" hidden>`
       + (colWidths[id] ? `<button type="button" data-a="unsize">Reset this column's width</button>` : "")
@@ -1807,6 +1830,7 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
     if (b.dataset.a==="full"){ ev.stopPropagation(); showFullName(id, ev.clientX, ev.clientY); return; }
     if (b.dataset.a==="rename"){ openRename(id); return; }
     if (b.dataset.a==="unfilter"){ clearFilter(id); return; }
+    if (b.dataset.a==="delcol"){ deleteColumn(id); return; }
     if (b.dataset.a==="freeze"){ freezeTo(id); return; }
     if (b.dataset.a==="unfreeze"){ frozenN = 1; renderGrid(); return; }
     if (b.dataset.a==="unsize"){ delete colWidths[id]; renderGrid(); return; }
@@ -2402,12 +2426,7 @@ function cmpSortVals(av, bv){
 // so the rows end up grouped by language, inside each language by series (its own name), inside each series by book #.
 function defaultSortRows(rows){
   const num = ed => { const n = parseFloat(ed.number_in_series); return isFinite(n) ? n : null; };
-  // The most recent release already out in English and in French goes to the very top (English first); everything else keeps the order below.
-  const today = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);   // only books already out (publication date today or earlier)
-  const newest = lang => rows.filter(ed=>ed.language===lang && ed.publication_date && String(ed.publication_date) <= today).reduce((m,ed)=> !m || String(ed.publication_date) > String(m.publication_date) ? ed : m, null);
-  const top = [newest("English"), newest("French")].filter(Boolean);
-  const sorted = defaultSortRows0(rows.filter(ed=>!top.includes(ed)), num);
-  return top.concat(sorted);
+  return defaultSortRows0(rows, num);
 }
 function defaultSortRows0(rows, num){
   return rows.map((ed,i)=>({ed,i,n:num(ed)})).sort((a,b)=>{
