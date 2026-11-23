@@ -585,13 +585,13 @@ dialog#ncdlg::backdrop{background:#0006}
     </ul>
   </details>
 
-  <details><summary>…copy several cells, or put one value into many cells?</summary>
+  <details><summary>…copy several cells, or paste into many cells?</summary>
     <ul>
       <li>To copy: click a cell, then <kbd>Shift</kbd>+click or <kbd>⌘</kbd>+click more cells. A bar appears at the bottom: press “⧉ Copy”. The selected cells go to your clipboard (columns separated by tabs, rows on separate lines), ready to paste into Excel or elsewhere.</li>
-      <li>To fill: in the same bar, press “Fill the others with the first cell” (the first cell clicked is the value that gets copied into the other selected cells).</li>
-      <li>You are asked to confirm. The fill saves straight to Supabase, one cell at a time. <b>Undo</b> (<kbd>⌘</kbd>+<kbd>Z</kbd>) reverses the whole fill in one step.</li>
-      <li>Only editable cells are filled. A cell is skipped if the value doesn't fit its column (text into a Yes/No column, a decimal into a whole-number column, a date it can't read, a value that isn't on a pick-one list). Yes/No accepts yes, no, true, false or blank; numbers ignore $, commas and spaces.</li>
-      <li>If Supabase refuses one cell, the fill stops there. The message says how many were filled; Undo reverses those.</li>
+      <li>To paste: select the cells to paste into, then press <kbd>⌘</kbd>+<kbd>V</kbd> (<kbd>Ctrl</kbd>+<kbd>V</kbd>). One copied value goes into every selected editable cell; several copied cells (from Excel or from Copy here) go in starting at the top-left selected cell.</li>
+      <li>You are asked to confirm. The paste saves straight to Supabase, one cell at a time. <b>Undo</b> (<kbd>⌘</kbd>+<kbd>Z</kbd>) reverses the whole paste in one step.</li>
+      <li>Only editable cells are pasted into. A cell is skipped if the value doesn't fit its column (text into a Yes/No column, a decimal into a whole-number column, a date it can't read, a value that isn't on a pick-one list). Yes/No accepts yes, no, true, false or blank; numbers ignore $, commas and spaces.</li>
+      <li>If Supabase refuses one cell, the paste stops there. The message says how many were pasted; Undo reverses those.</li>
       <li>To copy a cell's text to the clipboard instead, hover the cell and press the small ⧉ at its top right.</li>
     </ul>
   </details>
@@ -2727,7 +2727,7 @@ cpyBtn.addEventListener("click", e=>{
    clicking it puts that value into every other selected, editable cell. Undo reverses the whole fill at once. */
 const msel = new Set(); let manchor = null, undoGrp = null;
 const fillBar = document.createElement("div"); fillBar.id = "fillbar"; fillBar.className = "hidden";
-fillBar.innerHTML = `<button type="button" class="primary" data-a="copy" aria-label="Copy the selected cells">⧉ Copy</button><span class="fl"></span><span class="fv"></span><button type="button" data-a="fill" aria-label="Paste the first cell's value into the other selected cells">Fill the others with the first cell</button><button type="button" data-a="clear">Clear</button>`;
+fillBar.innerHTML = `<button type="button" class="primary" data-a="copy" aria-label="Copy the selected cells">⧉ Copy</button><span class="fl"></span><button type="button" data-a="clear">Clear</button>`;
 document.body.appendChild(fillBar);
 const keyOf = td => td.dataset.r + "," + td.dataset.c;
 const cellByKey = k => { const [r,c] = k.split(",").map(Number); return cellAt(r,c); };
@@ -2736,27 +2736,12 @@ function clearSel(){
   document.querySelectorAll("td.msel").forEach(t=>t.classList.remove("msel","anchor"));
   fillBar.classList.add("hidden");
 }
-function fillTargets(){
-  const out = [];
-  for (const k of msel){
-    if (k === manchor) continue;
-    const td = cellByKey(k); if (!td) continue;
-    const ed = viewRows[+td.dataset.r], c = viewCols[+td.dataset.c];
-    if (ed && c && c.kind!=="diffall" && c.id!=="info:long_synopsis" && canEdit(ed,c)) out.push({td, ed, c});
-  }
-  return out;
-}
 function paintSel(){
   document.querySelectorAll("td.msel").forEach(t=>t.classList.remove("msel","anchor"));
   for (const k of msel){ const td = cellByKey(k); if (td) td.classList.add("msel"); }
   const a = manchor && cellByKey(manchor); if (a) a.classList.add("msel","anchor");
-  const n = fillTargets().length;
   if (msel.size < 2 || !a){ fillBar.classList.add("hidden"); return; }
-  const txt = show(valueOf(viewRows[+a.dataset.r], viewCols[+a.dataset.c]));
-  fillBar.querySelector(".fl").textContent = `${msel.size} cells selected. First cell:`;
-  fillBar.querySelector(".fv").textContent = txt ? "“" + (txt.length>40 ? txt.slice(0,40)+"…" : txt) + "”" : "(blank)";
-  fillBar.querySelector('[data-a="fill"]').disabled = !n;
-  fillBar.querySelector('[data-a="fill"]').title = n ? `Puts the first cell's value into the other ${n} editable selected cell${n>1?"s":""} (saves to Supabase)` : "No other editable cells selected";
+  fillBar.querySelector(".fl").textContent = `${msel.size} cells selected. ⌘/Ctrl+V pastes into them.`;
   fillBar.classList.remove("hidden");
 }
 function selectBlock(a, b){
@@ -2831,26 +2816,54 @@ fillBar.addEventListener("click", async e=>{
     copyText(rowsOut.join("\n")).then(()=>setStatus(`Copied ${n} cell${n>1?"s":""}.`,"ok"), ()=>setStatus("Not copied: the browser blocked it","bad"));
     return;
   }
-  if (b.dataset.a !== "fill") return;
-  const a = manchor && cellByKey(manchor); if (!a) return;
-  const srcEd = viewRows[+a.dataset.r], srcCol = viewCols[+a.dataset.c];
-  const text = show(valueOf(srcEd, srcCol));
-  const jobs = fillTargets().filter(j=>{ const p = parseFor(j.c, text); return !p.ok || show(p.v) !== show(valueOf(j.ed, j.c)); }); if (!jobs.length){ setStatus("Those cells already have that value","ok"); return; }
-  if (!confirm(`Put ${text ? "“" + (text.length>50 ? text.slice(0,50)+"…" : text) + "”" : "a blank"} into ${jobs.length} cell${jobs.length>1?"s":""}?\n\nThis saves straight to Supabase. Undo reverses the whole fill.`)) return;
-  b.disabled = true; undoGrp = Date.now(); let done = 0, skipped = 0, failed = 0;
+});
+/* Paste (⌘/Ctrl+V) with cells selected: one copied value goes into every selected editable cell; a copied block (rows/columns, e.g. from Excel
+   or from Copy here) goes in starting at the top-left selected cell. Saves to Supabase after a confirm; Undo reverses the whole paste at once. */
+function parseTSV(t){
+  const rows = [[""]]; let q = false;
+  t = t.replace(/\r\n?/g,"\n");
+  if (t.endsWith("\n")) t = t.slice(0,-1);
+  for (let i=0;i<t.length;i++){
+    const ch = t[i], row = rows[rows.length-1];
+    if (q){ if (ch==='"'){ if (t[i+1]==='"'){ row[row.length-1]+='"'; i++; } else q = false; } else row[row.length-1]+=ch; }
+    else if (ch==='"' && row[row.length-1]==="") q = true;
+    else if (ch==="\t") row.push("");
+    else if (ch==="\n") rows.push([""]);
+    else row[row.length-1]+=ch;
+  }
+  return rows;
+}
+document.addEventListener("paste", async e=>{
+  if (editing || !msel.size || document.querySelector("dialog[open]")) return;
+  const t = e.target; if (t && t.closest && t.closest("input,textarea,select,[contenteditable]")) return;
+  const text = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; if (!text) return;
+  e.preventDefault();
+  const grid = parseTSV(text), one = grid.length===1 && grid[0].length===1;
+  const pos = [...msel].map(k=>k.split(",").map(Number));
+  const r0 = Math.min(...pos.map(p=>p[0])), c0 = Math.min(...pos.map(p=>p[1]));
+  const targets = [];   // {td, ed, c, text}
+  const add = (r,c,v)=>{ const td = cellAt(r,c); if (!td) return; const ed = viewRows[r], col = viewCols[c];
+    if (ed && col && col.kind!=="diffall" && col.id!=="info:long_synopsis" && canEdit(ed,col)) targets.push({td, ed, c:col, text:v}); };
+  if (one) for (const [r,c] of pos) add(r,c,grid[0][0]);
+  else grid.forEach((line,i)=>line.forEach((v,j)=>add(r0+i,c0+j,v)));
+  const jobs = targets.filter(j=>{ const p = parseFor(j.c, j.text); return !p.ok || show(p.v) !== show(valueOf(j.ed, j.c)); });
+  if (!jobs.length){ setStatus("Nothing to paste: those cells already have that, or none can be edited","ok"); return; }
+  const what = one ? (grid[0][0] ? "“" + (grid[0][0].length>50 ? grid[0][0].slice(0,50)+"…" : grid[0][0]) + "”" : "a blank") : `${grid.length} row${grid.length>1?"s":""} × ${Math.max(...grid.map(l=>l.length))} column${Math.max(...grid.map(l=>l.length))>1?"s":""} of copied cells`;
+  if (!confirm(`Paste ${what} into ${jobs.length} cell${jobs.length>1?"s":""}?\n\nThis saves straight to Supabase. Undo reverses the whole paste.`)) return;
+  undoGrp = Date.now(); let done = 0, skipped = 0, failed = 0;
   try{
     for (const j of jobs){
-      const p = parseFor(j.c, text);
+      const p = parseFor(j.c, j.text);
       if (!p.ok){ skipped++; flash(j.td,"err"); continue; }          // value doesn't fit this column (e.g. text into a Yes/No column)
       const old = valueOf(j.ed, j.c);
       if (show(p.v) === show(old)) continue;                           // already the same
-      setStatus(`Filling ${done+failed+1} of ${jobs.length}…`);
+      setStatus(`Pasting ${done+failed+1} of ${jobs.length}…`);
       if (await saveCell(j.ed, j.c, p.v, old, j.td, true)) done++; else { failed = jobs.length - done - skipped; break; }   // stop at the first refusal so nothing is half-done silently
     }
   } finally { undoGrp = null; }
   clearSel();
-  if (failed){ setStatus(`Stopped after ${done} cell${done===1?"":"s"}: the next one was refused (${$("#status").textContent.replace(/^Not saved: /,"")}). ${failed} not filled. Undo reverses the ${done} that were filled.`, "bad"); return; }
-  setStatus(`Filled ${done} cell${done===1?"":"s"}` + (skipped ? `, skipped ${skipped} that don't accept that value` : "") + ". Undo reverses the whole fill.", "ok");
+  if (failed){ setStatus(`Stopped after ${done} cell${done===1?"":"s"}: the next one was refused (${$("#status").textContent.replace(/^Not saved: /,"")}). ${failed} not pasted. Undo reverses the ${done} that were pasted.`, "bad"); return; }
+  setStatus(`Pasted into ${done} cell${done===1?"":"s"}` + (skipped ? `, skipped ${skipped} that don't accept that value` : "") + ". Undo reverses the whole paste.", "ok");
 });
 function parseFor(c, text){
   const t = typeOf(c), s = text.trim();
