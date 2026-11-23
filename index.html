@@ -153,7 +153,7 @@ td.title .v{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellip
 td.edit{cursor:default}
 td .v:has(+ select.yn){display:none}
 td select.yn{width:100%;min-width:0;padding:2px 4px;font-size:inherit;background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer}
-td select.yn.blank:not(:focus){color:transparent}
+td select.yn.blank:not(:focus){color:transparent;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center}
 td select.yn:hover,td select.yn:focus{border-color:var(--line);background:var(--panel)}
 /* header = dark blue (all columns, title too); title column cells = very subtle dark purple with slight row banding */
 :root{--hdr:#1f3a66; --hdr-ink:#ffffff; --ttl:#332c3e; --ttl-band:#413854; --ttl-ink:#ffffff}
@@ -2757,6 +2757,7 @@ function selectBlock(a, b){
 }
 $("#gridwrap").addEventListener("mousedown", e=>{ if (e.shiftKey && e.target.closest("td")) e.preventDefault(); }); // no text highlight on Shift+click
 $("#gridwrap").addEventListener("click", e=>{
+  if (e.target.closest("select")) return;   // clicking a Yes/No dropdown must not move focus off it, or the open list closes
   const td = e.target.closest("td"); if (!td || td === fillBar) return;
   if (e.shiftKey || e.metaKey || e.ctrlKey){
     e.stopImmediatePropagation(); e.preventDefault();
