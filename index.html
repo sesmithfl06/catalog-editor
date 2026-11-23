@@ -499,6 +499,7 @@ dialog#ncdlg::backdrop{background:#0006}
     <select id="nctable">
       <option value="editions">Each edition (every language has its own value)</option>
       <option value="stories">The story (shared by all languages)</option>
+      <option value="projects">Projects (each edition has its own value; always in the Projects section)</option>
     </select></label>
   <label>Section in the column list <select id="ncsec"></select></label>
   <label>Sits after <select id="ncafter"></select></label>
@@ -634,7 +635,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…choose, hide, move and freeze columns?</summary>
     <ul>
-      <li>Tick columns in the sidebar. Type in “Find a column…” and press <b>Check all shown</b> to tick every column the search finds. Right-click a section heading → Check all / Uncheck all. Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”. In that dialog, the first list is what goes to Notion (right-click an item → <b>Don't go to Notion</b>) and the second list is <b>what does not go</b> (hover for why; right-click one the sync has a place for → <b>Send to Notion</b>).</li>
+      <li>Tick columns in the sidebar. Type in “Find a column…” and press <b>Check all shown</b> to tick every column the search finds. Right-click a section heading → Check all / Uncheck all; on the <b>Projects</b> heading also <b>Add column…</b> (a new Projects column, blank for every book, placed in the Projects section after the column you choose). Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”. In that dialog, the first list is what goes to Notion (right-click an item → <b>Don't go to Notion</b>) and the second list is <b>what does not go</b> (hover for why; right-click one the sync has a place for → <b>Send to Notion</b>).</li>
       <li>Right-click a column heading → Does this go to Notion?, Clear filter, <b>Hide</b> (Hide column, Hide from here to end), <b>Delete column…</b> (only columns in the Projects section, other than Plot Order: removes the column and what is typed in it from Supabase for every book), <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, <b>Reset</b> (this column's width, all column widths, column order). Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
       <li>Drag a heading to move the column (a blue edge shows where it lands). Drag the right edge of a heading to resize; double-click that edge to reset the width.</li>
       <li><b>Show full text</b> (above the grid) shows long cells in full; otherwise only the first line shows.</li>
@@ -1171,7 +1172,9 @@ function buildCatalog(sample){
   for (const c of edCols) addCol({id:"ed:"+c, kind:"ed", col:c, table:"editions", label:regLabel("editions",c), group:regGroup("editions",c,"Edition"), order:regOrder("editions",c), ro:c==="sheet_order"});
   for (const c of sample.storyCols) if (c!=="story_id" && !SKIP_ST.has(c)) addCol({id:"st:"+c, kind:"st", col:c, table:"stories", label:regLabel("stories",c), group:"Story (shared by all languages)", order:regOrder("stories",c), ro:false});
   const regOk = Object.keys(REG).length > 0;   // a project column deleted in the editor (Delete column) is gone from field_registry, so it is left out
-  for (const [t,cs] of Object.entries(ONE_TABLES)) for (const c of cs) if (!(t==="projects" && c!=="plot" && regOk && !REG[t+"."+c])) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
+  // projects: the columns above, then any added with right-click the Projects section → Add column… (found in field_registry)
+  const oneTables = {...ONE_TABLES, projects:[...ONE_TABLES.projects, ...Object.values(REG).filter(r=>r.table_name==="projects" && !ONE_TABLES.projects.includes(r.column_name) && !["id","file_name","created_at","updated_at"].includes(r.column_name)).map(r=>r.column_name)]};
+  for (const [t,cs] of Object.entries(oneTables)) for (const c of cs) if (!(t==="projects" && c!=="plot" && regOk && !REG[t+"."+c])) addCol({id:`one:${t}:${c}`, kind:"one", t, col:c, table:t, label:regLabel(t,c), group:regGroup(t,c,"Edition extras"), order:regOrder(t,c), ro:false});
   for (const f of sample.estFields) addCol({id:"est:"+f, kind:"est", field:f, table:"english_source_text", label:(f==="title" ? "English source title" : "English "+f.replace(/_/g," ")), group:"English text on translations", order:5000, note:"Only on translated editions", ro:false});
   for (const l of sample.mlTypes){ const a = AFF_ML[l];
     addCol({id:"ml:"+l+":url", kind:"ml", lt:l, col:"url", table:"marketing_links", label:l, group:"Marketing links", order:a ? 6000.1 : 6000, ro:!!a, aff:a, note:a ? AFF_NOTE : undefined});
@@ -1679,9 +1682,9 @@ $("#collist").addEventListener("contextmenu", e=>{
   e.preventDefault(); closeCtx();
   const grp = sum.parentElement;
   const m = document.createElement("div"); m.className = "ctx";
-  m.innerHTML = `<button data-on="1">Check all</button><button data-on="0">Uncheck all</button>`;
-  m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-90)+"px";
-  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); setSection(grp, b.dataset.on==="1"); });
+  m.innerHTML = `<button data-on="1">Check all</button><button data-on="0">Uncheck all</button>` + (grp.dataset.g==="Projects" ? `<button data-a="addcol">Add column…</button>` : "");
+  m.style.left = Math.min(e.clientX, innerWidth-170)+"px"; m.style.top = Math.min(e.clientY, innerHeight-120)+"px";
+  m.addEventListener("click", ev=>{ const b = ev.target.closest("button"); if(!b) return; closeCtx(); if (b.dataset.a==="addcol"){ openNewCol("projects"); return; } setSection(grp, b.dataset.on==="1"); });
   document.body.appendChild(m); ctxMenu = m;
 });
 document.addEventListener("click", closeCtx);
@@ -2108,7 +2111,7 @@ const ARRAY_COLS = new Set(["stories.tags","stories.display_tags","editions.keyw
 const COMMA_LISTS = new Set(["stories.tags","stories.display_tags","editions.keywords"]);   // typed on one line, these also split at commas
 const isDateCol = c => /(^|_)(date|publication)$/.test(c.col||c.field||"");
 // Columns made with New column keep their kind of value in field_registry.editor_type.
-const regType = c => ((c.kind==="ed" || c.kind==="st") && REG[c.table+"."+c.col] && REG[c.table+"."+c.col].editor_type) || "";
+const regType = c => ((c.kind==="ed" || c.kind==="st" || (c.kind==="one" && c.t==="projects")) && REG[c.table+"."+c.col] && REG[c.table+"."+c.col].editor_type) || "";
 const REG_TYPE = {list:"list", date:"date", yes_no:"bool", number:"num", whole_number:"num"};
 const isLong = c => LONG_HINT.test(c.col||c.field||c.label) || regType(c)==="long_text";
 function typeOf(c){
@@ -3497,14 +3500,23 @@ function ncType(){
   $("#ncpick").classList.toggle("hidden", !pick);
   $("#ncnewbox").classList.toggle("hidden", !(pick && $("#nclist").value==="__new__"));
 }
-$("#newcol").onclick = ()=>{
+// a Projects column (right-click the Projects section in the column list → Add column…) always goes in the Projects section
+function ncTable(){
+  const proj = $("#nctable").value==="projects";
+  if (proj) $("#ncsec").value = "Projects";
+  $("#ncsec").disabled = proj;
+  ncFillAfter();
+}
+function openNewCol(table){
   $("#ncname").value = ""; $("#ncdesc").value = ""; $("#ncnewlist").value = ""; $("#ncvalues").value = ""; $("#ncmsg").textContent = "";
-  $("#nctype").value = "text"; $("#nctable").value = "editions";
+  $("#nctype").value = "text"; $("#nctable").value = table || "editions";
   $("#ncsec").innerHTML = GROUP_ORDER.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("");
   $("#nclist").innerHTML = Object.keys(REF).sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("") + `<option value="__new__">New list…</option>`;
-  ncType(); ncFillAfter(); $("#ncgo").disabled = false;
+  ncType(); ncTable(); $("#ncgo").disabled = false;
   $("#ncdlg").showModal(); $("#ncname").focus();
-};
+}
+$("#newcol").onclick = ()=>openNewCol("editions");
+$("#nctable").onchange = ncTable;
 $("#nctype").onchange = ncType;
 $("#nclist").onchange = ncType;
 $("#ncsec").onchange = ncFillAfter;
@@ -3530,7 +3542,7 @@ $("#ncgo").onclick = async ()=>{
   try{
     const col = await api("POST","rpc/add_catalog_column", {p_table:table, p_label:name, p_type:type, p_section:$("#ncsec").value,
       p_after:$("#ncafter").value||null, p_description:$("#ncdesc").value.trim()||null, p_list:list, p_values:values});
-    const id = (table==="stories" ? "st:" : "ed:") + col;
+    const id = (table==="stories" ? "st:" : table==="projects" ? "one:projects:" : "ed:") + col;
     $("#ncdlg").close();
     setStatus(`Adding "${name}"…`);
     await new Promise(r=>setTimeout(r, 1500));   // Supabase needs a moment to see the new column
