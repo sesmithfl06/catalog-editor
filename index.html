@@ -2466,7 +2466,11 @@ function sortSummary(){
 
 let viewCols = [], viewRows = [];
 /* Yes/No cells: a dropdown in the cell (Yes first, then No, then blank). Picking one saves straight away. */
-const ynSelect = v => `<select class="yn" aria-label="Yes or No"><option value="true"${v===true?" selected":""}>Yes</option><option value="false"${v===false?" selected":""}>No</option><option value=""${v==null?" selected":""}>(blank)</option></select>`;
+const ynSelect = v => `<select class="yn" aria-label="Yes or No"><option value="true"${v===true?" selected":""}>Yes</option><option value="false"${v===false?" selected":""}>No</option><option value=""${v==null?" selected":""}></option></select>`;
+/* A blank Yes/No cell looks empty; the word "(blank)" only appears in the list once the dropdown is opened. */
+const ynBlankText = (sel, open) => { const o = sel.querySelector('option[value=""]'); if (o) o.textContent = open ? "(blank)" : ""; };
+$("#gridwrap").addEventListener("focusin", e=>{ if (e.target.matches && e.target.matches("select.yn")) ynBlankText(e.target, true); });
+$("#gridwrap").addEventListener("focusout", e=>{ if (e.target.matches && e.target.matches("select.yn")) ynBlankText(e.target, false); });
 $("#gridwrap").addEventListener("change", e=>{
   const sel = e.target.closest("select.yn"); if (!sel) return;
   const td = sel.closest("td"), ed = viewRows[+td.dataset.r], c = viewCols[+td.dataset.c], old = valueOf(ed,c);
