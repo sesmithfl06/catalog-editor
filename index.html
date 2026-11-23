@@ -2708,7 +2708,9 @@ function copyText(t){
 function cpyReset(){ clearTimeout(cpyTimer); cpyBtn.classList.remove("done"); cpyBtn.textContent = "⧉"; }
 $("#gridwrap").addEventListener("mouseover", e=>{
   const td = e.target.closest("td"); if (!td || td === cpyBtn.parentNode) return;
-  cpyReset(); td.appendChild(cpyBtn);
+  cpyReset();
+  if (td.querySelector("select")){ cpyBtn.remove(); return; }   // no copy icon over a Yes/No dropdown (⌘/Ctrl+C copies it instead)
+  td.appendChild(cpyBtn);
 });
 $("#gridwrap").addEventListener("mouseleave", ()=>{ cpyReset(); cpyBtn.remove(); });
 cpyBtn.addEventListener("mousedown", e=>{ e.preventDefault(); e.stopPropagation(); });
