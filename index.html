@@ -587,7 +587,7 @@ dialog#ncdlg::backdrop{background:#0006}
 
   <details><summary>…copy several cells, or paste into many cells?</summary>
     <ul>
-      <li>To copy: click a cell, then <kbd>Shift</kbd>+click or <kbd>⌘</kbd>+click more cells. A bar appears at the bottom: press “⧉ Copy”. The selected cells go to your clipboard (columns separated by tabs, rows on separate lines), ready to paste into Excel or elsewhere.</li>
+      <li>To copy: click a cell, then <kbd>Shift</kbd>+click or <kbd>⌘</kbd>+click more cells. Press <kbd>⌘</kbd>+<kbd>C</kbd> (<kbd>Ctrl</kbd>+<kbd>C</kbd>) or the “⧉ Copy” button in the bar at the bottom. The selected cells go to your clipboard (columns separated by tabs, rows on separate lines), ready to paste into Excel or elsewhere.</li>
       <li>To paste: select the cells to paste into, then press <kbd>⌘</kbd>+<kbd>V</kbd> (<kbd>Ctrl</kbd>+<kbd>V</kbd>). One copied value goes into every selected editable cell; several copied cells (from Excel or from Copy here) go in starting at the top-left selected cell.</li>
       <li>You are asked to confirm. The paste saves straight to Supabase, one cell at a time. <b>Undo</b> (<kbd>⌘</kbd>+<kbd>Z</kbd>) reverses the whole paste in one step.</li>
       <li>Only editable cells are pasted into. A cell is skipped if the value doesn't fit its column (text into a Yes/No column, a decimal into a whole-number column, a date it can't read, a value that isn't on a pick-one list). Yes/No accepts yes, no, true, false or blank; numbers ignore $, commas and spaces.</li>
@@ -2741,7 +2741,7 @@ function paintSel(){
   for (const k of msel){ const td = cellByKey(k); if (td) td.classList.add("msel"); }
   const a = manchor && cellByKey(manchor); if (a) a.classList.add("msel","anchor");
   if (msel.size < 2 || !a){ fillBar.classList.add("hidden"); return; }
-  fillBar.querySelector(".fl").textContent = `${msel.size} cells selected. ⌘/Ctrl+V pastes into them.`;
+  fillBar.querySelector(".fl").textContent = `${msel.size} cells selected. ⌘/Ctrl+C copies, ⌘/Ctrl+V pastes.`;
   fillBar.classList.remove("hidden");
 }
 function selectBlock(a, b){
@@ -2798,24 +2798,36 @@ fillBar.addEventListener("click", async e=>{
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.a === "clear"){ clearSel(); return; }
   if (b.dataset.a === "copy"){
-    // Copy the selected cells to the clipboard as tab-separated text (rows on lines), so they paste into Excel or another cell as a block.
-    const pos = [...msel].map(k=>k.split(",").map(Number));
-    const r1 = Math.min(...pos.map(p=>p[0])), r2 = Math.max(...pos.map(p=>p[0]));
-    const c1 = Math.min(...pos.map(p=>p[1])), c2 = Math.max(...pos.map(p=>p[1]));
-    const rowsOut = [];
-    for (let r=r1; r<=r2; r++){
-      const line = [];
-      for (let c=c1; c<=c2; c++){
-        let v = msel.has(r+","+c) && viewRows[r] && viewCols[c] ? show(valueOf(viewRows[r], viewCols[c])) : "";
-        if (/[\t\n\r"]/.test(v)) v = '"' + v.replace(/"/g,'""') + '"';
-        line.push(v);
-      }
-      rowsOut.push(line.join("\t"));
-    }
     const n = msel.size;
-    copyText(rowsOut.join("\n")).then(()=>setStatus(`Copied ${n} cell${n>1?"s":""}.`,"ok"), ()=>setStatus("Not copied: the browser blocked it","bad"));
+    copyText(selectionText()).then(()=>setStatus(`Copied ${n} cell${n>1?"s":""}.`,"ok"), ()=>setStatus("Not copied: the browser blocked it","bad"));
     return;
   }
+});
+/* The selected cells as tab-separated text (rows on lines), so they paste into Excel or another cell as a block.
+   Cells in the rectangle around the selection that are not selected come out blank. */
+function selectionText(){
+  const pos = [...msel].map(k=>k.split(",").map(Number));
+  const r1 = Math.min(...pos.map(p=>p[0])), r2 = Math.max(...pos.map(p=>p[0]));
+  const c1 = Math.min(...pos.map(p=>p[1])), c2 = Math.max(...pos.map(p=>p[1]));
+  const rowsOut = [];
+  for (let r=r1; r<=r2; r++){
+    const line = [];
+    for (let c=c1; c<=c2; c++){
+      let v = msel.has(r+","+c) && viewRows[r] && viewCols[c] ? show(valueOf(viewRows[r], viewCols[c])) : "";
+      if (/[\t\n\r"]/.test(v)) v = '"' + v.replace(/"/g,'""') + '"';
+      line.push(v);
+    }
+    rowsOut.push(line.join("\t"));
+  }
+  return rowsOut.join("\n");
+}
+// ⌘/Ctrl+C with cells selected copies them (unless text is highlighted or a box is being typed in).
+document.addEventListener("copy", e=>{
+  if (editing || !msel.size || document.querySelector("dialog[open]")) return;
+  const t = e.target; if (t && t.closest && t.closest("input,textarea,select,[contenteditable]")) return;
+  if (String(window.getSelection()||"")) return;
+  e.preventDefault(); e.clipboardData.setData("text/plain", selectionText());
+  const n = msel.size; setStatus(`Copied ${n} cell${n>1?"s":""}.`,"ok");
 });
 /* Paste (⌘/Ctrl+V) with cells selected: one copied value goes into every selected editable cell; a copied block (rows/columns, e.g. from Excel
    or from Copy here) goes in starting at the top-left selected cell. Saves to Supabase after a confirm; Undo reverses the whole paste at once. */
