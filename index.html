@@ -636,7 +636,7 @@ dialog#ncdlg::backdrop{background:#0006}
   <details><summary>…choose, hide, move and freeze columns?</summary>
     <ul>
       <li>Tick columns in the sidebar. Type in “Find a column…” and press <b>Check all shown</b> to tick every column the search finds. Right-click a section heading → Check all / Uncheck all; on the <b>Projects</b> heading also <b>Add column…</b> (a new Projects column, blank for every book, placed in the Projects section after the column you choose). Right-click a column name → “What's this?” (when it has an explanation) and “Does this go to Notion?”. In that dialog, the first list is what goes to Notion (right-click an item → <b>Don't go to Notion</b>) and the second list is <b>what does not go</b> (hover for why; right-click one the sync has a place for → <b>Send to Notion</b>).</li>
-      <li>Right-click a column heading → <b>Hide column</b>, <b>Hide from here to end</b> (first in the menu), Does this go to Notion?, Clear filter, <b>Delete column…</b> (only columns in the Projects section, other than Plot Order: removes the column and what is typed in it from Supabase for every book), <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, <b>Reset</b> (this column's width, all column widths, column order). Title, language, series and number are always shown (the Blanks view keeps only the title).</li>
+      <li>Right-click a column heading → <b>Hide column</b>, <b>Hide from here to end</b> (first in the menu), Does this go to Notion?, Clear filter, <b>Delete column…</b> (only columns in the Projects section, other than Plot Order: removes the column and what is typed in it from Supabase for every book), <b>Freeze up to this column</b> (it and everything to its left stay put when you scroll sideways), Unfreeze, <b>Reset</b> (this column's width, all column widths, column order). Title and language are always shown (the Blanks view keeps only the title); series and number in series can be hidden like any other column.</li>
       <li>Drag a heading to move the column (a blue edge shows where it lands). Drag the right edge of a heading to resize; double-click that edge to reset the width.</li>
       <li><b>Show full text</b> (above the grid) shows long cells in full; otherwise only the first line shows.</li>
       <li><b>Blanks</b> (Columns section) shows the title plus every column that has a blank to fill for at least one book shown. Striped cells are empty because the book has no such thing (no award, no subtitle, no such format) and don't count. It loads every column, so it can take a minute.</li>
@@ -807,6 +807,8 @@ const DEFAULT_KEY = "sb_publishable_SCKdsKDMAWp8htqoVF7VPA_TN9A5KOU";
 const FAVORITES = ["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name","info:long_synopsis","st:rating","ed:word_count"];
 // Always shown first, never counted for "blanks".
 const KEY_COLS = new Set(["ed:title","ed:language","ed:series","ed:number_in_series","ed:file_name"]);
+// Of those, Title and Language can't be hidden (Hide column, Hide from here to end, Uncheck all); File name, Series and Number in series can.
+const NO_HIDE = new Set(["ed:title","ed:language"]);
 const LONG_HINT = /synopsis|description|loglines|reasons|excerpt|teaser|review|plot|bio|keywords|promo|tags|notes|tagline|seo|text|characters|species|technology|language|rare|bookclub|scene/i;
 
 /* ---------- small storage helpers (never required) ---------- */
@@ -1495,7 +1497,7 @@ function showFullName(id, x, y){
 let ctxMenu = null;
 function closeCtx(){ if(ctxMenu){ ctxMenu.remove(); ctxMenu = null; } }
 async function setSection(grp, on){
-  const keep = id => blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
+  const keep = id => blanksOn() ? id===BLANK_KEEP : NO_HIDE.has(id);
   const vb = viewSnap();
   grp.querySelectorAll("input[data-id]").forEach(i=>{
     const id = i.dataset.id;
@@ -1724,7 +1726,7 @@ async function hideColumnsFrom(id){
   const i = viewCols.findIndex(c=>c.id===id); if(i<0) return;
   const vb = viewSnap();
   for (const c of viewCols.slice(i)){
-    if (blanksOn() ? c.id===BLANK_KEEP : KEY_COLS.has(c.id) && c.id !== "ed:file_name") continue;
+    if (blanksOn() ? c.id===BLANK_KEEP : NO_HIDE.has(c.id)) continue;
     setColOn(c.id, false);
   }
   recordView(vb);
@@ -1816,7 +1818,7 @@ $("#gridwrap").addEventListener("contextmenu", e=>{
   const th = e.target.closest("th[data-sort]"); if(!th) return;
   e.preventDefault(); closeCtx();
   const id = th.dataset.sort;
-  const locked = blanksOn() ? id===BLANK_KEEP : KEY_COLS.has(id) && id !== "ed:file_name";
+  const locked = blanksOn() ? id===BLANK_KEEP : NO_HIDE.has(id);
   const m = document.createElement("div"); m.className = "ctx";
   m.innerHTML = (locked ? `<button type="button" disabled>Always shown</button>` : `<button type="button" data-a="hide">Hide column</button>`) + `<button type="button" data-a="end">Hide from here to end</button>`
     + (COLMAP[id] && COLMAP[id].full ? `<button type="button" data-a="full">Show full name</button>` : "") + `<button type="button" data-a="notion">Does this go to Notion?</button><button type="button" data-a="rename">Rename column…</button>` + (colFilters[id] ? `<button type="button" data-a="unfilter">Clear filter</button>` : "")
