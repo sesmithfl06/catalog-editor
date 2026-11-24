@@ -4063,10 +4063,11 @@ function wfDraftSpecs(words, hc){
   const six = w >= 40000, tw = six ? 6 : 5, th = six ? 9 : 8, pages = Math.ceil(w / (six ? 285 : 200) / 2) * 2;
   const r = x => Math.round(x * 100) / 100, sp = r(pages * 0.0027), bn = r(pages * 0.00212);
   const pbW = r(2 * tw + sp + 0.25), pbH = r(th + 0.25), hs = r(pages * 0.002252 + 0.19), hcW = r(2 * (tw + 0.7875) + hs), hcH = r(th + 1.417);
-  const size = `${tw}x${th}`;
+  const size = `${tw}x${th}`, px = x => Math.round(x * 300);
+  const pbPx = ` at 300 dpi (${px(pbW)} x ${px(pbH)} pixels)`, hcPx = ` at 300 dpi (${px(hcW)} x ${px(hcH)} pixels)`;
   return {short:`paperback ${pbW} x ${pbH}" (${size}, about ${pages} pages, spine ${sp}")` + (hc ? `; hardcover ${hcW} x ${hcH}"` : "") + ". Adjusted to the real templates after Vellum.",
-    prompt:`These are drafts we'll adjust to the real KDP and B&N templates later. Paperback, full wrap (back, spine, front): ${pbW} x ${pbH} inches including 0.125" bleed on every edge; ${size} trim, about ${pages} pages, spine about ${sp}". Keep all text and important art at least 0.25" inside the trim edges, spine text within the middle ${r(Math.max(bn - 0.125, 0.1))}" of the spine, and leave a 1.5 x 1.11" space for the barcode at the bottom right of the back cover.` +
-      (hc ? ` Hardcover (case laminate): ${hcW} x ${hcH} inches, spine ${hs}". Keep text and important art at least 0.72" in from every outer edge (that part wraps around the boards), out of a 0.46" hinge band on each side of the spine, spine text 0.06" inside the spine edges, and leave a 2 x 1.2" space for the barcode at the bottom right of the back cover.` : "")};
+    prompt:`These are drafts we'll adjust to the real KDP and B&N templates later. Paperback, full wrap (back, spine, front): ${pbW} x ${pbH} inches${pbPx} including 0.125" bleed on every edge; ${size} trim, about ${pages} pages, spine about ${sp}". Keep all text and important art at least 0.25" inside the trim edges, spine text within the middle ${r(Math.max(bn - 0.125, 0.1))}" of the spine, and leave a 1.5 x 1.11" space for the barcode at the bottom right of the back cover.` +
+      (hc ? ` Hardcover (case laminate): ${hcW} x ${hcH} inches${hcPx}, spine ${hs}". Keep text and important art at least 0.72" in from every outer edge (that part wraps around the boards), out of a 0.46" hinge band on each side of the spine, spine text 0.06" inside the spine edges, and leave a 2 x 1.2" space for the barcode at the bottom right of the back cover.` : "")};
 }
 // A new Dragon Box book's box month: the month after the latest Subsc Pub date in Supabase (wfLastSub, read when the list opens).
 // On time when that month's 15th is today or later (Subsc Pub = that 15th). Late when that 15th has already passed with no book:
