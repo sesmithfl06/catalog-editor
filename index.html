@@ -4081,6 +4081,40 @@ function wfSubPlan(){
   const date = iso(d), month = d.toLocaleDateString("en-US", {month:"long", year:"numeric"});
   return {date, month, late: date < today};
 }
+// The book's details for Bob's covers prompt (same read as the payhip-cover-image skill): tagline, genre, main characters' looks, species, settings, the scene prompts. Read from the story's English row.
+async function wfLoadCoverDetails(ed){
+  const en = wfEnglish(ed); if (!en) return null;
+  const F = encodeURIComponent(en.file_name), q = x => encodeURIComponent('"' + String(x).replace(/"/g, "") + '"');
+  const [e, st, bc, cs, sc] = await Promise.all([
+    api("GET", `editions?select=tagline,short_synopsis&file_name=eq.${F}`).catch(()=>[]),
+    en.story_id ? api("GET", `stories?select=main_genre_differentiated&story_id=eq.${encodeURIComponent(en.story_id)}`).catch(()=>[]) : [],
+    api("GET", `book_characters?select=character_id,name_in_book,physical_description&file_name=eq.${F}&role=eq.main&order=sort_order.asc`).catch(()=>[]),
+    api("GET", `character_settings?select=world,setting&file_name=eq.${F}`).catch(()=>[]),
+    api("GET", `scene_prompts?select=scene_number,scene_title,image_prompt&file_name=eq.${F}&order=scene_number.asc`).catch(()=>[])
+  ]);
+  const ids = (bc || []).map(r=>r.character_id).filter(Boolean);
+  const chars = ids.length ? await api("GET", `characters?select=character_id,species,gender,appearance&character_id=in.(${ids.map(q).join(",")})`).catch(()=>[]) : [];
+  const spNames = [...new Set((chars || []).map(c=>c.species).filter(Boolean))];
+  const species = spNames.length ? await api("GET", `species?select=name,appearance&name=in.(${spNames.map(q).join(",")})`).catch(()=>[]) : [];
+  const byId = new Map((chars || []).map(c=>[c.character_id, c]));
+  return {tagline:((e || [])[0] || {}).tagline || "", genre:((st || [])[0] || {}).main_genre_differentiated || "",
+    mains:(bc || []).map(r=>({physical:r.physical_description || "", ...(byId.get(r.character_id) || {})})), species:species || [],
+    settings:[...new Set((cs || []).map(r=>[r.world, r.setting].filter(Boolean).join(" / ")).filter(Boolean))], scenes:sc || []};
+}
+// The book's details as text for Bob's covers prompt ("" when nothing is in Supabase yet).
+function wfCoverDetailsText(d){
+  if (!d) return "";
+  const out = [];
+  if (d.genre) out.push(`Genre: ${d.genre}.`);
+  if (d.tagline) out.push(`Tagline: ${d.tagline}`);
+  const ch = d.mains.map(m=>[m.species && `species: ${m.species}`, m.gender && `gender: ${m.gender}`, m.physical || m.appearance].filter(Boolean).join("; ")).filter(Boolean);
+  if (ch.length) out.push("Main characters' looks: " + ch.map((x,i)=>`(${i+1}) ${x}`).join(" "));
+  const sp = d.species.filter(x=>x.appearance).map(x=>`${x.name}: ${x.appearance}`);
+  if (sp.length) out.push("Species appearance: " + sp.join(" | "));
+  if (d.settings.length) out.push("Settings: " + d.settings.join("; ") + ".");
+  if (d.scenes.length) out.push("Three scenes from the story (for looks and setting): " + d.scenes.map(x=>`${x.scene_number}. ${x.scene_title}: ${x.image_prompt}`).join(" "));
+  return out.length ? " Details of the book from my catalog: " + out.join(" ") : "";
+}
 // Everything the steps check or show for one book: the Release checklist rows, workflow ticks, ISBNs, promo, synopsis, story bible, Payhip links, Notion.
 async function wfLoadVals(ed){
   const F = encodeURIComponent(ed.file_name);
@@ -4097,6 +4131,7 @@ async function wfLoadVals(ed){
     api("GET", "settings?select=key,value&key=in.(paperback_min_words,hardcover_min_words)").catch(()=>[]),
     api("GET", `covers?select=cover,stage,done_on,done_by&file_name=eq.${F}`).catch(()=>[])
   ]);
+  const coverDetails = await wfLoadCoverDetails(ed).catch(()=>null);
   const rules = {}; for (const r of sets || []) rules[r.key] = r.value;
   const bibles = new Set((sbs || []).map(r=>r.file_name));
   const isbn = {}; for (const r of fm || []) if (!r.not_offered) isbn[r.format] = r.isbn || "";
@@ -4116,7 +4151,7 @@ async function wfLoadVals(ed){
     sub:String(((notes || [])[0] || {}).subscription_publication || "").slice(0,10), bf, short:i.short_synopsis || "", rules,
     genres:i.copyright_page_genres || "", promo:i.end_of_story_promo || "", newPromo:i.new_end_of_story_promo || "", cover:i.cover_image_link || "",
     synopsis:i.long_synopsis || "", rtl:i.reasons_to_love || "", best:((bl || [])[0] || {}).bestseller_line || "", payhip, eb, synced,
-    prev:wfPrev(ed), prevBible:wfPrev(ed, bibles)};
+    prev:wfPrev(ed), prevBible:wfPrev(ed, bibles), coverDetails};
 }
 // The story bible's Payhip description: the standard text, leaving out what this bible doesn't have (its has_… sections in story_bibles).
 function wfBibleBlurb(sb){
@@ -4216,11 +4251,11 @@ function wfSteps(kind, lang, ed, v){
     prompts:[{who:"bob", text:
       `Make the covers for ${t}${series}. ` +
       (prev ? `Place the title, series name, and author name the same way as on the attached cover of the previous book in the series, ${wfName(prev)}.` : `Place the title, series name, and author name so the same placement can be used for every book in the series${ed && ed.series ? "; if I attached another book's cover from the series, match its placement" : ""}.`) +
-      ` On the covers with text, leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. I need: the eBook cover with text` + (aud ? ", the square audiobook cover with text" : "") +
-      `, the eBook-size art with no text at all, the square art with no text at all (for Payhip${aud ? " and the audiobook" : ""})` +
+      ` On the covers with text, leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. I need: the eBook cover with text` + (aud ? ", the square audiobook cover with text (2400x2400 pixels)" : "") +
+      `, the eBook-size art with no text at all, one square art with no text at all, 2400x2400 pixels (the same file is used for Payhip${aud ? " and the audiobook" : ""})` +
       (pb ? `, and draft print covers: the paperback with text and with no text${hc ? ", and the hardcover with text" : ""}. ${draft.prompt}` : ".") +
       ` The no-text versions should still look good on their own as product images.` +
-      (desc ? ` About the book: ${desc}` : "") +
+      (desc ? ` About the book: ${desc}` : "") + wfCoverDetailsText(v && v.coverDetails) +
       (hasBible ? ` Then use my S.E. Smith Comprehensive Story Bible Formatter skill on the attached pre-images file for ${t}: make every staged picture and map, and save the result as a DOCX whose name ends in pre-vellum. Finally make the story bible cover from the story's cover you just made. Leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. ` +
         (v && v.prevBible ? `Place the title, the words Story Bible, and the author name the same way as on the attached story bible cover of ${wfName(v.prevBible)}.` : `Place the title, the words Story Bible, and the author name the same way as on the attached cover of the previous story bible.`) : "")}]};
   // One Photoshop step for every format that gets the line.
