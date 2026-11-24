@@ -462,8 +462,8 @@ dialog#ncdlg::backdrop{background:#0006}
   <div class="row">
     <b>Book</b>
     <select id="wfbook" aria-label="Book"></select>
-    <input id="wfsearch" type="search" list="wfsearchlist" placeholder="Type part of a title or file name, then pick the book" aria-label="Search for a book" hidden style="min-width:280px">
-    <datalist id="wfsearchlist"></datalist>
+    <input id="wfsearch" type="search" autocomplete="off" placeholder="Type part of a title or file name, then click the book" aria-label="Search for a book" hidden style="min-width:280px">
+    <div id="wfsearchlist" hidden style="flex-basis:100%;max-height:220px;overflow:auto;border:1px solid var(--line,#888);border-radius:6px"></div>
   </div>
   <div class="row">
     <label class="chk"><input type="radio" name="wfkind" value="db" checked> Dragon Box</label>
@@ -3915,12 +3915,15 @@ function rlClosest(){
 }
 async function rlMostActive(){
   const since = new Date(Date.now() - 30*864e5).toISOString();
-  // Only the file names come back (not the whole logged rows, which were megabytes), newest first by id.
-  const log = await api("GET", `change_log?select=nf:new_values->>file_name,of:old_values->>file_name&changed_at=gte.${encodeURIComponent(since)}&order=id.desc&limit=1000`);
-  const ok = new Set(rlInProgress().map(ed=>ed.file_name)), n = new Map();
-  for (const r of log || []){
-    const f = r.nf || r.of;
-    if (f && ok.has(f)) n.set(f, (n.get(f) || 0) + 1);
+  // A logged edit holds only the changed columns, not the file name, so books are found by the edition id (row_key).
+  // A save that touched many books at once (a bulk fix) says nothing about what she is working on, so those are skipped.
+  const log = await api("GET", `change_log?select=row_key,transaction_id&table_name=eq.editions&changed_at=gte.${encodeURIComponent(since)}&order=id.desc&limit=5000`);
+  const byTx = new Map();
+  for (const r of log || []){ if (!byTx.has(r.transaction_id)) byTx.set(r.transaction_id, new Set()); byTx.get(r.transaction_id).add(String(r.row_key)); }
+  const byId = new Map(rlInProgress().map(ed=>[String(ed.id), ed.file_name])), n = new Map();
+  for (const ids of byTx.values()){
+    if (ids.size > 10) continue;
+    for (const id of ids){ const f = byId.get(id); if (f) n.set(f, (n.get(f) || 0) + 1); }
   }
   let best = null, bn = 0;
   for (const [f, k] of n) if (k > bn){ bn = k; best = f; }
@@ -4492,7 +4495,7 @@ function wfOpen(kind, file){
     eds.map(e=>`<option value="${esc(e.file_name)}">${esc((e.title || e.file_name) + " — " + e.file_name)}</option>`).join("");
   sel.value = eds.some(e=>e.file_name === pick) ? pick : "";
   $("#wfsearch").hidden = true; $("#wfsearch").value = "";
-  $("#wfsearchlist").innerHTML = eds.map(e=>`<option value="${esc((e.title || e.file_name) + " — " + e.file_name)}"></option>`).join("");
+  $("#wfsearchlist").innerHTML = ""; $("#wfsearchlist").hidden = true;
   $("#wfmsg").textContent = "";
   wfValsFor = ""; wfVals = null; wfScroll = true;   // reload each time the list opens, so new values and ticks show
   api("GET", "edition_release_notes?select=subscription_publication&subscription_publication=not.is.null&order=subscription_publication.desc&limit=1")
@@ -4517,14 +4520,23 @@ function wfLive(p){
 }
 $("#wfopen").onclick = ()=>wfOpen("auto");
 document.querySelectorAll("input[name=wfkind]").forEach(r=>r.onchange = ()=>{ wfKind = r.value; wfAuto = false; wfRender(); });
-function wfPick(ed){ $("#wfbook").value = ed.file_name; $("#wfsearch").hidden = true; wfScroll = true; wfAuto = true; wfBookChanged(); }
-$("#wfsearch").oninput = ()=>{ const v = $("#wfsearch").value;
-  const ed = data.editions.find(e=>e.file_name && (e.title || e.file_name) + " — " + e.file_name === v); if (ed) wfPick(ed); };
+function wfPick(ed){ $("#wfbook").value = ed.file_name; $("#wfsearch").hidden = true; $("#wfsearchlist").hidden = true; wfScroll = true; wfAuto = true; wfBookChanged(); }
+function wfSearchHits(){
+  const words = $("#wfsearch").value.toLowerCase().split(/\s+/).filter(Boolean); if (!words.length) return [];
+  return data.editions.filter(e=>e.file_name && words.every(w=>((e.title || "") + " " + e.file_name + " " + (e.language || "")).toLowerCase().includes(w))).slice(0, 40);
+}
+$("#wfsearch").oninput = ()=>{
+  const hits = wfSearchHits(), box = $("#wfsearchlist");
+  box.hidden = !$("#wfsearch").value.trim();
+  box.innerHTML = hits.length ? hits.map(e=>`<button type="button" class="wfhit" data-f="${esc(e.file_name)}" style="display:block;width:100%;text-align:left;padding:5px 8px;border:0;background:none;color:inherit;cursor:pointer">${esc((e.title || e.file_name) + " — " + e.file_name)}</button>`).join("") : `<div class="empty" style="padding:6px 8px">No book matches.</div>`;
+};
+$("#wfsearch").onkeydown = ev=>{ if (ev.key === "Enter"){ ev.preventDefault(); const e = wfSearchHits()[0]; if (e) wfPick(e); } };
+$("#wfsearchlist").onclick = ev=>{ const b = ev.target.closest(".wfhit"); if (!b) return; const e = data.editions.find(x=>x.file_name === b.dataset.f); if (e) wfPick(e); };
 $("#wfclose").onclick = ()=>$("#wfdlg").close();
 $("#wfx").onclick = ()=>$("#wfdlg").close();
 $("#wfbook").onchange = async ()=>{
   const v = $("#wfbook").value, msg = t=>{ $("#wfmsg").textContent = t; };
-  $("#wfsearch").hidden = v !== "@search";
+  $("#wfsearch").hidden = v !== "@search"; if (v !== "@search") $("#wfsearchlist").hidden = true;
   if (v === "@search"){ $("#wfsearch").focus(); return; }
   if (v === "@closest"){ const ed = rlClosest(); if (!ed){ msg("No book in progress has a release date."); $("#wfbook").value = ""; return; } wfPick(ed); return; }
   if (v === "@active"){ msg("Looking at the last 30 days of edits…");
