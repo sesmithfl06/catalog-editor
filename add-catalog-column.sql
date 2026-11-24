@@ -35,7 +35,7 @@ begin
   sqltype := case p_type
     when 'text' then 'text' when 'long_text' then 'text' when 'pick' then 'text'
     when 'number' then 'numeric' when 'whole_number' then 'integer'
-    when 'date' then 'date' when 'yes_no' then 'boolean' when 'list' then 'text[]' end;
+    when 'date' then 'date' when 'yes_no' then 'boolean' when 'yes_click' then 'boolean' when 'list' then 'text[]' end;
   if sqltype is null then raise exception 'Unknown kind of value "%".', p_type; end if;
 
   if p_type = 'pick' then

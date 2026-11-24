@@ -155,6 +155,10 @@ td .v:has(+ select.yn){display:none}
 td select.yn{width:100%;min-width:0;padding:2px 4px;font-size:inherit;background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer}
 td select.yn.blank:not(:focus){color:transparent;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center}
 td select.yn:hover,td select.yn:focus{border-color:var(--line);background:var(--panel)}
+td .v:has(+ button.yc){display:none}
+td button.yc{width:100%;min-height:1.6em;padding:2px 4px;font:inherit;text-align:left;color:inherit;background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer}
+td button.yc.blank::before{content:"";display:inline-block;width:.9em;height:.9em;border:1px solid #888;border-radius:3px;vertical-align:middle}
+td button.yc:hover,td button.yc:focus{border-color:var(--line);background:var(--panel)}
 /* header = dark blue (all columns, title too); title column cells = very subtle dark purple with slight row banding */
 :root{--hdr:#1f3a66; --hdr-ink:#ffffff; --ttl:#332c3e; --ttl-band:#413854; --ttl-ink:#ffffff}
 th{background:var(--hdr);color:var(--hdr-ink)}
@@ -484,6 +488,7 @@ dialog#ncdlg::backdrop{background:#0006}
   <label>Kind of value
     <select id="nctype">
       <option value="yes_no">Yes / No</option>
+      <option value="yes_click">Click for Yes (click a blank cell to make it Yes)</option>
       <option value="text">Short text</option>
       <option value="long_text">Long text</option>
       <option value="number">Number (prices, decimals)</option>
@@ -2121,7 +2126,7 @@ const COMMA_LISTS = new Set(["stories.tags","stories.display_tags","editions.key
 const isDateCol = c => /(^|_)(date|publication)$/.test(c.col||c.field||"");
 // Columns made with New column keep their kind of value in field_registry.editor_type.
 const regType = c => ((c.kind==="ed" || c.kind==="st" || (c.kind==="one" && c.t==="projects")) && REG[c.table+"."+c.col] && REG[c.table+"."+c.col].editor_type) || "";
-const REG_TYPE = {list:"list", date:"date", yes_no:"bool", number:"num", whole_number:"num"};
+const REG_TYPE = {list:"list", date:"date", yes_no:"bool", yes_click:"bool", number:"num", whole_number:"num"};
 const isLong = c => LONG_HINT.test(c.col||c.field||c.label) || regType(c)==="long_text";
 function typeOf(c){
   if (c.kind==="slc") return "num";
@@ -2477,6 +2482,16 @@ let viewCols = [], viewRows = [];
 /* Yes/No cells: a dropdown in the cell (Yes first, then No, then blank). Picking one saves straight away. */
 /* A blank Yes/No cell looks empty (its "(blank)" text is only hidden by colour while the dropdown is not focused, so nothing changes when it opens). */
 const ynSelect = v => `<select class="yn${v==null?" blank":""}" aria-label="Yes or No"><option value="true"${v===true?" selected":""}>Yes</option><option value="false"${v===false?" selected":""}>No</option><option value=""${v==null?" selected":""}>(blank)</option></select>`;
+/* "Click for Yes" cells: one click on a blank (or No) cell makes it Yes; a click on Yes makes it blank again. Saves straight away; Undo works. */
+const ycBtn = v => `<button type="button" class="yc${v==null?" blank":""}" title="${v===true ? "Click to make it blank" : "Click for Yes"}">${v===true ? "Yes" : v===false ? "No" : ""}</button>`;
+function ycShow(btn, v){ btn.className = "yc" + (v==null ? " blank" : ""); btn.textContent = v===true ? "Yes" : v===false ? "No" : ""; btn.title = v===true ? "Click to make it blank" : "Click for Yes"; }
+$("#gridwrap").addEventListener("click", e=>{
+  const btn = e.target.closest("button.yc"); if (!btn || e.shiftKey || e.metaKey || e.ctrlKey) return;
+  const td = btn.closest("td"), ed = viewRows[+td.dataset.r], c = viewCols[+td.dataset.c], old = valueOf(ed,c);
+  const v = old===true ? null : true;
+  ycShow(btn, v); undoGrp = null;
+  saveCell(ed, c, v, old, td, true).then(ok=>{ if (!ok) ycShow(btn, old); });
+});
 $("#gridwrap").addEventListener("change", e=>{
   const sel = e.target.closest("select.yn"); if (!sel) return;
   const td = sel.closest("td"), ed = viewRows[+td.dataset.r], c = viewCols[+td.dataset.c], old = valueOf(ed,c);
@@ -2527,6 +2542,7 @@ function renderGrid(){
   });
   h += "</tr></thead><tbody>";
   const ynCol = viewCols.map(c=>typeOf(c)==="bool");   // Yes/No columns get a dropdown right in the cell
+  const ycCol = viewCols.map(c=>regType(c)==="yes_click");   // "Click for Yes" columns get a click box instead
   viewRows.forEach((ed,ri)=>{
     h += "<tr>";
     viewCols.forEach((c,ci)=>{
@@ -2534,7 +2550,7 @@ function renderGrid(){
       const cls = [ci===0?"first":"", ci<nFrz?"frz":"", ci===nFrz-1?"frzlast":"", ok?"edit":"ro", emptyCls(ed,c,v), (isLong(c)?"long":""), (c.id==="ed:title"?"title":""), (isGenreCol(c)?"genres":"")].join(" ");
       const noFmt = c.kind==="fmt" && !data.fmt[rowKey(ed,c)] ? `This book has no ${c.f}. Right-click → Add ${c.f} to add it.`
         : c.kind==="sb" && !data.sb[ed.file_name] ? "This book has no story bible. Right-click → Add a story bible to add it." : "";
-      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt || (ok ? "" : "Can't be edited: " + whyNoEdit(ed,c)), valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div>${ok && ynCol[ci] ? ynSelect(v) : ""}</td>`;
+      h += `<td class="${cls}" data-r="${ri}" data-c="${ci}" ${ok?'tabindex="0"':""} title="${esc([noFmt || (ok ? "" : "Can't be edited: " + whyNoEdit(ed,c)), valueHelp(c,v), disp(v,c)].filter(Boolean).join("\n")).slice(0,600)}"><div class="v">${esc(disp(v,c))}</div>${ok && ynCol[ci] ? (ycCol[ci] ? ycBtn(v) : ynSelect(v)) : ""}</td>`;
     });
     h += "</tr>";
   });
@@ -3222,6 +3238,7 @@ function updateCell(ed, c){
       const td = cellAt(ri,ci); if (!td) return;
       const v = valueOf(r,cc); td.querySelector(".v").textContent = disp(v,cc); td.title = disp(v,cc).slice(0,600);
       const yn = td.querySelector("select.yn"); if (yn){ yn.value = v==null ? "" : String(v); yn.classList.toggle("blank", v==null); }
+      const yc = td.querySelector("button.yc"); if (yc) ycShow(yc, v);
       setEmptyCls(td, r, cc, v);
     });
   });
