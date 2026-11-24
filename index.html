@@ -3915,15 +3915,29 @@ function rlClosest(){
 }
 async function rlMostActive(){
   const since = new Date(Date.now() - 30*864e5).toISOString();
-  // A logged edit holds only the changed columns, not the file name, so books are found by the edition id (row_key).
+  // A logged edit holds only the changed columns, not the file name, so books are found by row id:
+  // editions by edition id; formats and store links by asking which book each logged row belongs to.
   // A save that touched many books at once (a bulk fix) says nothing about what she is working on, so those are skipped.
-  const log = await api("GET", `change_log?select=row_key,transaction_id&table_name=eq.editions&changed_at=gte.${encodeURIComponent(since)}&order=id.desc&limit=5000`);
+  const log = await api("GET", `change_log?select=table_name,row_key,transaction_id&table_name=in.(editions,formats,store_links)&changed_at=gte.${encodeURIComponent(since)}&order=id.desc&limit=5000`) || [];
+  const fileOf = new Map(), edById = new Map(data.editions.map(ed=>[String(ed.id), ed.file_name]));
+  for (const t of ["formats", "store_links"]){
+    const ids = [...new Set(log.filter(r=>r.table_name === t).map(r=>r.row_key))].filter(k=>/^\d+$/.test(k));
+    for (let i = 0; i < ids.length; i += 150){
+      const rows = await api("GET", `${t}?select=id,file_name&id=in.(${ids.slice(i, i + 150).join(",")})`).catch(()=>[]) || [];
+      for (const r of rows) fileOf.set(t + "|" + r.id, r.file_name);
+    }
+  }
   const byTx = new Map();
-  for (const r of log || []){ if (!byTx.has(r.transaction_id)) byTx.set(r.transaction_id, new Set()); byTx.get(r.transaction_id).add(String(r.row_key)); }
-  const byId = new Map(rlInProgress().map(ed=>[String(ed.id), ed.file_name])), n = new Map();
-  for (const ids of byTx.values()){
-    if (ids.size > 10) continue;
-    for (const id of ids){ const f = byId.get(id); if (f) n.set(f, (n.get(f) || 0) + 1); }
+  for (const r of log){
+    const f = r.table_name === "editions" ? edById.get(String(r.row_key)) : fileOf.get(r.table_name + "|" + r.row_key);
+    if (!f) continue;
+    if (!byTx.has(r.transaction_id)) byTx.set(r.transaction_id, new Set());
+    byTx.get(r.transaction_id).add(f);
+  }
+  const ok = new Set(rlInProgress().map(ed=>ed.file_name)), n = new Map();
+  for (const files of byTx.values()){
+    if (files.size > 10) continue;
+    for (const f of files) if (ok.has(f)) n.set(f, (n.get(f) || 0) + 1);
   }
   let best = null, bn = 0;
   for (const [f, k] of n) if (k > bn){ bn = k; best = f; }
