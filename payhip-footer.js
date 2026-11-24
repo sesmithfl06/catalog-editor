@@ -38,7 +38,7 @@ function () {
        moved on every build: the first page view after a paste throws away what
        the old code stored and reads the store fresh, so a fix is on screen the
        moment it is in the store rather than when a reader's week runs out. */
-    cacheVersion: "b2026-11-06a",
+    cacheVersion: "b2026-11-24a",
     clean: (text) => (text || "").replace(/\s+/g, " ").trim(),
     flatten: (text) => (text || "").replace(/[\u2018\u2019\u02BC`]/g, "'").toLowerCase(),
     normalize: (text) => (text || "")
@@ -888,6 +888,7 @@ function () {
     p1Hmz: "The Dragon's Treasure: A Seven Kingdoms Tale 1 (Original Artwork Printable)",
     Cd2S9: "The Price for Peace: A Dragon Lords of Valdier Adventure Digital Pack 2026-03",
     pVbrC: "The Portal #7: The Dragonlings and the Pirate's Gambit Digital Pack 2025-09",
+    a4Npg: "The Portal #9: Dragonlings Forever Digital Pack 2025-11", /* Payhip cuts the stored name off at "2025-11 Dig..." */
     Rq0rJ: "Wild Instincts: More than Human Book 3 (Paperback)",
     FDIzm: "The Geek and the Sheikh: Girls from the Street Book 5 (Paperback)",
     yfYHq: "Stories of Glitter: The Kingdom in the Cavern (Paperback)",
