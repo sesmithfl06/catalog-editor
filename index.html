@@ -483,12 +483,12 @@ dialog#ncdlg::backdrop{background:#0006}
   <label>Name <input id="ncname" type="text" placeholder="e.g. Box Set ISBN" autocomplete="off"></label>
   <label>Kind of value
     <select id="nctype">
+      <option value="yes_no">Yes / No</option>
       <option value="text">Short text</option>
       <option value="long_text">Long text</option>
       <option value="number">Number (prices, decimals)</option>
       <option value="whole_number">Whole number</option>
       <option value="date">Date</option>
-      <option value="yes_no">Yes / No</option>
       <option value="list">List (several values, one per line)</option>
       <option value="pick">Pick one from a list</option>
     </select></label>
@@ -3590,7 +3590,7 @@ function ncTable(){
 }
 function openNewCol(table){
   $("#ncname").value = ""; $("#ncdesc").value = ""; $("#ncnewlist").value = ""; $("#ncvalues").value = ""; $("#ncmsg").textContent = "";
-  $("#nctype").value = "text"; $("#nctable").value = table || "editions";
+  $("#nctype").value = "yes_no"; $("#nctable").value = table || "editions";
   $("#ncsec").innerHTML = GROUP_ORDER.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("");
   $("#nclist").innerHTML = Object.keys(REF).sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("") + `<option value="__new__">New list…</option>`;
   ncType(); ncTable(); $("#ncgo").disabled = false;
