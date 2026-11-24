@@ -4251,8 +4251,8 @@ function wfSteps(kind, lang, ed, v){
     prompts:[{who:"bob", text:
       `Make the covers for ${t}${series}. ` +
       (prev ? `Place the title, series name, and author name the same way as on the attached cover of the previous book in the series, ${wfName(prev)}.` : `Place the title, series name, and author name so the same placement can be used for every book in the series${ed && ed.series ? "; if I attached another book's cover from the series, match its placement" : ""}.`) +
-      ` On the covers with text, leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. I need: the eBook cover with text` + (aud ? ", the square audiobook cover with text (2400x2400 pixels)" : "") +
-      `, the eBook-size art with no text at all, one square art with no text at all, 2400x2400 pixels (the same file is used for Payhip${aud ? " and the audiobook" : ""})` +
+      ` On the covers with text, leave space for the line “${bestLine}”, but don't write it: I'll add it in Photoshop. I need: the eBook cover with text (1600x2560 pixels)` + (aud ? ", the square audiobook cover with text (2400x2400 pixels)" : "") +
+      `, the eBook-size art with no text at all (1600x2560 pixels), one square art with no text at all, 2400x2400 pixels (the same file is used for Payhip${aud ? " and the audiobook" : ""})` +
       (pb ? `, and draft print covers: the paperback with text and with no text${hc ? ", and the hardcover with text" : ""}. ${draft.prompt}` : ".") +
       ` The no-text versions should still look good on their own as product images.` +
       (desc ? ` About the book: ${desc}` : "") + wfCoverDetailsText(v && v.coverDetails) +
