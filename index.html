@@ -4223,6 +4223,8 @@ function wfSteps(kind, lang, ed, v){
   const promoField = [["End promo (current)", "ed:end_of_story_promo"]];
   const heading = ed ? WF_RTL_HEADING[ed.language] || "" : "";
   const payVals = v ? [["Long Synopsis", v.synopsis], ["Heading", heading], ["Reasons to Love", v.rtl]] : [];
+  // The bundle is a normal Payhip product (not Payhip's bundle function): same description as the book, plus a hidden Formats: line the footer reads for the picker.
+  const bundleVals = v ? [["Bundle description: the Long Synopsis, Heading and Reasons to Love as above, plus this line on its own line (the site hides it and shows the formats under the bundle's row)", "Formats: eBook, Story Bible"]] : [];
   const sb = v && v.sb;
   const sbVal = v ? [["Story Bible Synopsis", (sb && sb.description) || wfBibleBlurb(sb)]] : [];
   const prev = v && v.prev;
@@ -4312,7 +4314,7 @@ function wfSteps(kind, lang, ed, v){
       "Add the end-of-book promo below.",
       `Export: generic EPUB, Kindle EPUB, PDF, Word (${F}-Bible-vellum.docx).`],
     vals: v ? [["SB ISBN", v.bibleIsbn]].concat(promoVals) : []};
-  const biblePayhip = {opt:o, app:"Payhip", text:"Add the story bible and bundle. Set them Live. Description: paste the value below. Don't use Bob's Payhip Product Page Description Builder skill.", links:payhipLink, tick:"bible_payhip", vals:sbVal};
+  const biblePayhip = {opt:o, app:"Payhip", text:"Add the story bible and bundle (the bundle is a normal product, not Payhip's bundle function). Set them Live. Descriptions: paste the story bible value below; the bundle's description is the book's description plus the Formats line below. Don't use Bob's Payhip Product Page Description Builder skill.", links:payhipLink, tick:"bible_payhip", vals:sbVal.concat(bundleVals)};
   const bibleLinks = {opt:o, app:"Catalog Editor", text:"Paste the story bible and bundle Payhip links.", fields:[["Payhip story bible link", "sl:Payhip|Story Bible|URL"], ["Payhip bundle link", "sl:Payhip|Bundle|URL"]]};
 
   // ---- narrator and audiobook ----
@@ -4379,7 +4381,7 @@ function wfSteps(kind, lang, ed, v){
     ...S("3. Narrator", [narrator]),
     ...S("4. Vellum, print covers, and cover lines", [vellum, bibleVellum, pages, printSpecs, printArt, nyt, coverLink, bundleCover]),
     ...S("5. Payhip and BookFunnel", [
-      {app:"Payhip", text:"Make the eBook, story bible, and bundle products. Upload both EPUBs of each. Descriptions: values below.", links:payhipLink, tick:"payhip_products", vals: payVals.concat(sbVal)},
+      {app:"Payhip", text:"Make the eBook, story bible, and bundle products (the bundle is a normal product, not Payhip's bundle function). Upload both EPUBs of each. Descriptions: values below. The bundle's description is the book's description plus the Formats line.", links:payhipLink, tick:"payhip_products", vals: payVals.concat(sbVal, bundleVals)},
       {app:"BookFunnel", text:"Upload both EPUBs of each title. Add the Payhip link. Build the bundle page.", links:[["Open BookFunnel", "https://bookfunnel.com/dashboard"]], tick:"bookfunnel"},
       {app:"Catalog Editor", text:"Paste the BookFunnel links.", fields:[["BookFunnel eBook link", "sl:BookFunnel|eBook|URL"], ["BookFunnel story bible link", "sl:BookFunnel|Story Bible|URL"], ["BookFunnel bundle link", "sl:BookFunnel|Bundle|URL"]]},
       {app:"BookFunnel", text:"Set up the Sales Action.", tick:"sales_action"}]),
