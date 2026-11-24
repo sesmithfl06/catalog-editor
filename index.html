@@ -4224,7 +4224,7 @@ function wfSteps(kind, lang, ed, v){
   const heading = ed ? WF_RTL_HEADING[ed.language] || "" : "";
   const payVals = v ? [["Long Synopsis", v.synopsis], ["Heading", heading], ["Reasons to Love", v.rtl]] : [];
   // The bundle is a normal Payhip product (not Payhip's bundle function): same description as the book, plus a hidden Formats: line the footer reads for the picker.
-  const bundleVals = v ? [["Bundle description: the Long Synopsis, Heading and Reasons to Love as above, plus this line on its own line, deleting any format this bundle doesn't include (the site hides the line and shows the formats under the bundle's row)", "Formats: eBook, Story Bible, Audiobook, Wallpapers, Games"]] : [];
+  const bundleVals = v ? [["Bundle description: the Long Synopsis, Heading and Reasons to Love as above, plus this line on its own line, deleting any format this bundle doesn't include and adding any extra, such as Journal (the site hides the line and shows the formats under the bundle's row)", "Formats: eBook, Story Bible, Audiobook, Wallpapers, Games"]] : [];
   const sb = v && v.sb;
   const sbVal = v ? [["Story Bible Synopsis", (sb && sb.description) || wfBibleBlurb(sb)]] : [];
   const prev = v && v.prev;
