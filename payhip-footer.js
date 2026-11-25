@@ -38,7 +38,7 @@ function () {
        moved on every build: the first page view after a paste throws away what
        the old code stored and reads the store fresh, so a fix is on screen the
        moment it is in the store rather than when a reader's week runs out. */
-    cacheVersion: "b2026-11-25a",
+    cacheVersion: "b2026-11-25b",
     clean: (text) => (text || "").replace(/\s+/g, " ").trim(),
     flatten: (text) => (text || "").replace(/[\u2018\u2019\u02BC`]/g, "'").toLowerCase(),
     normalize: (text) => (text || "")
@@ -8546,48 +8546,6 @@ function () {
   };
   SE.guard("discover-connections links", () => {
     SE.whenPresent(`img[src*="${IMAGE_MATCH}"], img[data-src*="${IMAGE_MATCH}"]`, build);
-  });
-})();
-},
-function () {
-/* ---------- Cover tint by format (TEST: Hunter's Claim only) ----------
-   A paperback cover leans blue, an audiobook red, a bundle green; the eBook stays as drawn.
-   This only tags the cover; the colour itself is in the Custom CSS ([data-se-tint]).
-   To try another book, add its name to TEST_TITLES. To switch the test off, empty that list. */
-(() => {
-  "use strict";
-  const SE = window.se;
-  const TEST_TITLES = [/hunter['\u2019`]?s\s+claim/i];
-  const tintFor = (name) => {
-    const text = name || "";
-    if (!TEST_TITLES.some((match) => match.test(text))) return "";
-    if (/story\s*bible/i.test(text)) return "";
-    if (/\b(bundle|box\s*set)\b/i.test(text)) return "bundle";
-    if (/\baudio\s*book\b/i.test(text)) return "audiobook";
-    if (/\bpaper\s*back\b/i.test(text)) return "paperback";
-    return "";
-  };
-  const sweep = () => {
-    const heading = document.querySelector("h1.font-section-product-name");
-    const frame = document.querySelector(".media-wrapper-outer");
-    if (heading && frame) {
-      const tint = tintFor(heading.dataset.seRawName || heading.textContent);
-      if (tint) frame.dataset.seTint = tint; else delete frame.dataset.seTint;
-    }
-    document.querySelectorAll(".product-card-wrapper").forEach((card) => {
-      const name = card.querySelector("[data-se-raw-name]")?.dataset.seRawName || card.textContent;
-      const tint = tintFor(name);
-      if (tint) card.dataset.seTint = tint; else delete card.dataset.seTint;
-    });
-  };
-  SE.guard("cover tint by format", () => {
-    sweep();
-    /* The page and its cards fill in over the first seconds, so look again once a second for a while. */
-    let rounds = 0;
-    const timer = setInterval(() => {
-      sweep();
-      if (++rounds >= 30) clearInterval(timer);
-    }, 1000);
   });
 })();
 }
