@@ -38,7 +38,7 @@ function () {
        moved on every build: the first page view after a paste throws away what
        the old code stored and reads the store fresh, so a fix is on screen the
        moment it is in the store rather than when a reader's week runs out. */
-    cacheVersion: "b2026-11-25b",
+    cacheVersion: "b2026-11-25c",
     clean: (text) => (text || "").replace(/\s+/g, " ").trim(),
     flatten: (text) => (text || "").replace(/[\u2018\u2019\u02BC`]/g, "'").toLowerCase(),
     normalize: (text) => (text || "")
@@ -1570,9 +1570,6 @@ function () {
 
      A series leaves Kindle Unlimited by having its line deleted here. */
   const KU_SERIES = {
-    "Cosmos' Gateway": "https://www.amazon.com/dp/B074CBP7QC",
-    "Girls from the Street": "https://www.amazon.com/Girls-from-the-Street/dp/B0B27TZWTB",
-    "Lords of Kassis": "https://www.amazon.com/Lords-of-Kassis/dp/B07F7N34CY",
     "Second Chance": "https://www.amazon.com/Second-Chance/dp/B075VBHLDT",
     "S.E. Smith Signature Romance": "https://www.amazon.com/S-Smith-Signature-Romance-Heart/dp/B0FLS4B3Q3",
     "Heart & Soul": "https://www.amazon.com/S-Smith-Signature-Romance-Heart/dp/B0FLS4B3Q3"
